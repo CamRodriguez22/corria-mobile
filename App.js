@@ -1,7 +1,7 @@
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 import { Amplify } from 'aws-amplify';
-import { AWS_CONFIG } from './src/config';
+import { AWS_CONFIG, APP_CONFIG } from './src/config';
 
 // Config unica desde src/config.js - Fix punto 3 de Jose
 Amplify.configure({
@@ -117,29 +117,51 @@ export default function App() {
   const guardarFotoReal = async (uri) => {
     try {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
-      const ubicacionDecidida = decidirUbicacion(loc.coords.latitude, loc.coords.longitude, puntosBackend);
-      const res = await subirMedicionReal({ uri, token, ubicacionDecidida });
-      Alert.alert('IA: ' + res.nivel_corrosion + ' ' + res.area_corroida_pct + '%', 'ID ' + res.id_medicion);
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+
+      // FIX: reverseGeocode va ANTES de decidirUbicacion (no despues como estaba).
+      // decidirUbicacion necesita ciudad+barrio para poder devolver planta_nueva
+      // en vez de coordenadas_libres cuando el punto no existe todavia.
+      const rev = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      const ciudadGeo = rev[0]?.city || rev[0]?.subregion || null;
+      const barrioGeo = rev[0]?.district || null;
+
+      const ubicacionDecidida = decidirUbicacion(lat, lng, puntosBackend, ciudadGeo, barrioGeo);
+
+      // FIX: lat/lng explicitos en el body (latitud_real/longitud_real) - en modo
+      // planta_existente, ubicacionDecidida NO trae coordenadas propias.
+      const res = await subirMedicionReal({ uri, token, ubicacionDecidida, lat, lng });
+
+      // FIX: mostrar confianza_promedio, que el backend siempre devolvio pero nunca se mostraba.
+      // OJO: no tengo una respuesta real del backend para confirmar si viene 0-1 o 0-100.
+      // Prueba con una foto real y si sale mal formateado avisame para ajustar el *100.
+      const confPct = typeof res.confianza_promedio === 'number'
+        ? Math.round(res.confianza_promedio <= 1 ? res.confianza_promedio * 100 : res.confianza_promedio)
+        : null;
+      Alert.alert(
+        'IA: ' + res.nivel_corrosion + ' ' + res.area_corroida_pct + '%',
+        `ID ${res.id_medicion}` + (confPct !== null ? ` · Confianza: ${confPct}%` : '')
+      );
 
       // Recargar historial real despues de subir, en vez de solo agregar a RAM
       await cargarHistorialBackend(token);
 
       // Mantener compatibilidad local para UX instantanea
       let nuevas = [...ciudades];
-      let rev = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      const ciudadNombre = rev[0]?.city || rev[0]?.subregion || 'Bogota';
+      const ciudadNombre = ciudadGeo || 'Bogota';
       let ciudad = nuevas.find((c) => c.ciudad.toLowerCase() === ciudadNombre.toLowerCase());
       if (!ciudad) { ciudad = { ciudad: ciudadNombre, subcarpetas: [] }; nuevas.push(ciudad); }
       let existente = null;
       for (let i = 0; i < ciudad.subcarpetas.length; i++) {
-        if (dist(loc.coords.latitude, loc.coords.longitude, ciudad.subcarpetas[i].lat, ciudad.subcarpetas[i].lng) < 100) {
+        if (dist(lat, lng, ciudad.subcarpetas[i].lat, ciudad.subcarpetas[i].lng) < APP_CONFIG.radioAgrupacionMetros) {
           existente = ciudad.subcarpetas[i]; break;
         }
       }
       if (existente) {
-        existente.fotos.push({ id: res.id_medicion, uri, pct: res.area_corroida_pct, nivel: res.nivel_corrosion, fecha: new Date().toLocaleDateString(), lat: loc.coords.latitude, lng: loc.coords.longitude });
+        existente.fotos.push({ id: res.id_medicion, uri, pct: res.area_corroida_pct, nivel: res.nivel_corrosion, fecha: new Date().toLocaleDateString(), lat, lng });
       } else {
-        ciudad.subcarpetas.push({ id: res.id_punto, nombre: rev[0]?.district || 'general', direccion: rev[0]?.street || '', lat: loc.coords.latitude, lng: loc.coords.longitude, fotos: [{ id: res.id_medicion, uri, pct: res.area_corroida_pct, nivel: res.nivel_corrosion, fecha: new Date().toLocaleDateString(), lat: loc.coords.latitude, lng: loc.coords.longitude }] });
+        ciudad.subcarpetas.push({ id: res.id_punto, nombre: barrioGeo || 'general', direccion: rev[0]?.street || '', lat, lng, fotos: [{ id: res.id_medicion, uri, pct: res.area_corroida_pct, nivel: res.nivel_corrosion, fecha: new Date().toLocaleDateString(), lat, lng }] });
       }
       setCiudades(nuevas);
     } catch (e) { Alert.alert('Error API', e.message); }
