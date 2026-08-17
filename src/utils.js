@@ -50,6 +50,9 @@ export function agruparMedicionesEnCiudades(mediciones) {
     }
 
     // fecha: el campo real del backend es "timestamp", no "createdAt" (ese no existe en el contrato).
+    // Guardamos el timestamp crudo aparte (_ts) para poder ordenar por fecha real,
+    // ademas de la version ya formateada para mostrar en pantalla.
+    const tsRaw = m.timestamp || m.fecha || null;
     const fecha = m.fecha
       ? m.fecha
       : m.timestamp
@@ -64,14 +67,25 @@ export function agruparMedicionesEnCiudades(mediciones) {
       pct: m.area_corroida_pct ?? m.pct ?? 0,
       nivel: m.nivel_corrosion ?? m.nivel ?? 'DESCONOCIDO',
       fecha,
+      _ts: tsRaw,
       lat,
       lng,
     });
   }
 
-  // Convertir mapa a array esperado por App.js
-  return Object.values(ciudadesMap).map((c) => ({
-    ciudad: c.ciudad,
-    subcarpetas: Object.values(c.subcarpetas),
-  }));
+  // Convertir mapa a array esperado por App.js.
+  // Fotos ordenadas por fecha real, mas reciente primero (no por orden de llegada del backend).
+  // Ciudades y subcarpetas ordenadas alfabeticamente para que la lista no salte de orden
+  // cada vez que se recarga el historial.
+  return Object.values(ciudadesMap)
+    .sort((a, b) => a.ciudad.localeCompare(b.ciudad))
+    .map((c) => ({
+      ciudad: c.ciudad,
+      subcarpetas: Object.values(c.subcarpetas)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+        .map((s) => ({
+          ...s,
+          fotos: [...s.fotos].sort((a, b) => new Date(b._ts || 0) - new Date(a._ts || 0)),
+        })),
+    }));
 }

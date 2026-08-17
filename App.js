@@ -24,9 +24,7 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { signIn, signOut, fetchAuthSession, confirmSignIn } from 'aws-amplify/auth';
 import { subirMedicionReal, decidirUbicacion, getPuntosCercanos, getMedicionesRecientes } from './src/api-real';
-import { dist, agruparMedicionesEnCiudades } from './src/utils.js';
-
-const { width } = Dimensions.get('window');
+import { dist, agruparMedicionesEnCiudades } from './src/utils';
 
 export default function App() {
   // FIX PUNTO 1 JOSE: campos vacios por defecto, nunca hardcodear password en repo publico
@@ -183,11 +181,15 @@ export default function App() {
         <ScrollView contentContainerStyle={{ padding: 16 }}>
           <Text style={styles.pageTitle}>📁 {selectedCity} / {selectedFolder.nombre}</Text>
           <Text style={styles.pageSub}>{selectedFolder.fotos.length} fotos</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, justifyContent: 'space-between' }}>
             {selectedFolder.fotos.map((f) => (
-              <Pressable key={f.id} onPress={() => { setSelectedPhoto({ ...f, ciudad: selectedCity, carpeta: selectedFolder.nombre }); setView('photoDetail'); }} style={{ width: (width - 44) / 2, backgroundColor: 'white', borderRadius: 12, overflow: 'hidden', marginBottom: 12, marginRight: 8 }}>
-                <Image source={{ uri: f.uri }} style={{ height: 120, backgroundColor: '#E5E7EB' }} />
-                <View style={{ padding: 8 }}><Text style={{ fontSize: 10, backgroundColor: '#F97316', color: 'white', alignSelf: 'flex-start', paddingHorizontal: 6, borderRadius: 6 }}>{f.nivel}</Text><Text style={{ fontSize: 11 }}>{f.pct}%</Text></View>
+              <Pressable key={f.id} onPress={() => { setSelectedPhoto({ ...f, ciudad: selectedCity, carpeta: selectedFolder.nombre }); setView('photoDetail'); }} style={{ width: '48%', backgroundColor: 'white', borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+                <Image source={{ uri: f.uri }} style={{ width: '100%', height: 120, backgroundColor: '#E5E7EB' }} />
+                <View style={{ padding: 8 }}>
+                  <Text style={{ fontSize: 10, backgroundColor: '#F97316', color: 'white', alignSelf: 'flex-start', paddingHorizontal: 6, borderRadius: 6 }}>{f.nivel}</Text>
+                  <Text style={{ fontSize: 11 }}>{f.pct}%</Text>
+                  {f.fecha ? <Text style={{ fontSize: 9, color: '#9CA3AF', marginTop: 2 }}>{f.fecha}</Text> : null}
+                </View>
               </Pressable>
             ))}
           </View>
