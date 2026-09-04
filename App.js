@@ -89,6 +89,14 @@ export default function App() {
   ]);
 
   // ════════════════════════════════════════════════════════════
+  // ESTADOS DE OBSERVACIONES Y CONTEXTO (movidos del nivel de pantalla)
+  // ════════════════════════════════════════════════════════════
+  const [espesor, setEspesor] = useState('');
+  const [obs, setObs] = useState('');
+  const [expandObs, setExpandObs] = useState(false);
+  const [bloqueSelected, setBloqueSelected] = useState('');
+
+  // ════════════════════════════════════════════════════════════
   // AUTO-LOGOUT AL INICIAR (para limpiar sesiones previas)
   // ════════════════════════════════════════════════════════════
   useEffect(() => {
@@ -368,8 +376,6 @@ export default function App() {
   // PANTALLA: CONTEXT (Seleccionar bloque)
   // ════════════════════════════════════════════════════════════
   if (view === 'context' && logged) {
-    const [bloqueSelected, setBloqueSelected] = useState('');
-    
     return (
       <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
         <Header
@@ -463,10 +469,6 @@ export default function App() {
   // PANTALLA: RESULT
   // ════════════════════════════════════════════════════════════
   if (view === 'result' && logged && resultado) {
-    const [espesor, setEspesor] = useState('');
-    const [obs, setObs] = useState('');
-    const [expandObs, setExpandObs] = useState(false);
-
     return (
       <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
         <Header title="Resultado" onBack={() => setView('home')} />
@@ -562,6 +564,9 @@ export default function App() {
               label="Siguiente medición"
               onPress={() => {
                 setResultado(null);
+                setEspesor('');
+                setObs('');
+                setExpandObs(false);
                 setView('context');
               }}
             />
@@ -569,6 +574,9 @@ export default function App() {
               label="Volver al inicio"
               onPress={() => {
                 setResultado(null);
+                setEspesor('');
+                setObs('');
+                setExpandObs(false);
                 setView('home');
               }}
             />
