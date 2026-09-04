@@ -16,3 +16,10 @@ export const APP_CONFIG = {
   // desde el cliente para que quede claro cual es el limite real si alguien lee este archivo.
   limiteHistorialMax: 100,
 };
+
+export const BLOQUES_CAMPUS = {
+  G: { lat: 4.7110, lng: -74.0721, nombre: 'Bloque G - Aulas', radio: 50 },
+  J: { lat: 4.7115, lng: -74.0725, nombre: 'Bloque J - Laboratorios', radio: 50 },
+  K: { lat: 4.7105, lng: -74.0720, nombre: 'Bloque K - Oficinas', radio: 50 },
+  L: { lat: 4.7120, lng: -74.0715, nombre: 'Bloque L - Biblioteca', radio: 50 },
+};
