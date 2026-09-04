@@ -97,20 +97,6 @@ export default function App() {
   const [bloqueSelected, setBloqueSelected] = useState('');
 
   // ════════════════════════════════════════════════════════════
-  // AUTO-LOGOUT AL INICIAR (para limpiar sesiones previas)
-  // ════════════════════════════════════════════════════════════
-  useEffect(() => {
-    const cleanup = async () => {
-      try {
-        await signOut();
-      } catch (e) {
-        console.log('No hay sesión activa');
-      }
-    };
-    cleanup();
-  }, []);
-
-  // ════════════════════════════════════════════════════════════
   // LOGIN
   // ════════════════════════════════════════════════════════════
   const handleLogin = async () => {
@@ -119,14 +105,29 @@ export default function App() {
       return;
     }
     try {
-      await signIn({ username: user, password: pass });
+      console.log('Intentando login con:', user);
+      const result = await signIn({ username: user, password: pass });
+      console.log('Login exitoso:', result);
+      
       const session = await fetchAuthSession();
       const tk = session?.tokens?.accessToken?.toString() || '';
       setToken(tk);
       setLogged(true);
       setView('home');
     } catch (e) {
-      Alert.alert('Error', 'No se pudo iniciar sesión: ' + e.message);
+      console.log('Error de login:', e);
+      // Manejo más específico de errores
+      let mensaje = e.message || 'Error desconocido';
+      
+      if (mensaje.includes('Invalid') || mensaje.includes('username')) {
+        mensaje = 'Usuario o contraseña incorrectos';
+      } else if (mensaje.includes('NotAuthorizedException')) {
+        mensaje = 'Credenciales inválidas';
+      } else if (mensaje.includes('UserNotFoundException')) {
+        mensaje = 'Usuario no encontrado';
+      }
+      
+      Alert.alert('Error de autenticación', mensaje);
     }
   };
 
