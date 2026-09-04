@@ -1,7 +1,7 @@
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 import { Amplify } from 'aws-amplify';
-import { AWS_CONFIG, APP_CONFIG, BLOQUES_CAMPUS } from './src/config';
+import { AWS_CONFIG, BLOQUES_CAMPUS } from './src/config';
 
 Amplify.configure({
   Auth: {
@@ -15,13 +15,10 @@ Amplify.configure({
 });
 
 import { useState, useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
 import {
   StyleSheet, Text, View, ScrollView, TextInput, Pressable,
   Dimensions, Image, Alert, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import MapView, { Marker, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { signIn, signOut, fetchAuthSession } from 'aws-amplify/auth';
@@ -29,80 +26,84 @@ import { signIn, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import { TOKENS, styles } from './src/DesignTokens';
 import {
   ButtonPrimary, ButtonSecondary, Card, CardTitle, CardBody,
-  ResultCard, Header, Divider, StatusBadge
+  ResultCard, Header, Divider
 } from './src/DesignComponents';
-
-import { subirMedicionReal, decidirUbicacion, getPuntosCercanos, getMedicionesRecientes } from './src/api-real';
-import { dist, agruparMedicionesEnCiudades } from './src/utils';
 
 const { width, height } = Dimensions.get('window');
 
 export default function App() {
   // ════════════════════════════════════════════════════════════
-  // ESTADOS PRINCIPALES
+  // ESTADOS
   // ════════════════════════════════════════════════════════════
   const [logged, setLogged] = useState(false);
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [token, setToken] = useState('');
-  const [currentLoc, setCurrentLoc] = useState(null);
-  const [region, setRegion] = useState({
-    latitude: 4.7110,
-    longitude: -74.0721,
-    latitudeDelta: 0.6,
-    longitudeDelta: 0.6,
-  });
-  const [ciudades, setCiudades] = useState([]);
-  const [puntosBackend, setPuntosBackend] = useState([]);
-  const [medicionesBackend, setMedicionesBackend] = useState([]);
-  const [selectedCity, setSelectedCity] = useState(null);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // ════════════════════════════════════════════════════════════
-  // NUEVOS ESTADOS PARA PIXELRUST
-  // ════════════════════════════════════════════════════════════
-  const [view, setView] = useState('main'); // main, context, camera, resultado
-  const [contexto, setContexto] = useState(null); // {bloque, entidad, ciudad}
-  const [resultado, setResultado] = useState(null); // datos del modelo
+  const [view, setView] = useState('login');
+  const [userName, setUserName] = useState('Juan Medina');
+  
+  // Nueva medición (contexto)
+  const [contexto, setContexto] = useState(null);
+  const [resultado, setResultado] = useState(null);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState(null);
 
-  // ════════════════════════════════════════════════════════════
-  // FUNCIONES DE UBICACIÓN
-  // ════════════════════════════════════════════════════════════
-  const fetchLoc = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return;
-    const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Highest,
-    });
-    const c = {
-      latitude: loc.coords.latitude,
-      longitude: loc.coords.longitude,
-    };
-    setCurrentLoc(c);
-    setRegion({ ...c, latitudeDelta: 0.03, longitudeDelta: 0.03 });
-  };
+  // Estadísticas
+  const [stats, setStats] = useState({
+    total: 12,
+    severas: 3,
+    avg: 'MODERADA',
+  });
 
-  const detectarBloqueAutomatico = (currentLoc) => {
-    if (!currentLoc) return '';
-    for (const [key, bloque] of Object.entries(BLOQUES_CAMPUS)) {
-      const d = dist(
-        currentLoc.latitude,
-        currentLoc.longitude,
-        bloque.lat,
-        bloque.lng
-      );
-      if (d < bloque.radio) return key;
-    }
-    return '';
-  };
+  // Mediciones recientes
+  const [reciente, setReciente] = useState([
+    {
+      id: 1,
+      block: 'K',
+      date: '23 ago',
+      pct: 42,
+      pctLabel: '42% corroído',
+      sev: 'MODERADA',
+      color: '#c25f2a',
+      tint: '#ffe1d0',
+    },
+    {
+      id: 2,
+      block: 'J',
+      date: '22 ago',
+      pct: 18,
+      pctLabel: '18% corroído',
+      sev: 'LEVE',
+      color: '#5f6d47',
+      tint: '#e1eecc',
+    },
+    {
+      id: 3,
+      block: 'G',
+      date: '20 ago',
+      pct: 67,
+      pctLabel: '67% corroído',
+      sev: 'SEVERA',
+      color: '#8c3524',
+      tint: '#ffe1d0',
+    },
+  ]);
 
+  // ════════════════════════════════════════════════════════════
+  // AUTO-LOGOUT AL INICIAR (para limpiar sesiones previas)
+  // ════════════════════════════════════════════════════════════
   useEffect(() => {
-    fetchLoc();
+    const cleanup = async () => {
+      try {
+        await signOut();
+      } catch (e) {
+        console.log('No hay sesión activa');
+      }
+    };
+    cleanup();
   }, []);
 
   // ════════════════════════════════════════════════════════════
-  // AUTENTICACIÓN
+  // LOGIN
   // ════════════════════════════════════════════════════════════
   const handleLogin = async () => {
     if (!user || !pass) {
@@ -115,7 +116,7 @@ export default function App() {
       const tk = session?.tokens?.accessToken?.toString() || '';
       setToken(tk);
       setLogged(true);
-      cargarHistorialBackend(tk);
+      setView('home');
     } catch (e) {
       Alert.alert('Error', 'No se pudo iniciar sesión: ' + e.message);
     }
@@ -128,34 +129,9 @@ export default function App() {
       setUser('');
       setPass('');
       setToken('');
-      setCiudades([]);
+      setView('login');
     } catch (e) {
       Alert.alert('Error', e.message);
-    }
-  };
-
-  // ════════════════════════════════════════════════════════════
-  // CARGAR HISTORIAL
-  // ════════════════════════════════════════════════════════════
-  const cargarHistorialBackend = async (tk) => {
-    try {
-      setLoadingHistory(true);
-      const [puntos, mediciones] = await Promise.all([
-        getPuntosCercanos(tk),
-        getMedicionesRecientes(tk),
-      ]);
-      setPuntosBackend(puntos);
-      setMedicionesBackend(mediciones);
-      if (mediciones && mediciones.length > 0) {
-        const ciudadesDesdeBackend = agruparMedicionesEnCiudades(mediciones);
-        setCiudades(ciudadesDesdeBackend);
-      }
-      return { puntos, mediciones };
-    } catch (e) {
-      console.log('Error cargando historial:', e.message);
-      return { puntos: [], mediciones: [] };
-    } finally {
-      setLoadingHistory(false);
     }
   };
 
@@ -175,42 +151,20 @@ export default function App() {
     });
     if (!result.canceled && result.assets[0]) {
       setSelectedPhotoUri(result.assets[0].uri);
-      guardarFotoReal(result.assets[0].uri);
+      guardarFoto(result.assets[0].uri);
     }
   };
 
-  // ════════════════════════════════════════════════════════════
-  // GUARDAR FOTO (DUMMY DATA PARA PRESENTACIÓN)
-  // ════════════════════════════════════════════════════════════
-  const guardarFotoReal = async (uri) => {
+  const guardarFoto = async (uri) => {
     try {
-      // Simular delay de procesamiento
       await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Datos ficticios del modelo (como si viniera del backend)
-      const resultado = {
+      setResultado({
         nivel_corrosion: 'MODERADA',
         area_corroida_pct: 42,
         confianza_promedio: 78,
-        detecciones: [],
-        mascaras: [],
-      };
-
-      console.log('Medición simulada guardada:', {
         bloque: contexto.bloque,
-        entidad: contexto.entidad,
-        ciudad: contexto.ciudad,
-        resultado,
-        timestamp: new Date().toISOString(),
       });
-
-      setResultado({
-        ...resultado,
-        bloque: contexto.bloque,
-        confianza_promedio: Math.round(resultado.confianza_promedio),
-      });
-      setView('resultado');
-
+      setView('result');
     } catch (e) {
       Alert.alert('Error', e.message);
     }
@@ -219,11 +173,11 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   // PANTALLA: LOGIN
   // ════════════════════════════════════════════════════════════
-  if (!logged) {
+  if (view === 'login') {
     return (
       <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
         <Header title="PIXELRUST" subtitle="Detección de corrosión" />
-
+        
         <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg }}>
           <Card>
             <CardBody text="Ingresa tu usuario y contraseña" />
@@ -246,7 +200,6 @@ export default function App() {
                 style={{
                   fontSize: TOKENS.fontSizes.body,
                   color: TOKENS.colors.text,
-                  padding: 0,
                 }}
                 placeholderTextColor={TOKENS.colors.neutral500}
               />
@@ -271,17 +224,140 @@ export default function App() {
                 style={{
                   fontSize: TOKENS.fontSizes.body,
                   color: TOKENS.colors.text,
-                  padding: 0,
                 }}
                 placeholderTextColor={TOKENS.colors.neutral500}
               />
             </View>
           </View>
 
+          <ButtonPrimary label="Iniciar sesión" onPress={handleLogin} />
+          
+          <View style={{ flex: 1 }} />
+          <Text style={{ textAlign: 'center', fontSize: 12, color: TOKENS.colors.neutral500, marginTop: 50 }}>
+            © 2026 Universidad del Norte
+          </Text>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // PANTALLA: HOME
+  // ════════════════════════════════════════════════════════════
+  if (view === 'home' && logged) {
+    return (
+      <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
+        <View style={{ paddingHorizontal: TOKENS.spacing.lg, paddingTop: TOKENS.spacing.lg }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View>
+              <Text style={{ fontSize: 14, color: TOKENS.colors.neutral600 }}>Buenos días,</Text>
+              <Text style={{ fontSize: 29, fontWeight: '700', marginTop: 2, color: TOKENS.colors.text }}>
+                {userName}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setView('settings')}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: TOKENS.colors.accent100,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: TOKENS.colors.accent700 }}>JM</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg, paddingTop: TOKENS.spacing.base }}>
+          {/* Estadísticas */}
+          <View style={{ flexDirection: 'row', gap: TOKENS.spacing.sm, marginBottom: TOKENS.spacing.lg }}>
+            <View style={{ flex: 1, backgroundColor: TOKENS.colors.neutral100, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.md }}>
+              <Text style={{ fontSize: 27, fontWeight: '700', color: TOKENS.colors.text }}>
+                {stats.total}
+              </Text>
+              <Text style={{ fontSize: 12, color: TOKENS.colors.neutral600, marginTop: 3 }}>Mediciones</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: TOKENS.colors.neutral100, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.md }}>
+              <Text style={{ fontSize: 27, fontWeight: '700', color: '#8c3524' }}>
+                {stats.severas}
+              </Text>
+              <Text style={{ fontSize: 12, color: TOKENS.colors.neutral600, marginTop: 3 }}>Severas</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: TOKENS.colors.neutral100, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.md }}>
+              <Text style={{ fontSize: 27, fontWeight: '700', color: TOKENS.colors.accent2 }}>
+                {stats.avg[0]}
+              </Text>
+              <Text style={{ fontSize: 12, color: TOKENS.colors.neutral600, marginTop: 3 }}>Promedio</Text>
+            </View>
+          </View>
+
+          {/* Botón Nueva medición */}
           <ButtonPrimary
-            label="Iniciar sesión"
-            onPress={handleLogin}
+            label="+ Nueva medición"
+            onPress={() => setView('context')}
             style={{ marginBottom: TOKENS.spacing.lg }}
+          />
+
+          {/* Mediciones recientes */}
+          <Text style={{ fontSize: 13, fontWeight: '700', textTransform: 'uppercase', color: TOKENS.colors.neutral600, marginBottom: TOKENS.spacing.md, letterSpacing: 0.5 }}>
+            Mediciones recientes
+          </Text>
+
+          {reciente.map((m) => (
+            <Pressable
+              key={m.id}
+              onPress={() => { setView('detail'); }}
+              style={{
+                backgroundColor: TOKENS.colors.neutral100,
+                borderRadius: TOKENS.radius.lg,
+                padding: TOKENS.spacing.md,
+                marginBottom: TOKENS.spacing.sm,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: TOKENS.spacing.md,
+              }}
+            >
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 14,
+                  backgroundColor: '#5c4133',
+                }}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: TOKENS.colors.text }}>
+                  Bloque {m.block}
+                </Text>
+                <Text style={{ fontSize: 12.5, color: TOKENS.colors.neutral600, marginTop: 2 }}>
+                  {m.date} · {m.pctLabel}
+                </Text>
+              </View>
+              <View
+                style={{
+                  backgroundColor: m.tint,
+                  borderRadius: 999,
+                  paddingHorizontal: 11,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '700', color: m.color, textTransform: 'uppercase' }}>
+                  {m.sev}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+
+          <Divider />
+
+          {/* Botón Cerrar sesión */}
+          <ButtonSecondary
+            label="Cerrar sesión"
+            onPress={handleLogout}
+            style={{ marginTop: TOKENS.spacing.lg }}
           />
         </ScrollView>
       </View>
@@ -289,24 +365,17 @@ export default function App() {
   }
 
   // ════════════════════════════════════════════════════════════
-  // PANTALLA: CONTEXT SELECTION (Nueva medición)
+  // PANTALLA: CONTEXT (Seleccionar bloque)
   // ════════════════════════════════════════════════════════════
-  if (view === 'context') {
-    const [bloqueSelected, setBloqueSelected] = useState(contexto?.bloque || '');
-
-    useEffect(() => {
-      if (currentLoc && !bloqueSelected) {
-        const b = detectarBloqueAutomatico(currentLoc);
-        if (b) setBloqueSelected(b);
-      }
-    }, [currentLoc]);
-
+  if (view === 'context' && logged) {
+    const [bloqueSelected, setBloqueSelected] = useState('');
+    
     return (
       <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
         <Header
           title="Nueva medición"
           subtitle="Selecciona bloque"
-          onBack={() => setView('main')}
+          onBack={() => setView('home')}
         />
 
         <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg }}>
@@ -322,25 +391,17 @@ export default function App() {
                 key={key}
                 onPress={() => setBloqueSelected(key)}
                 style={{
-                  backgroundColor:
-                    bloqueSelected === key
-                      ? TOKENS.colors.accent
-                      : TOKENS.colors.surface,
+                  backgroundColor: bloqueSelected === key ? TOKENS.colors.accent : TOKENS.colors.surface,
                   padding: TOKENS.spacing.md,
                   borderRadius: TOKENS.radius.md,
                   marginBottom: TOKENS.spacing.sm,
                 }}
               >
-                <Text
-                  style={{
-                    color:
-                      bloqueSelected === key
-                        ? '#fff'
-                        : TOKENS.colors.text,
-                    fontWeight: '600',
-                    fontSize: TOKENS.fontSizes.body,
-                  }}
-                >
+                <Text style={{
+                  color: bloqueSelected === key ? '#fff' : TOKENS.colors.text,
+                  fontWeight: '600',
+                  fontSize: TOKENS.fontSizes.body,
+                }}>
                   {bloque.nombre}
                 </Text>
               </Pressable>
@@ -350,12 +411,10 @@ export default function App() {
           <ButtonPrimary
             label="Capturar foto"
             onPress={() => {
-              setContexto({
-                bloque: bloqueSelected,
-                entidad: 'Uninorte',
-                ciudad: 'Barranquilla',
-              });
-              setView('camera');
+              if (bloqueSelected) {
+                setContexto({ bloque: bloqueSelected, entidad: 'Uninorte', ciudad: 'Barranquilla' });
+                setView('camera');
+              }
             }}
             disabled={!bloqueSelected}
             style={{ marginTop: TOKENS.spacing.lg }}
@@ -368,7 +427,7 @@ export default function App() {
   // ════════════════════════════════════════════════════════════
   // PANTALLA: CAMERA
   // ════════════════════════════════════════════════════════════
-  if (view === 'camera') {
+  if (view === 'camera' && logged) {
     return (
       <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
         <Header
@@ -394,26 +453,23 @@ export default function App() {
 
         <View style={{ padding: TOKENS.spacing.lg, gap: TOKENS.spacing.base }}>
           <ButtonPrimary label="Capturar foto" onPress={openCamera} />
-          <ButtonSecondary
-            label="Cancelar"
-            onPress={() => setView('context')}
-          />
+          <ButtonSecondary label="Cancelar" onPress={() => setView('context')} />
         </View>
       </View>
     );
   }
 
   // ════════════════════════════════════════════════════════════
-  // PANTALLA: RESULTADO
+  // PANTALLA: RESULT
   // ════════════════════════════════════════════════════════════
-  if (view === 'resultado' && resultado) {
+  if (view === 'result' && logged && resultado) {
     const [espesor, setEspesor] = useState('');
     const [obs, setObs] = useState('');
     const [expandObs, setExpandObs] = useState(false);
 
     return (
       <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
-        <Header title="Resultado" onBack={() => setView('main')} />
+        <Header title="Resultado" onBack={() => setView('home')} />
 
         <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg }}>
           <ResultCard
@@ -443,16 +499,14 @@ export default function App() {
             <Card>
               <View style={{ marginBottom: TOKENS.spacing.md }}>
                 <Text style={styles.smallText}>Espesor (mm)</Text>
-                <View
-                  style={{
-                    backgroundColor: TOKENS.colors.neutral100,
-                    borderWidth: 2,
-                    borderColor: TOKENS.colors.divider,
-                    borderRadius: TOKENS.radius.md,
-                    paddingHorizontal: TOKENS.spacing.md,
-                    paddingVertical: TOKENS.spacing.sm,
-                  }}
-                >
+                <View style={{
+                  backgroundColor: TOKENS.colors.neutral100,
+                  borderWidth: 2,
+                  borderColor: TOKENS.colors.divider,
+                  borderRadius: TOKENS.radius.md,
+                  paddingHorizontal: TOKENS.spacing.md,
+                  paddingVertical: TOKENS.spacing.sm,
+                }}>
                   <TextInput
                     placeholder="2.5"
                     value={espesor}
@@ -461,7 +515,6 @@ export default function App() {
                     style={{
                       fontSize: TOKENS.fontSizes.body,
                       color: TOKENS.colors.text,
-                      padding: 0,
                     }}
                     placeholderTextColor={TOKENS.colors.neutral500}
                   />
@@ -470,17 +523,15 @@ export default function App() {
 
               <View style={{ marginBottom: TOKENS.spacing.md }}>
                 <Text style={styles.smallText}>Descripción</Text>
-                <View
-                  style={{
-                    backgroundColor: TOKENS.colors.neutral100,
-                    borderWidth: 2,
-                    borderColor: TOKENS.colors.divider,
-                    borderRadius: TOKENS.radius.md,
-                    paddingHorizontal: TOKENS.spacing.md,
-                    paddingVertical: TOKENS.spacing.sm,
-                    minHeight: 80,
-                  }}
-                >
+                <View style={{
+                  backgroundColor: TOKENS.colors.neutral100,
+                  borderWidth: 2,
+                  borderColor: TOKENS.colors.divider,
+                  borderRadius: TOKENS.radius.md,
+                  paddingHorizontal: TOKENS.spacing.md,
+                  paddingVertical: TOKENS.spacing.sm,
+                  minHeight: 80,
+                }}>
                   <TextInput
                     placeholder="Óxido en esquina, causas observadas..."
                     value={obs}
@@ -490,7 +541,6 @@ export default function App() {
                     style={{
                       fontSize: TOKENS.fontSizes.body,
                       color: TOKENS.colors.text,
-                      padding: 0,
                     }}
                     placeholderTextColor={TOKENS.colors.neutral500}
                   />
@@ -500,7 +550,6 @@ export default function App() {
               <ButtonPrimary
                 label="Guardar observaciones"
                 onPress={() => {
-                  console.log('Observaciones guardadas:', { espesor, obs });
                   Alert.alert('Guardado', 'Observaciones guardadas correctamente');
                 }}
                 style={{ marginTop: TOKENS.spacing.md }}
@@ -513,7 +562,6 @@ export default function App() {
               label="Siguiente medición"
               onPress={() => {
                 setResultado(null);
-                setSelectedPhotoUri(null);
                 setView('context');
               }}
             />
@@ -521,8 +569,7 @@ export default function App() {
               label="Volver al inicio"
               onPress={() => {
                 setResultado(null);
-                setSelectedPhotoUri(null);
-                setView('main');
+                setView('home');
               }}
             />
           </View>
@@ -532,51 +579,130 @@ export default function App() {
   }
 
   // ════════════════════════════════════════════════════════════
-  // PANTALLA: MAIN (Historial/Dashboard)
+  // PANTALLA: FOLDERS
   // ════════════════════════════════════════════════════════════
-  return (
-    <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
-      <Header
-        title="PIXELRUST"
-        subtitle="Tus mediciones"
-      />
-
-      <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg }}>
-        <ButtonPrimary
-          label="Nueva medición"
-          onPress={() => setView('context')}
-          style={{ marginBottom: TOKENS.spacing.lg }}
+  if (view === 'folders' && logged) {
+    return (
+      <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
+        <Header
+          title="Carpetas"
+          subtitle="Organizadas por ciudad y bloque"
+          onBack={() => setView('home')}
         />
 
-        {loadingHistory ? (
-          <ActivityIndicator
-            size="large"
-            color={TOKENS.colors.accent}
-            style={{ marginTop: 50 }}
-          />
-        ) : ciudades && ciudades.length > 0 ? (
-          ciudades.map((ciudad, idx) => (
-            <Card key={idx}>
-              <CardTitle text={`${ciudad.nombre}`} />
-              <CardBody
-                text={`${ciudad.mediciones?.length || 0} mediciones`}
-              />
-            </Card>
-          ))
-        ) : (
-          <Card>
-            <CardBody text="Sin mediciones aún. Comienza capturando una foto." />
+        <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg }}>
+          <Card style={{ backgroundColor: TOKENS.colors.accent2_100 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: TOKENS.colors.accent2_900 }}>
+              📍 Barranquilla · Uninorte
+            </Text>
+            <Text style={{ fontSize: 13, color: TOKENS.colors.accent2_800, marginTop: 4 }}>
+              {stats.total} mediciones
+            </Text>
           </Card>
-        )}
 
-        <Divider />
+          <Divider />
 
-        <ButtonSecondary
-          label="Cerrar sesión"
-          onPress={handleLogout}
-          style={{ marginTop: TOKENS.spacing.lg }}
+          {/* Placeholder para bloques */}
+          {['G', 'J', 'K', 'L'].map((bloque) => (
+            <Pressable
+              key={bloque}
+              style={{
+                backgroundColor: TOKENS.colors.neutral100,
+                borderRadius: TOKENS.radius.lg,
+                padding: TOKENS.spacing.md,
+                marginBottom: TOKENS.spacing.sm,
+              }}
+              onPress={() => setView('home')}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '700', color: TOKENS.colors.text }}>
+                Bloque {bloque}
+              </Text>
+              <Text style={{ fontSize: 12, color: TOKENS.colors.neutral600, marginTop: 2 }}>
+                3 mediciones
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // PANTALLA: SETTINGS
+  // ════════════════════════════════════════════════════════════
+  if (view === 'settings' && logged) {
+    return (
+      <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
+        <Header
+          title="Configuración"
+          subtitle="Tu perfil"
+          onBack={() => setView('home')}
         />
-      </ScrollView>
+
+        <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg }}>
+          <Card>
+            <CardTitle text={userName} />
+            <CardBody text="appbogota@corria.app" />
+          </Card>
+
+          <Divider />
+
+          <ButtonSecondary
+            label="Cerrar sesión"
+            onPress={handleLogout}
+            style={{ marginTop: TOKENS.spacing.lg }}
+          />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // PANTALLA: DETAIL
+  // ════════════════════════════════════════════════════════════
+  if (view === 'detail' && logged) {
+    return (
+      <View style={{ flex: 1, backgroundColor: TOKENS.colors.bg }}>
+        <Header
+          title="Medición"
+          subtitle="23 de agosto"
+          onBack={() => setView('home')}
+        />
+
+        <ScrollView contentContainerStyle={{ padding: TOKENS.spacing.lg }}>
+          <ResultCard
+            nivel="MODERADA"
+            percentage={42}
+            confidence={78}
+            ubicacion="Bloque K"
+          />
+
+          <Card>
+            <CardTitle text="Observaciones" />
+            <CardBody text="Óxido en esquina superior derecha" />
+          </Card>
+
+          <Card>
+            <CardTitle text="Espesor" />
+            <CardBody text="2.5 mm" />
+          </Card>
+
+          <Divider />
+
+          <ButtonSecondary
+            label="Volver"
+            onPress={() => setView('home')}
+            style={{ marginTop: TOKENS.spacing.lg }}
+          />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // Fallback
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Cargando...</Text>
     </View>
   );
 }
