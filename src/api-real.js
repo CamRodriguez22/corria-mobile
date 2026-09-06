@@ -169,18 +169,30 @@ export async function subirMedicionReal({ uri, base64, token, ubicacionDecidida,
 
 // ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
 // foto: { uri, base64 }  ·  gps: { lat, lng }  ·  bloqueClave: "K"
+// Resiliente: si el modo de ubicación elegido falla, reintenta una vez con coordenadas_libres
+// (modo mínimo del contrato) para que el demo no dependa de que exista/creable un punto.
 export async function subirMedicion({ foto, gps, bloqueClave, ciudad = CIUDAD, notas = '' }) {
   if (!gps?.lat || !gps?.lng) throw new Error('No hay coordenadas GPS para la medición.');
-  const ubicacion = await decidirUbicacionBloque({ bloqueClave, lat: gps.lat, lng: gps.lng, ciudad });
-  const medicion = await subirMedicionReal({
+  const base = {
     uri: foto?.uri,
     base64: foto?.base64,
-    ubicacionDecidida: ubicacion,
     lat: gps.lat,
     lng: gps.lng,
     notas,
-  });
-  return { medicion, ubicacion };
+  };
+
+  const ubicacion = await decidirUbicacionBloque({ bloqueClave, lat: gps.lat, lng: gps.lng, ciudad });
+  try {
+    const medicion = await subirMedicionReal({ ...base, ubicacionDecidida: ubicacion });
+    return { medicion, ubicacion };
+  } catch (e) {
+    if (e.status === 400 || e.status === 404 || e.status === 422) {
+      const fallback = { modo: 'coordenadas_libres', latitud: gps.lat, longitud: gps.lng };
+      const medicion = await subirMedicionReal({ ...base, ubicacionDecidida: fallback });
+      return { medicion, ubicacion: fallback };
+    }
+    throw e;
+  }
 }
 
 // Guardar observaciones (espesor/nota) tras el análisis: se hace un PUT del perfil no aplica;

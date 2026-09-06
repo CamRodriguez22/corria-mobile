@@ -31,6 +31,7 @@ export const APP_CONFIG = {
   storageKeys: {
     historialCache: 'pixelrust_historial_cache',
     bloquePorMedicion: 'pixelrust_bloque_por_medicion',
+    obsPorMedicion: 'pixelrust_obs_por_medicion',
     borradorPendiente: 'pixelrust_borrador_pendiente',
   },
   carpetaFotos: 'PIXELRUST_Mediciones',

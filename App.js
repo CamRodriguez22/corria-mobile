@@ -9,6 +9,8 @@ import {
   Image,
   StatusBar,
   Share,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 // Polyfills antes de Amplify
@@ -51,6 +53,7 @@ import {
 } from './src/api-real';
 import {
   getCurrentLocation,
+  reverseGeocode,
   pickPhoto,
   validarFoto,
   formatDate,
@@ -127,6 +130,7 @@ function Root() {
   const [gps, setGps] = useState(null);
   const [gpsError, setGpsError] = useState('');
   const [foto, setFoto] = useState(null);
+  const [lugar, setLugar] = useState(null); // { ciudad, barrio, direccion } del reverse-geocode
   const [progress, setProgress] = useState(0);
   const [resultado, setResultado] = useState(null);
   const [espesor, setEspesor] = useState('');
@@ -169,7 +173,7 @@ function Root() {
     const [cache, bmap, omap] = await Promise.all([
       loadLocal(APP_CONFIG.storageKeys.historialCache, []),
       loadLocal(APP_CONFIG.storageKeys.bloquePorMedicion, {}),
-      loadLocal('pixelrust_obs_por_medicion', {}),
+      loadLocal(APP_CONFIG.storageKeys.obsPorMedicion, {}),
     ]);
     setBloqueMap(bmap || {});
     setObsMap(omap || {});
@@ -181,15 +185,15 @@ function Root() {
         getMedicionesRecientes(undefined, APP_CONFIG.limiteHistorialMovil),
       ]);
       if (p) setPerfil(p);
-      const limpio = (meds || []).sort(
-        (a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0)
-      );
+      // Sin las máscaras (cientos de KB c/u): no se usan en el móvil y saturan memoria/AsyncStorage.
+      const limpio = (meds || [])
+        .map(({ mascaras, ...rest }) => rest)
+        .sort((a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0));
       setMediciones(limpio);
       setOffline(false);
-      // guardar cache sin las máscaras pesadas
       saveLocal(
         APP_CONFIG.storageKeys.historialCache,
-        limpio.map(({ mascaras, detecciones, ...rest }) => rest)
+        limpio.map(({ detecciones, ...rest }) => rest)
       );
     } catch (e) {
       console.log('cargarTodo', e?.message);
@@ -288,10 +292,14 @@ function Root() {
     setDescripcion('');
     setObsOpen(false);
     setObsSaved(false);
+    setLugar(null);
     setScreen('context');
     try {
       const loc = await getCurrentLocation();
       setGps(loc);
+      reverseGeocode(loc.lat, loc.lng)
+        .then((l) => setLugar(l))
+        .catch(() => {});
     } catch (e) {
       setGpsError(e.message || 'No se pudo obtener la ubicación.');
     }
@@ -358,7 +366,8 @@ function Root() {
         },
       });
 
-      const medConFoto = { ...medicion, url_imagen: medicion.url_imagen || foto.uri, _localUri: foto.uri };
+      const { mascaras, ...ligera } = medicion;
+      const medConFoto = { ...ligera, url_imagen: medicion.url_imagen || foto.uri, _localUri: foto.uri };
       setResultado(medConFoto);
       setMediciones((prev) => [medConFoto, ...prev.filter((m) => m.id_medicion !== medicion.id_medicion)]);
       setScreen('result');
@@ -376,7 +385,7 @@ function Root() {
     if (!resultado) return;
     const nuevo = { ...obsMap, [resultado.id_medicion]: { espesor, descripcion } };
     setObsMap(nuevo);
-    await saveLocal('pixelrust_obs_por_medicion', nuevo);
+    await saveLocal(APP_CONFIG.storageKeys.obsPorMedicion, nuevo);
     setObsSaved(true);
   };
 
@@ -454,6 +463,7 @@ function Root() {
       <ContextScreen
         gps={gps}
         gpsError={gpsError}
+        lugar={lugar}
         bloqueSel={bloqueSel}
         setBloqueSel={setBloqueSel}
         onBack={() => setScreen('home')}
@@ -600,9 +610,13 @@ function LoginScreen({
 }) {
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ padding: PAD, flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={{ height: 24 }} />
-        <Logo size={18} />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={{ padding: PAD, flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          <View style={{ height: 24 }} />
+          <Logo size={18} />
         <Text style={{ fontSize: 40, fontWeight: '800', color: TOKENS.colors.text, marginTop: 20 }}>
           PIXELRUST
         </Text>
@@ -655,7 +669,8 @@ function LoginScreen({
         <Text style={{ textAlign: 'center', fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500, marginTop: 40 }}>
           © 2026 Universidad del Norte
         </Text>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -930,16 +945,20 @@ function SettingsScreen({ perfil, nombre, iniciales, onLogout }) {
 }
 
 // ═══════════════════════════ CONTEXT ═══════════════════════════
-function ContextScreen({ gps, gpsError, bloqueSel, setBloqueSel, onBack, onNext }) {
+function ContextScreen({ gps, gpsError, lugar, bloqueSel, setBloqueSel, onBack, onNext }) {
+  const ciudadDetectada = lugar?.ciudad || CIUDAD;
   return (
     <Screen>
       <Header title="Nueva medición" subtitle="Selecciona el bloque" onBack={onBack} />
       <ScrollView contentContainerStyle={{ padding: PAD, flexGrow: 1 }}>
         <View style={{ backgroundColor: TOKENS.colors.accent2_100, borderRadius: TOKENS.radius.lg, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <Text style={{ fontSize: 20 }}>🏛️</Text>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.accent2_900 }}>Entidad: {ENTIDAD}</Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.accent2_800 }}>Ciudad: {CIUDAD}</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.accent2_800 }}>
+              Ciudad: {ciudadDetectada}
+              {lugar?.barrio ? ` · ${lugar.barrio}` : ''}
+            </Text>
             <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.accent2_800 }}>{formatDateTime()}</Text>
           </View>
         </View>
@@ -1097,7 +1116,12 @@ function ResultScreen({
   return (
     <Screen>
       <Header title="Resultado" onBack={onHome} />
-      <ScrollView contentContainerStyle={{ padding: PAD }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+      <ScrollView contentContainerStyle={{ padding: PAD }} keyboardShouldPersistTaps="handled">
         {medicion._localUri || medicion.url_imagen ? (
           <Image
             source={{ uri: medicion._localUri || medicion.url_imagen }}
@@ -1132,6 +1156,7 @@ function ResultScreen({
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
       <View style={{ padding: PAD, gap: 10 }}>
         <Button label="Siguiente medición" onPress={onNext} />
         <Button variant="ghost" label="Volver al inicio" onPress={onHome} />
