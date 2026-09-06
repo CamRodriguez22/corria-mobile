@@ -1,172 +1,195 @@
+// src/api-real.js — Cliente del backend PIXELRUST (API Gateway + Cognito).
+//
+// CONTRATO VERIFICADO EN VIVO — 2026-09-06 (llamadas reales con token de Camila):
+//   Authorization: <ID token>          (token CRUDO, sin "Bearer ")
+//   El backend NO conoce "bloques": trabaja con puntos geolocalizados (id_punto).
+//
+//   GET    /usuarios/me
+//   GET    /puntos?limit=200
+//   GET    /puntos/{id_punto}
+//   GET    /mediciones/recientes?limit=N      -> { total, mediciones:[...] }   (máx 100)
+//   GET    /mediciones/{id_punto}             -> [ ...mediciones ]
+//   GET    /alertas?horas=N&nivel_minimo=LEVE|MODERADA|SEVERA|CRITICA
+//   POST   /medicion                          -> objeto medición (corre YOLO)
+//   DELETE /mediciones/{id_punto}?id_medicion={id_medicion}  -> { ok:true }
+//
+// Forma de una medición (POST y listados):
+//   nivel_corrosion    : number  (0 ninguna · 1 leve · 2 moderada · 3 severa · 4 crítica)
+//   area_corroida_pct  : string en los GET ("36.66") / number en el POST  -> usar parseFloat
+//   confianza_promedio : 0..1 (string/number)
+//   detecciones, mascaras : arrays (mascaras puede pesar cientos de KB — ignorar en móvil)
+//   url_imagen, url_thumbnail : URLs S3 prefirmadas (~7 días). El S3 crudo da 403.
+//   s3_key_imagen / _thumbnail / _resultado : claves (no accesibles directo)
+//   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
+
 import * as FileSystem from 'expo-file-system/legacy';
-import { AWS_CONFIG, APP_CONFIG } from './config';
-import { dist } from './utils';
+import { AWS_CONFIG, APP_CONFIG, CIUDAD } from './config';
+import { dist, getIdToken } from './utils';
 
 const API_BASE = AWS_CONFIG.apiBase;
 
-// ===========================================================================
-// CONTRATO DE API VERIFICADO POR JOSE NORIEGA - 16 AGOSTO 2026
-// Fuente: código real del backend (no adivinado, no inventado)
-// Authorization: <token>  -- SIN prefijo "Bearer ", si se agrega deja de andar
-// ===========================================================================
+// ─────────────────────────── fetch con timeout + errores claros ───────────────────────────
+async function req(method, path, { token, body, timeoutMs = 60000 } = {}) {
+  const auth = token || (await getIdToken());
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        Authorization: auth, // CRUDO, sin "Bearer "
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    clearTimeout(t);
+    if (e.name === 'AbortError') throw new Error('El servidor tardó demasiado. Revisa tu conexión.');
+    throw new Error('Sin conexión con el servidor.');
+  }
+  clearTimeout(t);
 
-// ---------------------------------------------------------------------------
-// DECISIÓN DE UBICACIÓN
-// ubicacion.modo acepta tres valores confirmados:
-//   planta_existente: { modo, id_punto }              — punto ya en DynamoDB
-//   planta_nueva:     { modo, sede, ciudad }           — crea punto con nombre
-//   coordenadas_libres: { modo, latitud, longitud }    — punto sin nombre
-//
-// Cambio vs versión anterior: ahora recibe ciudad+barrio del reverseGeocode
-// para usar planta_nueva en vez de coordenadas_libres cuando hay info de lugar.
-// Así los nuevos puntos quedan nombrados en la base de datos desde el primer POST.
-// ---------------------------------------------------------------------------
-export function decidirUbicacion(lat, lng, puntosExistentes, ciudad = null, barrio = null) {
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || text || `Error ${res.status}`;
+    const err = new Error(`${method} ${path} — ${msg}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+// ─────────────────────────── Perfil ───────────────────────────
+export async function getUsuarioMe(token) {
+  return req('GET', '/usuarios/me', { token });
+}
+export async function updateUsuarioMe(token, data) {
+  return req('PUT', '/usuarios/me', { token, body: data });
+}
+export const getMiPerfil = () => req('GET', '/usuarios/me');
+
+// ─────────────────────────── Puntos ───────────────────────────
+export async function getPuntosCercanos(token) {
+  const data = await req('GET', '/puntos?limit=200', { token });
+  return Array.isArray(data) ? data : data.items || data.puntos || [];
+}
+export async function getDetallePunto(token, id_punto) {
+  return req('GET', `/puntos/${id_punto}`, { token });
+}
+
+// ─────────────────────────── Mediciones ───────────────────────────
+export async function getMedicionesRecientes(token, limit = APP_CONFIG.limiteHistorialMovil) {
+  const lim = Math.min(limit, APP_CONFIG.limiteHistorialMax);
+  const data = await req('GET', `/mediciones/recientes?limit=${lim}`, { token });
+  return Array.isArray(data) ? data : data.mediciones || data.items || [];
+}
+// Alias con nombre pedido en el prompt.
+export const listarMediciones = (limit) => getMedicionesRecientes(undefined, limit);
+export const fetchUserMeasurements = (limit) => getMedicionesRecientes(undefined, limit);
+
+export async function getMedicionesDelPunto(token, id_punto) {
+  const data = await req('GET', `/mediciones/${id_punto}`, { token });
+  return Array.isArray(data) ? data : data.mediciones || data.items || [];
+}
+
+export async function getAlertas(token, horas = 24, nivel_minimo = 'MODERADA') {
+  const data = await req('GET', `/alertas?horas=${horas}&nivel_minimo=${nivel_minimo}`, { token });
+  return Array.isArray(data) ? data : data.items || data.alertas || [];
+}
+
+// DELETE /mediciones/{id_punto}?id_medicion={id_medicion}
+export async function eliminarMedicion(id_punto, id_medicion, token) {
+  if (!id_punto || !id_medicion) throw new Error('Faltan id_punto o id_medicion para eliminar.');
+  return req('DELETE', `/mediciones/${id_punto}?id_medicion=${encodeURIComponent(id_medicion)}`, { token });
+}
+
+// ─────────────────────────── Decisión de ubicación ───────────────────────────
+// ubicacion.modo:
+//   planta_existente:   { modo, id_punto }               — reusar punto ya en DynamoDB
+//   planta_nueva:       { modo, sede, ciudad }            — crea punto con nombre
+//   coordenadas_libres: { modo, latitud, longitud }       — punto sin nombre
+export function decidirUbicacion(lat, lng, puntosExistentes = [], ciudad = null, barrio = null) {
   let cercano = null;
   let minDist = Infinity;
-  for (let p of puntosExistentes) {
+  for (const p of puntosExistentes) {
     const plat = p.lat || p.latitud || p.coordenadas?.lat;
     const plng = p.lng || p.longitud || p.coordenadas?.lng;
-    if (!plat) continue;
+    if (plat == null) continue;
     const d = dist(lat, lng, plat, plng);
     if (d < APP_CONFIG.radioAgrupacionMetros && d < minDist) {
       minDist = d;
       cercano = p;
     }
   }
-
-  if (cercano) {
-    return {
-      modo: 'planta_existente',
-      id_punto: cercano.id_punto || cercano.puntoId || cercano.id,
-    };
-  }
-
-  // Usa planta_nueva si el reverseGeocode dio ciudad y barrio,
-  // para que el backend cree el punto con nombre desde el primer POST.
-  if (ciudad && barrio) {
-    return { modo: 'planta_nueva', sede: barrio, ciudad };
-  }
-
-  // Último recurso: sin info de lugar (GPS sin cobertura de geocoding)
+  if (cercano) return { modo: 'planta_existente', id_punto: cercano.id_punto || cercano.puntoId || cercano.id };
+  if (ciudad && barrio) return { modo: 'planta_nueva', sede: barrio, ciudad };
   return { modo: 'coordenadas_libres', latitud: lat, longitud: lng };
 }
 
-// ---------------------------------------------------------------------------
-// GET /puntos  — lista todas las plantas (cualquier rol)
-// GET /puntos/{id_punto} — detalle + historial de cambios de una planta
-// ---------------------------------------------------------------------------
-export async function getPuntosCercanos(token) {
-  const res = await fetch(`${API_BASE}/puntos?limit=200`, {
-    headers: { Authorization: token },
-  });
-  if (!res.ok) throw new Error(`GET /puntos fallo (${res.status}): ${await res.text()}`);
-  return await res.json();
-}
-
-export async function getDetallePunto(token, id_punto) {
-  const res = await fetch(`${API_BASE}/puntos/${id_punto}`, {
-    headers: { Authorization: token },
-  });
-  if (!res.ok) throw new Error(`GET /puntos/${id_punto} fallo (${res.status}): ${await res.text()}`);
-  return await res.json();
-}
-
-// ---------------------------------------------------------------------------
-// GET /mediciones/recientes?limit=N  — últimas N de todos los puntos (máx 100)
-// GET /mediciones/{id_punto}         — historial de un punto específico (máx 200)
-// Confirmado: trae 14 mediciones en cuenta nueva. El límite de 100 no es el problema.
-// ---------------------------------------------------------------------------
-export async function getMedicionesRecientes(token, limit = APP_CONFIG.limiteHistorialMax) {
-  const limiteSeguro = Math.min(limit, APP_CONFIG.limiteHistorialMax);
-  const res = await fetch(`${API_BASE}/mediciones/recientes?limit=${limiteSeguro}`, {
-    headers: { Authorization: token },
-  });
-  if (!res.ok) {
-    throw new Error(`GET /mediciones/recientes fallo (${res.status}): ${await res.text()}`);
+// Ubicación para una foto tomada "en el Bloque X": reusa punto cercano o crea uno con
+// sede = "Bloque X" para que quede nombrado en la base desde el primer POST.
+export async function decidirUbicacionBloque({ bloqueClave, lat, lng, ciudad = CIUDAD }) {
+  let puntos = [];
+  try {
+    puntos = await getPuntosCercanos();
+  } catch {
+    puntos = [];
   }
-  const data = await res.json();
-  return Array.isArray(data) ? data : data.items || data.mediciones || [];
+  const decidida = decidirUbicacion(lat, lng, puntos, ciudad, `Bloque ${bloqueClave}`);
+  return decidida;
 }
 
-export async function getMedicionesDelPunto(token, id_punto) {
-  const res = await fetch(`${API_BASE}/mediciones/${id_punto}`, {
-    headers: { Authorization: token },
-  });
-  if (!res.ok) throw new Error(`GET /mediciones/${id_punto} fallo (${res.status}): ${await res.text()}`);
-  const data = await res.json();
-  return Array.isArray(data) ? data : data.items || data.mediciones || [];
-}
-
-// ---------------------------------------------------------------------------
-// GET /alertas?horas=N&nivel_minimo=NIVEL
-// Mediciones moderadas/severas/críticas recientes (cualquier rol)
-// nivel_minimo: LEVE | MODERADA | SEVERA | CRITICA
-// ---------------------------------------------------------------------------
-export async function getAlertas(token, horas = 24, nivel_minimo = 'MODERADA') {
-  const res = await fetch(
-    `${API_BASE}/alertas?horas=${horas}&nivel_minimo=${nivel_minimo}`,
-    { headers: { Authorization: token } }
-  );
-  if (!res.ok) throw new Error(`GET /alertas fallo (${res.status}): ${await res.text()}`);
-  const data = await res.json();
-  return Array.isArray(data) ? data : data.items || data.alertas || [];
-}
-
-// ---------------------------------------------------------------------------
-// GET /usuarios/me  — tu perfil
-// PUT /usuarios/me  — editar tu perfil (cualquier rol)
-// ---------------------------------------------------------------------------
-export async function getUsuarioMe(token) {
-  const res = await fetch(`${API_BASE}/usuarios/me`, {
-    headers: { Authorization: token },
-  });
-  if (!res.ok) throw new Error(`GET /usuarios/me fallo (${res.status}): ${await res.text()}`);
-  return await res.json();
-}
-
-export async function updateUsuarioMe(token, data) {
-  const res = await fetch(`${API_BASE}/usuarios/me`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: token },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(`PUT /usuarios/me fallo (${res.status}): ${await res.text()}`);
-  return await res.json();
-}
-
-// ---------------------------------------------------------------------------
-// POST /medicion — sube foto, corre modelo, guarda resultado
-//
-// Respuesta confirmada del backend:
-//   { nivel_corrosion, area_corroida_pct, confianza_promedio, detecciones, id_medicion, id_punto }
-//
-// Nota: latitud_real y longitud_real van en el body principal (no dentro de ubicacion),
-// el backend los usa para georreferencia incluso cuando ubicacion es planta_existente.
-// ---------------------------------------------------------------------------
-export async function subirMedicionReal({ uri, token, ubicacionDecidida, lat, lng, notas = '' }) {
-  const base64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
+// ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
+export async function subirMedicionReal({ uri, base64, token, ubicacionDecidida, lat, lng, notas = '' }) {
+  let img = base64;
+  if (!img && uri) {
+    img = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+  }
+  if (!img) throw new Error('No se pudo leer la imagen.');
 
   const body = {
-    imagen_base64: base64,
+    imagen_base64: img, // CRUDO, sin prefijo "data:image/jpeg;base64," (verificado)
     fuente: 'movil',
     ubicacion: ubicacionDecidida,
     latitud_real: lat,
     longitud_real: lng,
     notas: notas || `movil-radio-${APP_CONFIG.radioAgrupacionMetros}m`,
   };
+  return req('POST', '/medicion', { token, body, timeoutMs: 120000 });
+}
 
-  const res = await fetch(`${API_BASE}/medicion`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: token },
-    body: JSON.stringify(body),
+// ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
+// foto: { uri, base64 }  ·  gps: { lat, lng }  ·  bloqueClave: "K"
+export async function subirMedicion({ foto, gps, bloqueClave, ciudad = CIUDAD, notas = '' }) {
+  if (!gps?.lat || !gps?.lng) throw new Error('No hay coordenadas GPS para la medición.');
+  const ubicacion = await decidirUbicacionBloque({ bloqueClave, lat: gps.lat, lng: gps.lng, ciudad });
+  const medicion = await subirMedicionReal({
+    uri: foto?.uri,
+    base64: foto?.base64,
+    ubicacionDecidida: ubicacion,
+    lat: gps.lat,
+    lng: gps.lng,
+    notas,
   });
+  return { medicion, ubicacion };
+}
 
-  if (!res.ok) throw new Error(`POST /medicion fallo (${res.status}): ${await res.text()}`);
-
-  // Devuelve el objeto completo para que App.js pueda mostrar
-  // nivel_corrosion, area_corroida_pct, confianza_promedio Y detecciones
-  return await res.json();
+// Guardar observaciones (espesor/nota) tras el análisis: se hace un PUT del perfil no aplica;
+// el backend actual no expone PATCH de medición, así que las observaciones se conservan
+// localmente y se reenvían en la nota de la siguiente subida. Se expone para que App.js
+// pueda persistirlas en AsyncStorage.
+export function componerObservaciones({ bloqueClave, espesor, descripcion }) {
+  const partes = [`Bloque ${bloqueClave}`];
+  if (espesor) partes.push(`espesor ${espesor} mm`);
+  if (descripcion) partes.push(descripcion);
+  return partes.join(' · ');
 }

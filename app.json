@@ -1,32 +1,55 @@
 {
   "expo": {
-    "name": "corria-mobile",
+    "name": "PIXELRUST",
     "slug": "corria-mobile",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "PIXELRUST usa la cámara para fotografiar la corrosión que vas a analizar.",
+        "NSPhotoLibraryUsageDescription": "PIXELRUST accede a tus fotos para analizar imágenes de corrosión ya tomadas.",
+        "NSLocationWhenInUseUsageDescription": "PIXELRUST usa tu ubicación para georreferenciar cada medición de corrosión."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#f5ead8"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.camrodriguez22.corriamobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-asset"
-    ]
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "PIXELRUST usa la cámara para fotografiar la corrosión que vas a analizar.",
+          "photosPermission": "PIXELRUST accede a tus fotos para analizar imágenes de corrosión ya tomadas."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "PIXELRUST usa tu ubicación para georreferenciar cada medición de corrosión."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6d878dc8-2650-4f48-a220-079ae77258f6"
+      }
+    }
   }
 }
