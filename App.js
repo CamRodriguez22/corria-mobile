@@ -221,6 +221,8 @@ function Root() {
       const res = await signIn({ username: email.trim(), password: pass });
       if (res.isSignedIn) {
         setLogged(true);
+      } else if (res.nextStep?.signInStep === 'DONE') {
+        setLogged(true);
       } else if (
         res.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED'
       ) {
@@ -230,7 +232,11 @@ function Root() {
         setAuthError(`Paso adicional requerido: ${res.nextStep?.signInStep || 'desconocido'}`);
       }
     } catch (e) {
-      setAuthError(traducirAuthError(e));
+      if (e?.name === 'UserAlreadyAuthenticatedException') {
+        setLogged(true);
+      } else {
+        setAuthError(traducirAuthError(e));
+      }
     } finally {
       setAuthBusy(false);
     }
@@ -1064,7 +1070,7 @@ function PreviewScreen({ foto, bloqueSel, onBack, onConfirm }) {
         ) : null}
         <View style={{ marginTop: 14, backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: 16, gap: 10, ...TOKENS.shadow.sm }}>
           <CheckRow text={`Resolución ${foto?.width || '—'} × ${foto?.height || '—'}`} />
-          <CheckRow text="Compresión 0.7 (JPEG)" />
+          <CheckRow text="Compresión JPEG 0.6" />
           <CheckRow text={`Bloque ${bloqueSel} + GPS adjuntos`} />
         </View>
       </ScrollView>
