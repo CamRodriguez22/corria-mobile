@@ -6,7 +6,7 @@ import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-import { APP_CONFIG, BLOQUES_CAMPUS, LISTA_BLOQUES, CIUDAD } from './config';
+import { APP_CONFIG, LISTA_BLOQUES, CIUDAD } from './config';
 import { num, severidad } from './DesignTokens';
 
 // ───────────────────────────── Geometría ─────────────────────────────
@@ -202,10 +202,29 @@ export async function guardarFotoLocal({ uri, base64, bloque = 'SIN_BLOQUE', id,
 }
 
 // ───────────────────────────── Bloques del campus ─────────────────────────────
-export function bloqueMasCercano(lat, lng, maxMetros = 120) {
+// Adapta un bloque real del backend (GET/POST /bloques) a la misma forma que ya
+// usan las pantallas para BLOQUES_CAMPUS: { clave, nombre, detalle, lat, lng }.
+// clave = id_bloque real (antes era una letra fija G/J/K/L). Se conserva
+// id_bloque explícito además, para distinguir "bloque real" de "bloque de
+// respaldo offline" (ver resolverBloqueId en api-real.js).
+export function adaptarBloque(b) {
+  return {
+    clave: b.id_bloque,
+    id_bloque: b.id_bloque,
+    nombre: b.nombre,
+    detalle: b.descripcion || [b.ciudad, b.departamento].filter(Boolean).join(', ') || '',
+    lat: b.coordenadas?.lat,
+    lng: b.coordenadas?.lng,
+  };
+}
+
+// listaBloques: por defecto el catálogo de respaldo offline (BLOQUES_CAMPUS);
+// App.js pasa el catálogo real cargado del backend cuando está disponible.
+export function bloqueMasCercano(lat, lng, maxMetros = 120, listaBloques = LISTA_BLOQUES) {
   let best = null;
   let bestD = Infinity;
-  for (const b of LISTA_BLOQUES) {
+  for (const b of listaBloques) {
+    if (b.lat == null || b.lng == null) continue;
     const d = dist(lat, lng, b.lat, b.lng);
     if (d < bestD) {
       bestD = d;
@@ -222,39 +241,56 @@ export function construirNotas(bloque, texto = '') {
 }
 
 export function parseBloqueDeNotas(notas = '') {
-  const m = /bloque\s+([a-z0-9]+)/i.exec(notas || '');
+  // Incluye guiones: los id_bloque reales (uuid) los usan; las claves de
+  // BLOQUES_CAMPUS (letras) también matchean igual que antes.
+  const m = /bloque\s+([a-z0-9-]+)/i.exec(notas || '');
   return m ? m[1].toUpperCase() : null;
 }
 
 // Deriva el bloque de una medición: mapa local -> notas -> GPS más cercano.
-export function bloqueDeMedicion(m, mapaLocal = {}) {
+// listaBloques: catálogo contra el que se valida/busca (real del backend o
+// respaldo offline BLOQUES_CAMPUS por defecto).
+export function bloqueDeMedicion(m, mapaLocal = {}, listaBloques = LISTA_BLOQUES) {
   if (!m) return null;
   if (mapaLocal[m.id_medicion]) return mapaLocal[m.id_medicion];
+  // El backend real ya devuelve id_punto = id_bloque directamente en cada
+  // medición (fusión Punto→Bloque, ver lambda_src/api_mediciones/handler.py:
+  // "Hoy id_punto vale el id_bloque"). Es la fuente más confiable — se prioriza
+  // sobre las heurísticas de abajo (notas/GPS), que solo tienen sentido cuando
+  // no hay id_punto (p. ej. datos viejos o el catálogo de respaldo offline).
+  if (m.id_punto) return m.id_punto;
   const porNotas = parseBloqueDeNotas(m.notas);
-  if (porNotas && BLOQUES_CAMPUS[porNotas]) return porNotas;
+  if (porNotas && listaBloques.some((b) => String(b.clave).toUpperCase() === porNotas)) {
+    return listaBloques.find((b) => String(b.clave).toUpperCase() === porNotas).clave;
+  }
   const lat = m.latitud_real ?? m.punto_info?.coordenadas?.lat;
   const lng = m.longitud_real ?? m.punto_info?.coordenadas?.lng;
   if (lat != null && lng != null) {
-    const cerca = bloqueMasCercano(lat, lng, 150);
+    const cerca = bloqueMasCercano(lat, lng, 150, listaBloques);
     if (cerca) return cerca;
   }
   return null;
 }
 
-// Agrupa mediciones por bloque del campus (para la pantalla Carpetas).
-export function agruparPorBloque(mediciones = [], mapaLocal = {}) {
+// Agrupa mediciones por bloque (para la pantalla Carpetas). listaBloques: catálogo
+// real cargado del backend, o BLOQUES_CAMPUS de respaldo si no hay conexión.
+export function agruparPorBloque(mediciones = [], mapaLocal = {}, listaBloques = LISTA_BLOQUES) {
   const grupos = {};
-  for (const clave of Object.keys(BLOQUES_CAMPUS)) grupos[clave] = [];
+  const bloquesPorClave = {};
+  for (const b of listaBloques) {
+    bloquesPorClave[b.clave] = b;
+    grupos[b.clave] = [];
+  }
   const sinBloque = [];
   for (const m of mediciones) {
-    const b = bloqueDeMedicion(m, mapaLocal);
+    const b = bloqueDeMedicion(m, mapaLocal, listaBloques);
     if (b && grupos[b]) grupos[b].push(m);
     else sinBloque.push(m);
   }
   const orden = (arr) => arr.sort((a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0));
   const salida = Object.entries(grupos).map(([clave, items]) => ({
     clave,
-    bloque: BLOQUES_CAMPUS[clave],
+    bloque: bloquesPorClave[clave],
     items: orden(items),
     peorPct: items.length ? Math.max(...items.map((m) => num(m.area_corroida_pct, 0))) : 0,
   }));
