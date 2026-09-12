@@ -40,7 +40,6 @@ import {
 import {
   AWS_CONFIG,
   APP_CONFIG,
-  BLOQUES_CAMPUS,
   LISTA_BLOQUES,
   ENTIDAD,
   CIUDAD,
@@ -48,6 +47,8 @@ import {
 import {
   getMiPerfil,
   getMedicionesRecientes,
+  getBloques,
+  resolverBloqueId,
   subirMedicion,
   eliminarMedicion,
 } from './src/api-real';
@@ -66,6 +67,7 @@ import {
   bloqueDeMedicion,
   agruparPorBloque,
   construirNotas,
+  adaptarBloque,
 } from './src/utils';
 
 Amplify.configure({
@@ -113,6 +115,7 @@ function Root() {
   // sesión / datos
   const [perfil, setPerfil] = useState(null);
   const [mediciones, setMediciones] = useState([]);
+  const [bloques, setBloques] = useState([]); // catálogo real (GET /bloques), adaptado
   const [bloqueMap, setBloqueMap] = useState({});
   const [obsMap, setObsMap] = useState({});
   const [loadingData, setLoadingData] = useState(false);
@@ -146,7 +149,23 @@ function Root() {
     .map((s) => s[0]?.toUpperCase())
     .join('');
   const esAdmin = (perfil?.rol || '').toLowerCase() === 'admin';
+  // El backend bloquea con 403 a cliente en POST /medicion: se oculta la entrada
+  // a "Nueva medición" para que la UX no rompa con un error del servidor.
+  const esCliente = (perfil?.rol || '').toLowerCase() === 'cliente';
   const stats = useMemo(() => calcularEstadisticas(mediciones), [mediciones]);
+
+  // Catálogo de bloques a usar: el real del backend si cargó, si no el de
+  // respaldo offline (BLOQUES_CAMPUS/LISTA_BLOQUES, ver src/config.js).
+  const listaBloques = bloques.length ? bloques : LISTA_BLOQUES;
+  const bloquesMap = useMemo(
+    () => Object.fromEntries(listaBloques.map((b) => [b.clave, b])),
+    [listaBloques]
+  );
+  // Label corto para pantallas que arman "Bloque {bloqueSel}" (Cámara, Revisar
+  // foto, Analizando, Resultado): antes bloqueSel era una letra (G/J/K/L); ahora
+  // puede ser un id_bloque real, así que se muestra el nombre del bloque en su
+  // lugar (sin duplicar la palabra "Bloque" si el nombre real ya la trae).
+  const bloqueSelLabel = nombreCortoBloque(bloquesMap[bloqueSel], bloqueSel);
 
   // ───────────────────────── arranque: sesión persistida ─────────────────────────
   useEffect(() => {
@@ -180,11 +199,15 @@ function Root() {
     if (Array.isArray(cache) && cache.length) setMediciones(cache);
 
     try {
-      const [p, meds] = await Promise.all([
+      const [p, meds, blqs] = await Promise.all([
         getMiPerfil().catch(() => null),
         getMedicionesRecientes(undefined, APP_CONFIG.limiteHistorialMovil),
+        getBloques().catch(() => null),
       ]);
       if (p) setPerfil(p);
+      // Si falla o la empresa aún no tiene bloques cargados, queda el catálogo
+      // de respaldo offline (ver `listaBloques` más abajo); no se pisa con [].
+      if (Array.isArray(blqs)) setBloques(blqs.map(adaptarBloque));
       // Sin las máscaras (cientos de KB c/u): no se usan en el móvil y saturan memoria/AsyncStorage.
       const limpio = (meds || [])
         .map(({ mascaras, ...rest }) => rest)
@@ -337,32 +360,52 @@ function Root() {
       setProgress((p) => (p >= 92 ? 92 : p + Math.random() * 12));
     }, 350);
 
+    const bloqueElegido = bloquesMap[bloqueSel];
     let gpsUsar = gps;
     if (!gpsUsar) {
-      const b = BLOQUES_CAMPUS[bloqueSel];
-      gpsUsar = { lat: b.lat, lng: b.lng };
+      gpsUsar = { lat: bloqueElegido?.lat, lng: bloqueElegido?.lng };
     }
 
     try {
-      const notas = construirNotas(bloqueSel, descripcion);
+      // Usa el nombre legible del bloque en la nota (bloqueSel puede ser un
+      // id_bloque real, no una letra corta como antes).
+      const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), descripcion);
+      // bloqueElegido puede venir del catálogo real (ya trae id_bloque) o del
+      // respaldo offline (BLOQUES_CAMPUS, sin id_bloque real): resolverBloqueId
+      // crea el bloque de verdad en ese segundo caso (equivalente al viejo
+      // modo "planta_nueva", ahora contra el endpoint real /bloques).
+      const bloqueIdReal = await resolverBloqueId({
+        bloque: bloqueElegido,
+        lat: gpsUsar.lat,
+        lng: gpsUsar.lng,
+      });
       const { medicion } = await subirMedicion({
         foto,
         gps: gpsUsar,
-        bloqueClave: bloqueSel,
-        ciudad: CIUDAD,
+        bloqueId: bloqueIdReal,
         notas,
       });
       clearInterval(timer);
       setProgress(100);
 
+      // Si el bloque se acababa de crear (no estaba en el catálogo cargado),
+      // se agrega localmente para que Carpetas/Detalle lo resuelvan sin esperar
+      // otro refresh.
+      if (!bloqueElegido?.id_bloque) {
+        setBloques((prev) => [
+          ...prev,
+          { ...bloqueElegido, id_bloque: bloqueIdReal, clave: bloqueIdReal },
+        ]);
+      }
+
       // etiquetar bloque + guardar foto local + refrescar lista
-      const nuevoMap = { ...bloqueMap, [medicion.id_medicion]: bloqueSel };
+      const nuevoMap = { ...bloqueMap, [medicion.id_medicion]: bloqueIdReal };
       setBloqueMap(nuevoMap);
       saveLocal(APP_CONFIG.storageKeys.bloquePorMedicion, nuevoMap);
       guardarFotoLocal({
         uri: foto.uri,
         base64: foto.base64,
-        bloque: bloqueSel,
+        bloque: bloqueIdReal,
         id: medicion.id_medicion,
         ts: medicion.timestamp,
         meta: {
@@ -470,6 +513,7 @@ function Root() {
         gps={gps}
         gpsError={gpsError}
         lugar={lugar}
+        bloques={listaBloques}
         bloqueSel={bloqueSel}
         setBloqueSel={setBloqueSel}
         onBack={() => setScreen('home')}
@@ -480,7 +524,7 @@ function Root() {
   if (screen === 'camera')
     return (
       <CameraScreen
-        bloqueSel={bloqueSel}
+        bloqueSel={bloqueSelLabel}
         onBack={() => setScreen('context')}
         onPick={capturar}
       />
@@ -490,20 +534,20 @@ function Root() {
     return (
       <PreviewScreen
         foto={foto}
-        bloqueSel={bloqueSel}
+        bloqueSel={bloqueSelLabel}
         onBack={() => setScreen('camera')}
         onConfirm={analizar}
       />
     );
 
   if (screen === 'analyzing')
-    return <AnalyzingScreen progress={progress} bloqueSel={bloqueSel} />;
+    return <AnalyzingScreen progress={progress} bloqueSel={bloqueSelLabel} />;
 
   if (screen === 'result' && resultado)
     return (
       <ResultScreen
         medicion={resultado}
-        bloqueSel={bloqueSel}
+        bloqueSel={bloqueSelLabel}
         espesor={espesor}
         setEspesor={setEspesor}
         descripcion={descripcion}
@@ -520,11 +564,12 @@ function Root() {
       />
     );
 
-  if (screen === 'detail' && detalle)
+  if (screen === 'detail' && detalle) {
+    const detalleClaveBloque = bloqueDeMedicion(detalle, bloqueMap, listaBloques);
     return (
       <DetailScreen
         medicion={detalle}
-        bloque={bloqueDeMedicion(detalle, bloqueMap)}
+        bloque={detalleClaveBloque ? nombreCortoBloque(bloquesMap[detalleClaveBloque], detalleClaveBloque) : null}
         obs={obsMap[detalle.id_medicion]}
         esAdmin={esAdmin}
         onBack={() => setScreen(folderClave ? 'folder' : tab)}
@@ -532,6 +577,7 @@ function Root() {
         onDelete={() => borrar(detalle)}
       />
     );
+  }
 
   if (screen === 'folder' && folderClave)
     return (
@@ -539,6 +585,8 @@ function Root() {
         clave={folderClave}
         mediciones={mediciones}
         bloqueMap={bloqueMap}
+        bloquesMap={bloquesMap}
+        listaBloques={listaBloques}
         onBack={() => setScreen('folders')}
         onOpen={abrirDetalle}
       />
@@ -561,9 +609,11 @@ function Root() {
             stats={stats}
             mediciones={mediciones}
             bloqueMap={bloqueMap}
+            bloquesMap={bloquesMap}
             offline={offline}
             loading={loadingData}
             refreshing={refreshing}
+            esCliente={esCliente}
             onRefresh={onRefresh}
             onNueva={irANuevaMedicion}
             onOpen={abrirDetalle}
@@ -574,6 +624,7 @@ function Root() {
           <FoldersScreen
             mediciones={mediciones}
             bloqueMap={bloqueMap}
+            listaBloques={listaBloques}
             refreshing={refreshing}
             onRefresh={onRefresh}
             onOpen={(clave) => {
@@ -586,6 +637,7 @@ function Root() {
           <ActivityScreen
             mediciones={mediciones}
             bloqueMap={bloqueMap}
+            bloquesMap={bloquesMap}
             refreshing={refreshing}
             onRefresh={onRefresh}
             onOpen={abrirDetalle}
@@ -688,9 +740,11 @@ function HomeScreen({
   stats,
   mediciones,
   bloqueMap,
+  bloquesMap,
   offline,
   loading,
   refreshing,
+  esCliente,
   onRefresh,
   onNueva,
   onOpen,
@@ -733,9 +787,11 @@ function HomeScreen({
         <StatCard value={stats.total ? `${stats.promedioPct}%` : '—'} label="Promedio" color={TOKENS.colors.accent2_800} />
       </View>
 
-      <View style={{ marginTop: 18 }}>
-        <Button label="＋  Nueva medición" onPress={onNueva} accessibilityHint="Abre la cámara para una nueva inspección" />
-      </View>
+      {!esCliente && (
+        <View style={{ marginTop: 18 }}>
+          <Button label="＋  Nueva medición" onPress={onNueva} accessibilityHint="Abre la cámara para una nueva inspección" />
+        </View>
+      )}
 
       <Text style={{ fontSize: TOKENS.fontSizes.h6, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: TOKENS.colors.neutral600, marginTop: 26, marginBottom: 12 }}>
         Mediciones recientes
@@ -750,7 +806,7 @@ function HomeScreen({
           <MeasurementRow
             key={m.id_medicion}
             medicion={m}
-            title={tituloBloque(m, bloqueMap)}
+            title={tituloBloque(m, bloqueMap, bloquesMap)}
             subtitle={`${formatDate(m.timestamp)} · ${num(m.area_corroida_pct, 0).toFixed(0)}% corroído`}
             onPress={() => onOpen(m)}
           />
@@ -763,8 +819,11 @@ function HomeScreen({
 }
 
 // ═══════════════════════════ FOLDERS ═══════════════════════════
-function FoldersScreen({ mediciones, bloqueMap, refreshing, onRefresh, onOpen }) {
-  const grupos = useMemo(() => agruparPorBloque(mediciones, bloqueMap), [mediciones, bloqueMap]);
+function FoldersScreen({ mediciones, bloqueMap, listaBloques, refreshing, onRefresh, onOpen }) {
+  const grupos = useMemo(
+    () => agruparPorBloque(mediciones, bloqueMap, listaBloques),
+    [mediciones, bloqueMap, listaBloques]
+  );
   return (
     <ScrollView
       contentContainerStyle={{ padding: PAD, paddingBottom: 32 }}
@@ -807,7 +866,7 @@ function FoldersScreen({ mediciones, bloqueMap, refreshing, onRefresh, onOpen })
         >
           <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: severidad({ area_corroida_pct: g.peorPct }).tint, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: TOKENS.fontSizes.h4, fontWeight: '800', color: severidad({ area_corroida_pct: g.peorPct }).color }}>
-              {g.clave === 'SIN_BLOQUE' ? '—' : g.clave}
+              {g.clave === 'SIN_BLOQUE' ? '—' : inicialBloque(g.bloque?.nombre || g.clave)}
             </Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -824,12 +883,12 @@ function FoldersScreen({ mediciones, bloqueMap, refreshing, onRefresh, onOpen })
   );
 }
 
-function FolderScreen({ clave, mediciones, bloqueMap, onBack, onOpen }) {
-  const bloque = BLOQUES_CAMPUS[clave] || { nombre: 'Sin bloque' };
+function FolderScreen({ clave, mediciones, bloqueMap, bloquesMap, listaBloques, onBack, onOpen }) {
+  const bloque = bloquesMap[clave] || { nombre: 'Sin bloque' };
   const items = useMemo(
     () =>
-      agruparPorBloque(mediciones, bloqueMap).find((g) => g.clave === clave)?.items || [],
-    [mediciones, bloqueMap, clave]
+      agruparPorBloque(mediciones, bloqueMap, listaBloques).find((g) => g.clave === clave)?.items || [],
+    [mediciones, bloqueMap, listaBloques, clave]
   );
   return (
     <Screen>
@@ -854,7 +913,7 @@ function FolderScreen({ clave, mediciones, bloqueMap, onBack, onOpen }) {
 }
 
 // ═══════════════════════════ ACTIVITY ═══════════════════════════
-function ActivityScreen({ mediciones, bloqueMap, refreshing, onRefresh, onOpen }) {
+function ActivityScreen({ mediciones, bloqueMap, bloquesMap, refreshing, onRefresh, onOpen }) {
   const [filtro, setFiltro] = useState('all');
   const filtradas = useMemo(() => {
     if (filtro === 'all') return mediciones;
@@ -899,7 +958,7 @@ function ActivityScreen({ mediciones, bloqueMap, refreshing, onRefresh, onOpen }
                 <View style={{ position: 'absolute', left: -22, top: 4, width: 14, height: 14, borderRadius: 7, backgroundColor: s.color, borderWidth: 3, borderColor: TOKENS.colors.bg }} />
                 <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral500 }}>{relativeDate(m.timestamp)}</Text>
                 <Text style={{ fontSize: TOKENS.fontSizes.h5, fontWeight: '700', color: TOKENS.colors.text, marginTop: 3 }}>
-                  {tituloBloque(m, bloqueMap)} · {num(m.area_corroida_pct, 0).toFixed(0)}%
+                  {tituloBloque(m, bloqueMap, bloquesMap)} · {num(m.area_corroida_pct, 0).toFixed(0)}%
                 </Text>
                 <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
                   {s.label} · confianza {confianzaPct(m.confianza_promedio)}%
@@ -951,7 +1010,7 @@ function SettingsScreen({ perfil, nombre, iniciales, onLogout }) {
 }
 
 // ═══════════════════════════ CONTEXT ═══════════════════════════
-function ContextScreen({ gps, gpsError, lugar, bloqueSel, setBloqueSel, onBack, onNext }) {
+function ContextScreen({ gps, gpsError, lugar, bloques, bloqueSel, setBloqueSel, onBack, onNext }) {
   const ciudadDetectada = lugar?.ciudad || CIUDAD;
   return (
     <Screen>
@@ -973,7 +1032,7 @@ function ContextScreen({ gps, gpsError, lugar, bloqueSel, setBloqueSel, onBack, 
           Bloques disponibles
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          {LISTA_BLOQUES.map((b) => {
+          {bloques.map((b) => {
             const active = bloqueSel === b.clave;
             return (
               <Pressable
@@ -1247,9 +1306,33 @@ function CheckRow({ text }) {
   );
 }
 
-function tituloBloque(m, bloqueMap) {
-  const b = bloqueDeMedicion(m, bloqueMap);
-  return b ? (BLOQUES_CAMPUS[b]?.nombre || `Bloque ${b}`) : 'Sin bloque';
+// bloquesMap: catálogo real cargado del backend (o de respaldo offline), no la
+// constante fija BLOQUES_CAMPUS.
+function tituloBloque(m, bloqueMap, bloquesMap = {}) {
+  // Antes no se pasaba el catálogo real (listaBloques) a bloqueDeMedicion, así
+  // que su fallback por notas/GPS usaba siempre el catálogo offline (BLOQUES_
+  // CAMPUS) aunque bloquesMap ya tuviera el real cargado. Se deriva el array
+  // desde bloquesMap; si está vacío, se deja el default (offline) de la función.
+  const listaReal = Object.values(bloquesMap);
+  const b = bloqueDeMedicion(m, bloqueMap, listaReal.length ? listaReal : undefined);
+  return b ? (bloquesMap[b]?.nombre || `Bloque ${b}`) : 'Sin bloque';
+}
+
+// Nombre corto para plantillas tipo "Bloque {x}": si el bloque real ya tiene un
+// nombre (p. ej. "Bloque G" o "Torre Norte"), se usa sin duplicar la palabra
+// "Bloque"; si no se encontró el bloque, cae al valor crudo (clave/id) recibido.
+function nombreCortoBloque(bloqueObj, claveFallback = '') {
+  if (!bloqueObj) return claveFallback;
+  return String(bloqueObj.nombre || '').replace(/^bloque\s+/i, '').trim() || claveFallback;
+}
+
+// Inicial para el avatar de carpetas: antes `clave` era siempre una letra
+// (G/J/K/L); con bloques reales `clave` es un id_bloque largo, así que la
+// inicial sale del nombre (quitando el prefijo "Bloque " si lo trae, para que
+// los bloques de respaldo offline sigan mostrando la misma letra que antes).
+function inicialBloque(nombre = '') {
+  const sinPrefijo = String(nombre).replace(/^bloque\s+/i, '').trim();
+  return (sinPrefijo[0] || String(nombre)[0] || '?').toUpperCase();
 }
 
 function traducirAuthError(e) {

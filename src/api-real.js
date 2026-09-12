@@ -1,12 +1,14 @@
 // src/api-real.js — Cliente del backend PIXELRUST (API Gateway + Cognito).
 //
-// CONTRATO VERIFICADO EN VIVO — 2026-09-06 (llamadas reales con token de Camila):
+// CONTRATO VERIFICADO EN VIVO — 2026-09-12 (post fusión Punto→Bloque):
 //   Authorization: <ID token>          (token CRUDO, sin "Bearer ")
-//   El backend NO conoce "bloques": trabaja con puntos geolocalizados (id_punto).
+//   El backend trabaja con bloques (empresa→bloque→punto→medición). /puntos quedó
+//   retirado; POST /medicion ahora exige bloque_id (string, bloque YA existente de
+//   la empresa del usuario) en la RAÍZ del body.
 //
 //   GET    /usuarios/me
-//   GET    /puntos?limit=200
-//   GET    /puntos/{id_punto}
+//   GET    /bloques                           -> { bloques:[...] } (filtrado por empresa del caller)
+//   POST   /bloques                           -> bloque creado (tecnico/admin; NO cliente)
 //   GET    /mediciones/recientes?limit=N      -> { total, mediciones:[...] }   (máx 100)
 //   GET    /mediciones/{id_punto}             -> [ ...mediciones ]
 //   GET    /alertas?horas=N&nivel_minimo=LEVE|MODERADA|SEVERA|CRITICA
@@ -23,8 +25,8 @@
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
 import * as FileSystem from 'expo-file-system/legacy';
-import { AWS_CONFIG, APP_CONFIG, CIUDAD } from './config';
-import { dist, getIdToken } from './utils';
+import { AWS_CONFIG, APP_CONFIG, CIUDAD, DEPARTAMENTO } from './config';
+import { getIdToken } from './utils';
 
 const API_BASE = AWS_CONFIG.apiBase;
 
@@ -77,13 +79,32 @@ export async function updateUsuarioMe(token, data) {
 }
 export const getMiPerfil = () => req('GET', '/usuarios/me');
 
-// ─────────────────────────── Puntos ───────────────────────────
-export async function getPuntosCercanos(token) {
-  const data = await req('GET', '/puntos?limit=200', { token });
-  return Array.isArray(data) ? data : data.items || data.puntos || [];
+// ─────────────────────────── Bloques ───────────────────────────
+// GET /bloques (sin query param): el backend filtra automático por la empresa
+// del usuario logueado (excepto super_admin, que esta app no contempla).
+export async function getBloques(token) {
+  const data = await req('GET', '/bloques', { token });
+  return Array.isArray(data) ? data : data.bloques || data.items || [];
 }
-export async function getDetallePunto(token, id_punto) {
-  return req('GET', `/puntos/${id_punto}`, { token });
+
+// POST /bloques — permitido a tecnico/admin, NO a cliente. El backend asigna
+// empresa_id solo del caller: nunca lo mandamos nosotros.
+export async function crearBloque({
+  nombre,
+  lat,
+  lng,
+  ciudad = CIUDAD,
+  departamento = DEPARTAMENTO,
+  descripcion,
+  tipo_estructura,
+  grosor_mm,
+  token,
+} = {}) {
+  const body = { nombre, coordenadas: { lat, lng }, ciudad, departamento };
+  if (descripcion) body.descripcion = descripcion;
+  if (tipo_estructura) body.tipo_estructura = tipo_estructura;
+  if (grosor_mm != null) body.grosor_mm = grosor_mm;
+  return req('POST', '/bloques', { token, body });
 }
 
 // ─────────────────────────── Mediciones ───────────────────────────
@@ -112,87 +133,63 @@ export async function eliminarMedicion(id_punto, id_medicion, token) {
   return req('DELETE', `/mediciones/${id_punto}?id_medicion=${encodeURIComponent(id_medicion)}`, { token });
 }
 
-// ─────────────────────────── Decisión de ubicación ───────────────────────────
-// ubicacion.modo:
-//   planta_existente:   { modo, id_punto }               — reusar punto ya en DynamoDB
-//   planta_nueva:       { modo, sede, ciudad }            — crea punto con nombre
-//   coordenadas_libres: { modo, latitud, longitud }       — punto sin nombre
-export function decidirUbicacion(lat, lng, puntosExistentes = [], ciudad = null, barrio = null) {
-  let cercano = null;
-  let minDist = Infinity;
-  for (const p of puntosExistentes) {
-    const plat = p.lat || p.latitud || p.coordenadas?.lat;
-    const plng = p.lng || p.longitud || p.coordenadas?.lng;
-    if (plat == null) continue;
-    const d = dist(lat, lng, plat, plng);
-    if (d < APP_CONFIG.radioAgrupacionMetros && d < minDist) {
-      minDist = d;
-      cercano = p;
-    }
-  }
-  if (cercano) return { modo: 'planta_existente', id_punto: cercano.id_punto || cercano.puntoId || cercano.id };
-  if (ciudad && barrio) return { modo: 'planta_nueva', sede: barrio, ciudad };
-  return { modo: 'coordenadas_libres', latitud: lat, longitud: lng };
-}
-
-// Ubicación para una foto tomada "en el Bloque X": reusa punto cercano o crea uno con
-// sede = "Bloque X" para que quede nombrado en la base desde el primer POST.
-export async function decidirUbicacionBloque({ bloqueClave, lat, lng, ciudad = CIUDAD }) {
-  let puntos = [];
-  try {
-    puntos = await getPuntosCercanos();
-  } catch {
-    puntos = [];
-  }
-  const decidida = decidirUbicacion(lat, lng, puntos, ciudad, `Bloque ${bloqueClave}`);
-  return decidida;
+// ─────────────────────────── Resolución de bloque_id ───────────────────────────
+// El bloque elegido en ContextScreen puede venir de dos orígenes:
+//   - catálogo real (GET /bloques): ya trae id_bloque -> se usa tal cual.
+//   - catálogo de respaldo offline (BLOQUES_CAMPUS, sin backend): no tiene
+//     id_bloque real, así que hay que CREARLO de verdad antes de subir la
+//     medición. Esto reemplaza al viejo modo "planta_nueva" (que creaba un
+//     "punto" con nombre) contra el endpoint real /bloques.
+export async function resolverBloqueId({ bloque, lat, lng, ciudad = CIUDAD, departamento = DEPARTAMENTO, token } = {}) {
+  if (!bloque) throw new Error('Selecciona un bloque antes de continuar.');
+  if (bloque.id_bloque) return bloque.id_bloque; // ya es un bloque real del backend
+  const creado = await crearBloque({
+    nombre: bloque.nombre,
+    lat: bloque.lat ?? lat,
+    lng: bloque.lng ?? lng,
+    ciudad,
+    departamento,
+    token,
+  });
+  return creado.id_bloque;
 }
 
 // ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
-export async function subirMedicionReal({ uri, base64, token, ubicacionDecidida, lat, lng, notas = '' }) {
+export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng, notas = '' }) {
   let img = base64;
   if (!img && uri) {
     img = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
   }
   if (!img) throw new Error('No se pudo leer la imagen.');
+  if (!bloqueId) throw new Error('bloque_id es requerido para subir la medición.');
 
   const body = {
     imagen_base64: img, // CRUDO, sin prefijo "data:image/jpeg;base64," (verificado)
     fuente: 'movil',
-    ubicacion: ubicacionDecidida,
+    bloque_id: bloqueId,
     latitud_real: lat,
     longitud_real: lng,
-    notas: notas || `movil-radio-${APP_CONFIG.radioAgrupacionMetros}m`,
+    notas: notas || `movil-bloque-${bloqueId}`,
   };
   return req('POST', '/medicion', { token, body, timeoutMs: 120000 });
 }
 
 // ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
-// foto: { uri, base64 }  ·  gps: { lat, lng }  ·  bloqueClave: "K"
-// Resiliente: si el modo de ubicación elegido falla, reintenta una vez con coordenadas_libres
-// (modo mínimo del contrato) para que el demo no dependa de que exista/creable un punto.
-export async function subirMedicion({ foto, gps, bloqueClave, ciudad = CIUDAD, notas = '' }) {
+// foto: { uri, base64 }  ·  gps: { lat, lng }  ·  bloqueId: id_bloque real ya resuelto
+// (ver resolverBloqueId). El backend ya no acepta mediciones sin bloque, así que no
+// hay modo "coordenadas_libres" de respaldo: si falta bloqueId, falla explícito.
+export async function subirMedicion({ foto, gps, bloqueId, notas = '' }) {
   if (!gps?.lat || !gps?.lng) throw new Error('No hay coordenadas GPS para la medición.');
-  const base = {
+  if (!bloqueId) throw new Error('No se pudo determinar el bloque de la medición.');
+  const medicion = await subirMedicionReal({
     uri: foto?.uri,
     base64: foto?.base64,
     lat: gps.lat,
     lng: gps.lng,
+    bloqueId,
     notas,
-  };
-
-  const ubicacion = await decidirUbicacionBloque({ bloqueClave, lat: gps.lat, lng: gps.lng, ciudad });
-  try {
-    const medicion = await subirMedicionReal({ ...base, ubicacionDecidida: ubicacion });
-    return { medicion, ubicacion };
-  } catch (e) {
-    if (e.status === 400 || e.status === 404 || e.status === 422) {
-      const fallback = { modo: 'coordenadas_libres', latitud: gps.lat, longitud: gps.lng };
-      const medicion = await subirMedicionReal({ ...base, ubicacionDecidida: fallback });
-      return { medicion, ubicacion: fallback };
-    }
-    throw e;
-  }
+  });
+  return { medicion };
 }
 
 // Guardar observaciones (espesor/nota) tras el análisis: se hace un PUT del perfil no aplica;
