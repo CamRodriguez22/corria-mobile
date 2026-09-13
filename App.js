@@ -233,6 +233,19 @@ function Root() {
   };
 
   // ───────────────────────── auth handlers ─────────────────────────
+  // Aplica el resultado de signIn() a la UI (se usa en el intento normal y en
+  // el reintento tras cerrar una sesión vieja, ver handleLogin más abajo).
+  const aplicarResultadoSignIn = (res) => {
+    if (res.isSignedIn || res.nextStep?.signInStep === 'DONE') {
+      setLogged(true);
+    } else if (res.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+      setNeedsNewPass(true);
+      setAuthError('Tu contraseña es temporal. Define una nueva.');
+    } else {
+      setAuthError(`Paso adicional requerido: ${res.nextStep?.signInStep || 'desconocido'}`);
+    }
+  };
+
   const handleLogin = async () => {
     setAuthError('');
     if (!email.trim() || !pass) {
@@ -242,22 +255,24 @@ function Root() {
     setAuthBusy(true);
     try {
       const res = await signIn({ username: email.trim(), password: pass });
-      if (res.isSignedIn) {
-        setLogged(true);
-      } else if (res.nextStep?.signInStep === 'DONE') {
-        setLogged(true);
-      } else if (
-        res.nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED'
-      ) {
-        setNeedsNewPass(true);
-        setAuthError('Tu contraseña es temporal. Define una nueva.');
-      } else {
-        setAuthError(`Paso adicional requerido: ${res.nextStep?.signInStep || 'desconocido'}`);
-      }
+      aplicarResultadoSignIn(res);
     } catch (e) {
       if (e?.name === 'UserAlreadyAuthenticatedException') {
-        setLogged(true);
+        // Quedó una sesión vieja en el dispositivo (misma app/package de una
+        // instalación anterior). No sabemos si es la misma cuenta que se
+        // está intentando entrar ahora, así que la cerramos y reintentamos
+        // el login real con las credenciales escritas — nunca asumimos que
+        // "ya hay sesión" == "es la persona correcta".
+        try {
+          await signOut();
+          const res = await signIn({ username: email.trim(), password: pass });
+          aplicarResultadoSignIn(res);
+        } catch (e2) {
+          console.log('signIn retry error', e2?.name, e2?.message, e2?.underlyingError);
+          setAuthError(traducirAuthError(e2));
+        }
       } else {
+        console.log('signIn error', e?.name, e?.message, e?.underlyingError);
         setAuthError(traducirAuthError(e));
       }
     } finally {
