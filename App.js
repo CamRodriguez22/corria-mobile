@@ -1157,10 +1157,10 @@ function ActivityScreen({ mediciones, bloqueMap, bloquesMap, refreshing, onRefre
         onChange={setFiltro}
         options={[
           { value: 'all', label: 'Todas' },
+          { value: 'NINGUNA', label: 'Sin corrosión' },
           { value: 'LEVE', label: 'Leve' },
           { value: 'MODERADA', label: 'Moderada' },
           { value: 'SEVERA', label: 'Severa' },
-          { value: 'CRÍTICA', label: 'Crítica' },
         ]}
       />
 

@@ -153,7 +153,7 @@ export function calcularEstadisticas(mediciones = []) {
     const pct = num(m.area_corroida_pct, 0);
     suma += pct;
     const s = severidad(m);
-    if (s.i >= 3 || pct >= 40) severas += 1;
+    if (s.i >= 3 || pct >= 25) severas += 1;
   }
   const promedioPct = Math.round(suma / total);
   return {

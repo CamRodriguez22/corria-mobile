@@ -121,11 +121,10 @@ export const TOKENS = {
 // area_corroida_pct y confianza_promedio llegan como string en los GET y como number en el POST.
 // ─────────────────────────────────────────────────────────────
 export const NIVELES = [
-  { i: 0, label: 'Sin corrosión', short: 'NINGUNA', color: TOKENS.colors.success, tint: TOKENS.colors.successTint },
-  { i: 1, label: 'Leve', short: 'LEVE', color: TOKENS.colors.success, tint: TOKENS.colors.successTint },
-  { i: 2, label: 'Moderada', short: 'MODERADA', color: TOKENS.colors.warning, tint: TOKENS.colors.warningTint },
-  { i: 3, label: 'Severa', short: 'SEVERA', color: TOKENS.colors.danger, tint: TOKENS.colors.dangerTint },
-  { i: 4, label: 'Crítica', short: 'CRÍTICA', color: TOKENS.colors.critical, tint: TOKENS.colors.criticalTint },
+  { i: 0, label: 'Sin corrosión', short: 'NINGUNA', color: '#10b981', tint: 'rgba(16, 185, 129, 0.12)' },
+  { i: 1, label: 'Leve', short: 'LEVE', color: '#0ea5e9', tint: 'rgba(14, 165, 233, 0.12)' },
+  { i: 2, label: 'Moderada', short: 'MODERADA', color: '#f59e0b', tint: 'rgba(245, 158, 11, 0.12)' },
+  { i: 3, label: 'Severa', short: 'SEVERA', color: '#ef4444', tint: 'rgba(239, 68, 68, 0.12)' },
 ];
 
 export function num(v, fallback = 0) {
@@ -135,17 +134,17 @@ export function num(v, fallback = 0) {
 
 // Metadatos de severidad a partir del nivel numérico del backend.
 export function nivelMeta(nivelCorrosion) {
-  const i = Math.max(0, Math.min(4, Math.round(num(nivelCorrosion, 0))));
+  const i = Math.max(0, Math.min(3, Math.round(num(nivelCorrosion, 0))));
   return NIVELES[i];
 }
 
-// Fallback cuando no hay nivel: derivar de % de área (bandas del mockup).
+// Fallback exacto a la función _calcular_nivel de inference/handler.py (10% y 25%).
 export function severidadDePct(pct) {
   const p = num(pct, 0);
-  if (p >= 40) return NIVELES[3];
-  if (p >= 20) return NIVELES[2];
-  if (p > 0) return NIVELES[1];
-  return NIVELES[0];
+  if (p < 0.05) return NIVELES[0];
+  if (p < 10) return NIVELES[1];
+  if (p < 25) return NIVELES[2];
+  return NIVELES[3];
 }
 
 // Severidad "efectiva": usa el nivel del backend, cae al % si el nivel no viene.
