@@ -67,7 +67,6 @@ import {
   validarFoto,
   formatDate,
   formatDateTime,
-  relativeDate,
   calcularEstadisticas,
   saveLocal,
   loadLocal,
