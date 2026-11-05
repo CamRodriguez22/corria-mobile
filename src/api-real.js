@@ -133,11 +133,15 @@ export async function renombrarMedicion(id_punto, id_medicion, nuevoNombre, toke
 }
 
 // POST /mediciones/lote/renombrar (renombrar lote)
-export async function renombrarLote(mediciones, nuevoNombre, token) {
-  if (!Array.isArray(mediciones) || mediciones.length === 0) throw new Error('Se requiere lista de mediciones.');
+export async function renombrarLote(items, nuevoNombre, token) {
+  if (!Array.isArray(items) || items.length === 0) throw new Error('Se requiere lista de mediciones.');
+  const formateados = items.map((it) => ({
+    id_punto: it.id_punto,
+    id_medicion: it.id_medicion,
+  }));
   return req('POST', '/mediciones/lote/renombrar', {
     token,
-    body: { mediciones, nombre: nuevoNombre },
+    body: { items: formateados, nombre: nuevoNombre },
   });
 }
 
