@@ -641,7 +641,7 @@ function Root() {
       title: 'Renombrar foto',
       message: 'Ingresa el nuevo nombre descriptivo para esta medición:',
       initialValue: m.nombre || '',
-      placeholder: 'Ej. Probeta soldadura B, Cara norte',
+      placeholder: 'Ej. Cara norte, Viga 4B',
       onConfirm: async (nuevoNombre) => {
         setPromptModal((prev) => ({ ...prev, visible: false }));
         if (!nuevoNombre || !nuevoNombre.trim()) return;
@@ -1580,11 +1580,11 @@ function ContextScreen({ gps, gpsError, lugar, bloques, bloqueSel, setBloqueSel,
         </View>
 
         <Text style={{ fontSize: TOKENS.fontSizes.h6, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: TOKENS.colors.neutral600, marginTop: 20, marginBottom: 8 }}>
-          Lote / Campaña (opcional)
+          Lote (opcional)
         </Text>
         <Field
           label="Nombre del lote"
-          placeholder="Ej. Inspección Noviembre, Probeta #4"
+          placeholder="Ej. Inspección Noviembre, Estructura A"
           value={loteNombre}
           onChangeText={setLoteNombre}
         />

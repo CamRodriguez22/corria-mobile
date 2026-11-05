@@ -573,7 +573,10 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombr
       </View>
       <Text style={{ fontSize: 42, fontWeight: '800', color: TOKENS.colors.text }}>{porcentaje}%</Text>
       <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
-        {esSobrePlaca ? 'Corrosión sobre la probeta/placa' : 'Corrosión detectada'}
+        {esSobrePlaca ? 'Corrosión sobre la placa' : 'Corrosión detectada'}
+      </Text>
+      <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500, marginTop: 4, fontStyle: 'italic' }}>
+        * Valor aproximado: depende del encuadre y no reemplaza una inspección en sitio.
       </Text>
       <Divider />
       <View style={{ gap: 10 }}>
