@@ -61,6 +61,7 @@ import {
   getCurrentLocation,
   reverseGeocode,
   pickPhoto,
+  pickPhotos,
   validarFoto,
   formatDate,
   formatDateTime,
@@ -141,8 +142,9 @@ function Root() {
   const [gps, setGps] = useState(null);
   const [gpsError, setGpsError] = useState('');
   const [foto, setFoto] = useState(null);
+  const [colaFotos, setColaFotos] = useState([]); // [{ uri, base64, status: 'esperando'|'subiendo'|'analizando'|'lista'|'error', error?: string }]
   const [lugar, setLugar] = useState(null); // { ciudad, barrio, direccion } del reverse-geocode
-  const [progress, setProgress] = useState(0);
+  const [etapaSubida, setEtapaSubida] = useState(''); // preparando_subida | subiendo_s3 | analizando_ia | completado
   const [resultado, setResultado] = useState(null);
   const [espesor, setEspesor] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -423,29 +425,64 @@ function Root() {
 
   const capturar = async (fromCamera) => {
     try {
-      const f = await pickPhoto({ fromCamera });
-      if (!f) return; // cancelado
-      const err = validarFoto(f);
-      if (err) {
-        Alert.alert('Foto no válida', err);
-        return;
+      if (fromCamera) {
+        const f = await pickPhoto({ fromCamera: true });
+        if (!f) return;
+        const err = validarFoto(f);
+        if (err) {
+          setConfirmModal({
+            visible: true,
+            title: 'Foto no válida',
+            message: err,
+            confirmLabel: 'Entendido',
+            cancelLabel: '',
+            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
+          });
+          return;
+        }
+        setFoto(f);
+        setColaFotos([{ ...f, status: 'esperando' }]);
+        setScreen('preview');
+      } else {
+        const fotosSeleccionadas = await pickPhotos({ fromCamera: false, allowsMultiple: true });
+        if (!fotosSeleccionadas || !fotosSeleccionadas.length) return;
+        const validas = [];
+        for (const item of fotosSeleccionadas) {
+          if (!validarFoto(item)) {
+            validas.push({ ...item, status: 'esperando' });
+          }
+        }
+        if (!validas.length) {
+          setConfirmModal({
+            visible: true,
+            title: 'Fotos no válidas',
+            message: 'Ninguna de las fotos seleccionadas cumple los requisitos de resolución.',
+            confirmLabel: 'Entendido',
+            cancelLabel: '',
+            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
+          });
+          return;
+        }
+        setFoto(validas[0]);
+        setColaFotos(validas);
+        setScreen('preview');
       }
-      setFoto(f);
-      setScreen('preview');
     } catch (e) {
-      Alert.alert('Cámara', e.message || 'No se pudo abrir la cámara.');
+      setConfirmModal({
+        visible: true,
+        title: 'Cámara / Galería',
+        message: e.message || 'No se pudo acceder a las fotos.',
+        confirmLabel: 'Entendido',
+        cancelLabel: '',
+        onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
+      });
     }
   };
 
   const analizar = async () => {
-    if (!foto || !bloqueSel) return;
+    if (!colaFotos.length || !bloqueSel) return;
     setScreen('analyzing');
-    setProgress(6);
     setResultado(null);
-
-    const timer = setInterval(() => {
-      setProgress((p) => (p >= 92 ? 92 : p + Math.random() * 12));
-    }, 350);
 
     const bloqueElegido = bloquesMap[bloqueSel];
     let gpsUsar = gps;
@@ -454,57 +491,86 @@ function Root() {
     }
 
     try {
-      // Usa el nombre legible del bloque en la nota (bloqueSel puede ser un
-      // id_bloque real, no una letra corta como antes).
       const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), descripcion);
-      const bloqueIdReal = await resolverBloqueId({
-        bloque: bloqueElegido,
-      });
+      const bloqueIdReal = await resolverBloqueId({ bloque: bloqueElegido });
       let idLoteParaSubir = loteIdActual;
       if (!idLoteParaSubir && loteNombreInput) {
         idLoteParaSubir = `lote_${Date.now()}`;
         setLoteIdActual(idLoteParaSubir);
       }
-      const { medicion } = await subirMedicion({
-        foto,
-        gps: gpsUsar,
-        bloqueId: bloqueIdReal,
-        loteId: idLoteParaSubir || undefined,
-        loteNombre: loteNombreInput || undefined,
-        notas,
-      });
-      clearInterval(timer);
-      setProgress(100);
 
-      // etiquetar bloque + guardar foto local + refrescar lista
-      const nuevoMap = { ...bloqueMap, [medicion.id_medicion]: bloqueIdReal };
-      setBloqueMap(nuevoMap);
-      saveLocal(APP_CONFIG.storageKeys.bloquePorMedicion, nuevoMap);
-      guardarFotoLocal({
-        uri: foto.uri,
-        base64: foto.base64,
-        bloque: bloqueIdReal,
-        id: medicion.id_medicion,
-        ts: medicion.timestamp,
-        meta: {
-          nivel_corrosion: medicion.nivel_corrosion,
-          area_corroida_pct: medicion.area_corroida_pct,
-          confianza_promedio: medicion.confianza_promedio,
+      let ultimaMedicion = null;
+      const colaActualizada = [...colaFotos];
+
+      for (let i = 0; i < colaActualizada.length; i++) {
+        const itemFoto = colaActualizada[i];
+        itemFoto.status = 'subiendo';
+        setColaFotos([...colaActualizada]);
+
+        try {
+          const { medicion } = await subirMedicion({
+            foto: itemFoto,
+            gps: gpsUsar,
+            bloqueId: bloqueIdReal,
+            loteId: idLoteParaSubir || undefined,
+            loteNombre: loteNombreInput || undefined,
+            notas,
+            onEtapa: (e) => setEtapaSubida(e),
+          });
+
+          itemFoto.status = 'lista';
+          itemFoto.medicion = medicion;
+          ultimaMedicion = medicion;
+          setColaFotos([...colaActualizada]);
+
+          const nuevoMap = { ...bloqueMap, [medicion.id_medicion]: bloqueIdReal };
+          setBloqueMap(nuevoMap);
+          saveLocal(APP_CONFIG.storageKeys.bloquePorMedicion, nuevoMap);
+
+          guardarFotoLocal({
+            uri: itemFoto.uri,
+            base64: itemFoto.base64,
+            bloque: bloqueIdReal,
+            id: medicion.id_medicion,
+            ts: medicion.timestamp,
+            meta: {
+              nivel_corrosion: medicion.nivel_corrosion,
+              area_corroida_pct: medicion.area_corroida_pct,
+              confianza_promedio: medicion.confianza_promedio,
+            },
+          });
+
+          const { mascaras, ...ligera } = medicion;
+          const medConFoto = { ...ligera, url_imagen: medicion.url_imagen || itemFoto.uri, _localUri: itemFoto.uri };
+          setMediciones((prev) => [medConFoto, ...prev.filter((m) => m.id_medicion !== medicion.id_medicion)]);
+        } catch (errFoto) {
+          itemFoto.status = 'error';
+          itemFoto.error = errFoto.message;
+          setColaFotos([...colaActualizada]);
+        }
+      }
+
+      setEtapaSubida('completado');
+
+      if (ultimaMedicion) {
+        const { mascaras, ...ligera } = ultimaMedicion;
+        setResultado({ ...ligera, url_imagen: ultimaMedicion.url_imagen || colaFotos[0]?.uri, _localUri: colaFotos[0]?.uri });
+        setScreen('result');
+      } else {
+        throw new Error('No se pudo procesar ninguna foto.');
+      }
+    } catch (e) {
+      setConfirmModal({
+        visible: true,
+        title: 'Error en el análisis',
+        message: e.message || 'Error del servidor.',
+        confirmLabel: 'Reintentar',
+        cancelLabel: 'Volver',
+        onConfirm: () => {
+          setConfirmModal((prev) => ({ ...prev, visible: false }));
+          analizar();
         },
       });
-
-      const { mascaras, ...ligera } = medicion;
-      const medConFoto = { ...ligera, url_imagen: medicion.url_imagen || foto.uri, _localUri: foto.uri };
-      setResultado(medConFoto);
-      setMediciones((prev) => [medConFoto, ...prev.filter((m) => m.id_medicion !== medicion.id_medicion)]);
-      setScreen('result');
-    } catch (e) {
-      clearInterval(timer);
-      console.log('analizar', e?.message);
-      Alert.alert('No se pudo analizar', e.message || 'Error del servidor.', [
-        { text: 'Reintentar', onPress: analizar },
-        { text: 'Volver', style: 'cancel', onPress: () => setScreen('preview') },
-      ]);
     }
   };
 
@@ -657,7 +723,7 @@ function Root() {
     );
 
   if (screen === 'analyzing')
-    return <AnalyzingScreen progress={progress} bloqueSel={bloqueSelLabel} />;
+    return <AnalyzingScreen etapa={etapaSubida} colaFotos={colaFotos} bloqueSel={bloqueSelLabel} />;
 
   if (screen === 'result' && resultado)
     return (
@@ -1357,22 +1423,48 @@ function PreviewScreen({ foto, bloqueSel, onBack, onConfirm }) {
 }
 
 // ═══════════════════════════ ANALYZING ═══════════════════════════
-function AnalyzingScreen({ progress, bloqueSel }) {
-  const phase = progress < 45 ? 'Subiendo foto' : 'Analizando corrosión';
+function AnalyzingScreen({ etapa, colaFotos, bloqueSel }) {
+  let mensaje = 'Procesando inspección…';
+  let detalle = 'Conectando con el servidor';
+  if (etapa === 'preparando_subida') {
+    mensaje = 'Preparando almacenamiento';
+    detalle = 'Generando enlace seguro';
+  } else if (etapa === 'subiendo_s3') {
+    mensaje = 'Subiendo imagen a la nube';
+    detalle = 'Cargando foto en alta resolución';
+  } else if (etapa === 'analizando_ia') {
+    mensaje = 'Analizando corrosión con IA';
+    detalle = 'Segmentando áreas y severidad';
+  } else if (etapa === 'completado') {
+    mensaje = '¡Análisis completado!';
+    detalle = 'Sincronizando registros';
+  }
+
+  const procesadas = colaFotos.filter((f) => f.status === 'lista' || f.status === 'error').length;
+  const total = colaFotos.length || 1;
+  const progresoPct = Math.round((procesadas / total) * 100);
+
   return (
     <Screen center style={{ padding: 40, gap: 26 }}>
       <Spinner size={92} thickness={5} />
       <View style={{ alignItems: 'center' }}>
-        <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text }}>{phase}</Text>
-        <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 6 }}>
-          Bloque {bloqueSel} · {progress < 45 ? 'envío a la nube' : 'detección de óxido (YOLO)'}
+        <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text, textAlign: 'center' }}>
+          {mensaje}
+        </Text>
+        <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 6, textAlign: 'center' }}>
+          Punto {bloqueSel} · {detalle}
         </Text>
       </View>
-      <View style={{ width: '100%' }}>
-        <ProgressBar value={progress} />
-        <Text style={{ textAlign: 'right', fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500, marginTop: 8 }}>
-          {Math.round(progress)}%
-        </Text>
+      <View style={{ width: '100%', gap: 8 }}>
+        <ProgressBar value={total > 1 ? progresoPct : (etapa === 'analizando_ia' ? 75 : 35)} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500 }}>
+            {total > 1 ? `Foto ${procesadas + 1} de ${total}` : 'Foto en proceso'}
+          </Text>
+          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.accent, fontWeight: '700' }}>
+            {total > 1 ? `${progresoPct}%` : (etapa === 'analizando_ia' ? 'Fase 2/2' : 'Fase 1/2')}
+          </Text>
+        </View>
       </View>
     </Screen>
   );
