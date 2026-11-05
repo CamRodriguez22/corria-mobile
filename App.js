@@ -36,6 +36,8 @@ import {
   Header,
   TabBar,
   ResultCard,
+  ConfirmModal,
+  PromptModal,
 } from './src/DesignComponents';
 import {
   AWS_CONFIG,
@@ -145,6 +147,10 @@ function Root() {
   const [descripcion, setDescripcion] = useState('');
   const [obsOpen, setObsOpen] = useState(false);
   const [obsSaved, setObsSaved] = useState(false);
+
+  // modales interactivos (reemplazo de Alert.alert y Alert.prompt en web y móvil)
+  const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', variant: 'primary', onConfirm: null });
+  const [promptModal, setPromptModal] = useState({ visible: false, title: '', message: '', initialValue: '', onConfirm: null });
 
   const nombre = perfil?.nombre || (perfil?.email || email).split('@')[0] || 'Usuario';
   const iniciales = nombre
@@ -308,30 +314,30 @@ function Root() {
   };
 
   const handleLogout = async () => {
-    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Cerrar sesión',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await signOut();
-          } catch {}
-          await clearLocalData();
-          setLogged(false);
-          setPerfil(null);
-          setMediciones([]);
-          setBloques([]);
-          setBloqueMap({});
-          setObsMap({});
-          setPass('');
-          setNewPass('');
-          setNeedsNewPass(false);
-          setTab('home');
-          setScreen('home');
-        },
+    setConfirmModal({
+      visible: true,
+      title: 'Cerrar sesión',
+      message: '¿Seguro que quieres salir de tu cuenta?',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, visible: false }));
+        try {
+          await signOut();
+        } catch {}
+        await clearLocalData();
+        setLogged(false);
+        setPerfil(null);
+        setMediciones([]);
+        setBloques([]);
+        setBloqueMap({});
+        setObsMap({});
+        setPass('');
+        setNewPass('');
+        setNeedsNewPass(false);
+        setTab('home');
+        setScreen('home');
       },
-    ]);
+    });
   };
 
   // ───────────────────────── flujo de medición ─────────────────────────
@@ -488,51 +494,59 @@ function Root() {
   };
 
   const renombrarFoto = (m) => {
-    Alert.prompt
-      ? Alert.prompt(
-          'Renombrar foto',
-          'Ingresa el nuevo nombre:',
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            {
-              text: 'Guardar',
-              onPress: async (nuevoNombre) => {
-                if (!nuevoNombre || !nuevoNombre.trim()) return;
-                try {
-                  await renombrarMedicion(m.id_punto, m.id_medicion, nuevoNombre.trim());
-                  const act = { ...m, nombre: nuevoNombre.trim() };
-                  setDetalle(act);
-                  setMediciones((prev) => prev.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
-                } catch (e) {
-                  Alert.alert('No se pudo renombrar', e.message || 'Error del servidor.');
-                }
-              },
-            },
-          ],
-          'plain-text',
-          m.nombre || ''
-        )
-      : Alert.alert('Aviso', 'Función disponible en la web o dispositivo compatible.');
+    setPromptModal({
+      visible: true,
+      title: 'Renombrar foto',
+      message: 'Ingresa el nuevo nombre descriptivo para esta medición:',
+      initialValue: m.nombre || '',
+      placeholder: 'Ej. Probeta soldadura B, Cara norte',
+      onConfirm: async (nuevoNombre) => {
+        setPromptModal((prev) => ({ ...prev, visible: false }));
+        if (!nuevoNombre || !nuevoNombre.trim()) return;
+        try {
+          await renombrarMedicion(m.id_punto, m.id_medicion, nuevoNombre.trim());
+          const act = { ...m, nombre: nuevoNombre.trim() };
+          setDetalle(act);
+          setMediciones((prev) => prev.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
+        } catch (e) {
+          setConfirmModal({
+            visible: true,
+            title: 'No se pudo renombrar',
+            message: e.message || 'Error del servidor.',
+            confirmLabel: 'Entendido',
+            cancelLabel: '',
+            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
+          });
+        }
+      },
+    });
   };
 
   const borrar = (m) => {
-    Alert.alert('Eliminar medición', 'Esta acción no se puede deshacer.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await eliminarMedicion(m.id_punto, m.id_medicion);
-            setMediciones((prev) => prev.filter((x) => x.id_medicion !== m.id_medicion));
-            setDetalle(null);
-            setScreen(folderClave ? 'folder' : tab);
-          } catch (e) {
-            Alert.alert('No se pudo eliminar', e.message || 'Error del servidor.');
-          }
-        },
+    setConfirmModal({
+      visible: true,
+      title: 'Eliminar medición',
+      message: 'Esta acción no se puede deshacer. Se borrará la foto y el registro.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, visible: false }));
+        try {
+          await eliminarMedicion(m.id_punto, m.id_medicion);
+          setMediciones((prev) => prev.filter((x) => x.id_medicion !== m.id_medicion));
+          setDetalle(null);
+          setScreen(folderClave ? 'folder' : tab);
+        } catch (e) {
+          setConfirmModal({
+            visible: true,
+            title: 'No se pudo eliminar',
+            message: e.message || 'Error del servidor.',
+            confirmLabel: 'Entendido',
+            cancelLabel: '',
+            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
+          });
+        }
       },
-    ]);
+    });
   };
 
   // ───────────────────────── render ─────────────────────────
@@ -710,6 +724,25 @@ function Root() {
         )}
       </View>
       <TabBar current={tab} onChange={setTabAndScreen} items={TABS} />
+      <ConfirmModal
+        visible={confirmModal.visible}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, visible: false }))}
+      />
+      <PromptModal
+        visible={promptModal.visible}
+        title={promptModal.title}
+        message={promptModal.message}
+        initialValue={promptModal.initialValue}
+        placeholder={promptModal.placeholder}
+        onConfirm={promptModal.onConfirm}
+        onCancel={() => setPromptModal((prev) => ({ ...prev, visible: false }))}
+      />
     </Screen>
   );
 }

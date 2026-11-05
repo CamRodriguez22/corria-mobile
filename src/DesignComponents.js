@@ -14,6 +14,7 @@ import {
   ScrollView,
   Platform,
   StatusBar,
+  Modal,
 } from 'react-native';
 import { TOKENS, severidad, confianzaPct, num } from './DesignTokens';
 
@@ -579,6 +580,114 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombr
         )}
       </View>
     </View>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// ConfirmModal — Reemplazo accesible y multiplataforma de Alert.alert
+// ─────────────────────────────────────────────────────────────
+export const ConfirmModal = ({
+  visible,
+  title,
+  message,
+  confirmLabel = 'Aceptar',
+  cancelLabel = 'Cancelar',
+  variant = 'primary', // primary | danger
+  onConfirm,
+  onCancel,
+}) => {
+  if (!visible) return null;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: 24, width: '100%', maxWidth: 340, ...TOKENS.shadow.lg }}>
+          {!!title && (
+            <Text style={{ fontSize: TOKENS.fontSizes.h4, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 8 }}>
+              {title}
+            </Text>
+          )}
+          {!!message && (
+            <Text style={{ fontSize: TOKENS.fontSizes.body, color: TOKENS.colors.neutral600, marginBottom: 20 }}>
+              {message}
+            </Text>
+          )}
+          <View style={{ gap: 10 }}>
+            <Button
+              variant={variant === 'danger' ? 'danger' : 'primary'}
+              label={confirmLabel}
+              onPress={onConfirm}
+            />
+            {!!cancelLabel && (
+              <Button
+                variant="ghost"
+                label={cancelLabel}
+                onPress={onCancel}
+              />
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// PromptModal — Reemplazo multiplataforma de Alert.prompt
+// ─────────────────────────────────────────────────────────────
+export const PromptModal = ({
+  visible,
+  title,
+  message,
+  initialValue = '',
+  placeholder = '',
+  confirmLabel = 'Guardar',
+  cancelLabel = 'Cancelar',
+  onConfirm,
+  onCancel,
+}) => {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue, visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: 24, width: '100%', maxWidth: 340, ...TOKENS.shadow.lg }}>
+          {!!title && (
+            <Text style={{ fontSize: TOKENS.fontSizes.h4, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 6 }}>
+              {title}
+            </Text>
+          )}
+          {!!message && (
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginBottom: 16 }}>
+              {message}
+            </Text>
+          )}
+          <Field
+            label=""
+            value={value}
+            onChangeText={setValue}
+            placeholder={placeholder}
+            autoFocus
+          />
+          <View style={{ gap: 10, marginTop: 12 }}>
+            <Button
+              label={confirmLabel}
+              onPress={() => onConfirm(value)}
+            />
+            <Button
+              variant="ghost"
+              label={cancelLabel}
+              onPress={onCancel}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
