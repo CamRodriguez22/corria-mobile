@@ -62,8 +62,16 @@ async function req(method, path, { token, body, timeoutMs = 60000 } = {}) {
     data = text;
   }
   if (!res.ok) {
-    const msg = (data && (data.error || data.message)) || text || `Error ${res.status}`;
-    const err = new Error(`${method} ${path} — ${msg}`);
+    const serverMsg = (data && (data.error || data.message)) || (typeof text === 'string' && text.length < 200 ? text : null);
+    let userMsg = serverMsg;
+    if (!userMsg) {
+      if (res.status === 401) userMsg = 'Tu sesión expiró. Inicia sesión nuevamente.';
+      else if (res.status === 403) userMsg = 'No tienes permiso para realizar esta acción.';
+      else if (res.status === 404) userMsg = 'El recurso solicitado no fue encontrado.';
+      else if (res.status >= 500) userMsg = 'Error en el servidor. Intenta de nuevo en unos momentos.';
+      else userMsg = `Ocurrió un error (${res.status}). Intenta de nuevo.`;
+    }
+    const err = new Error(userMsg);
     err.status = res.status;
     err.data = data;
     throw err;
