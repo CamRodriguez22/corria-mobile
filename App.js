@@ -989,13 +989,16 @@ function LoginScreen({
               />
               {!!authError && <ErrorText text={authError} />}
               <Button label="Iniciar sesión" onPress={onLogin} loading={authBusy} />
+              <Text style={{ textAlign: 'center', fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 14 }}>
+                ¿Olvidaste tu contraseña? Contacta al administrador de tu organización para restablecer tu acceso.
+              </Text>
             </>
           )}
         </View>
 
         <View style={{ flex: 1 }} />
         <Text style={{ textAlign: 'center', fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500, marginTop: 40 }}>
-          © 2026 Universidad del Norte
+          © 2026 PIXELRUST · Inspección asistida por IA
         </Text>
         </ScrollView>
       </KeyboardAvoidingView>
