@@ -167,10 +167,12 @@ export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng
     imagen_base64: img, // CRUDO, sin prefijo "data:image/jpeg;base64," (verificado)
     fuente: 'movil',
     bloque_id: bloqueId,
-    latitud_real: lat,
-    longitud_real: lng,
     notas: notas || `movil-bloque-${bloqueId}`,
   };
+  if (lat != null && lng != null) {
+    body.latitud_real = lat;
+    body.longitud_real = lng;
+  }
   if (loteId) body.lote_id = loteId;
   if (loteNombre) body.lote_nombre = loteNombre;
 
@@ -178,15 +180,14 @@ export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng
 }
 
 // ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
-// foto: { uri, base64 }  ·  gps: { lat, lng }  ·  bloqueId: id_bloque real ya resuelto
+// foto: { uri, base64 }  ·  gps: { lat, lng } (opcional) ·  bloqueId: id_bloque real
 export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, notas = '' }) {
-  if (!gps?.lat || !gps?.lng) throw new Error('No hay coordenadas GPS para la medición.');
-  if (!bloqueId) throw new Error('No se pudo determinar el bloque de la medición.');
+  if (!bloqueId) throw new Error('No se pudo determinar el punto de la medición.');
   const medicion = await subirMedicionReal({
     uri: foto?.uri,
     base64: foto?.base64,
-    lat: gps.lat,
-    lng: gps.lng,
+    lat: gps?.lat,
+    lng: gps?.lng,
     bloqueId,
     loteId,
     loteNombre,
