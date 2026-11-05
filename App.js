@@ -11,6 +11,7 @@ import {
   Share,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
 
 // Polyfills antes de Amplify
@@ -196,6 +197,46 @@ function Root() {
     if (logged) cargarTodo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged]);
+
+  // Manejador del botón atrás de Android (BackHandler)
+  useEffect(() => {
+    const onBackPress = () => {
+      if (screen === 'detail') {
+        setScreen(folderClave ? 'folder' : tab);
+        return true;
+      }
+      if (screen === 'folder') {
+        setScreen('folders');
+        setFolderClave(null);
+        return true;
+      }
+      if (screen === 'preview') {
+        setScreen('camera');
+        return true;
+      }
+      if (screen === 'camera') {
+        setScreen('context');
+        return true;
+      }
+      if (screen === 'context') {
+        setScreen('home');
+        return true;
+      }
+      if (screen === 'result') {
+        terminarLote();
+        return true;
+      }
+      if (tab !== 'home') {
+        setTab('home');
+        setScreen('home');
+        return true;
+      }
+      return false; // permite salir de la app en la pantalla inicial
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [screen, tab, folderClave]);
 
   const cargarTodo = useCallback(async (first = false) => {
     if (first) setLoadingData(true);
