@@ -1816,7 +1816,10 @@ function ResultScreen({
           <View style={{ marginTop: 12 }}>
             <Field label="Espesor (mm)" value={espesor} onChangeText={setEspesor} placeholder="Ej. 2.4" keyboardType="decimal-pad" />
             <Field label="Descripción" value={descripcion} onChangeText={setDescripcion} placeholder="Notas de campo…" multiline autoCapitalize="sentences" />
-            <Button variant="ghost" label={obsSaved ? 'Guardado ✓' : 'Guardar observaciones'} onPress={onSaveObs} />
+            <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.neutral500, marginBottom: 8 }}>
+              * Las notas y espesor se guardan localmente en este teléfono.
+            </Text>
+            <Button variant="ghost" label={obsSaved ? 'Guardado en este teléfono ✓' : 'Guardar en este teléfono'} onPress={onSaveObs} />
           </View>
         )}
       </ScrollView>
