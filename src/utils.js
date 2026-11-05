@@ -185,6 +185,17 @@ export async function loadLocal(key, fallback = null) {
   }
 }
 
+export async function clearLocalData() {
+  try {
+    const keys = Object.values(APP_CONFIG.storageKeys);
+    await AsyncStorage.multiRemove(keys);
+    return true;
+  } catch (e) {
+    console.log('clearLocalData', e?.message);
+    return false;
+  }
+}
+
 // ───────────────────────────── Fotos locales ─────────────────────────────
 // Guarda la foto en DocumentDirectory/PIXELRUST_Mediciones/{bloque}/{fecha}/ + metadata JSON.
 export async function guardarFotoLocal({ uri, base64, bloque = 'SIN_BLOQUE', id, meta = {}, ts }) {

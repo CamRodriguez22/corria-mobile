@@ -65,6 +65,7 @@ import {
   calcularEstadisticas,
   saveLocal,
   loadLocal,
+  clearLocalData,
   guardarFotoLocal,
   bloqueDeMedicion,
   agruparPorBloque,
@@ -315,9 +316,13 @@ function Root() {
           try {
             await signOut();
           } catch {}
+          await clearLocalData();
           setLogged(false);
           setPerfil(null);
           setMediciones([]);
+          setBloques([]);
+          setBloqueMap({});
+          setObsMap({});
           setPass('');
           setNewPass('');
           setNeedsNewPass(false);
