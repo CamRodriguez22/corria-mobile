@@ -1,69 +1,50 @@
-# PIXELRUST
+# PIXELRUST Móvil
 
-Detección de corrosión con IA (YOLOv8) — app móvil de inspección para el campus de Uninorte.
-Expo SDK 57 · React Native 0.86 · AWS Amplify (Cognito) + API Gateway + Lambda + DynamoDB + S3.
+Aplicación móvil para inspección y monitoreo de corrosión en campo con análisis asistido por inteligencia artificial.
+Construida con Expo SDK 57, React Native 0.86 y backend serverless en AWS (Cognito, API Gateway, Lambda, DynamoDB y S3).
 
-## Cómo demostrarla el lunes
+## Propósito
 
-### Opción A — APK independiente (recomendada, sin laptop)
+La aplicación móvil está diseñada como herramienta ágil para inspectores y técnicos en campo:
+- Subir mediciones individuales o por lotes de inspección a puntos existentes.
+- Analizar el porcentaje y severidad de corrosión mediante el modelo de segmentación en la nube.
+- Vigilar y consultar el historial reciente de mediciones e indicadores en tiempo real.
+- Operar de forma liviana y accesible, complementando la plataforma web sin duplicar funciones administrativas (sin gestión de usuarios, zonas ni puntos).
 
-Se generó un APK con EAS Build (perfil `preview`). Instálalo directo en un Android:
+## Desarrollo y pruebas locales
 
-1. Abre el link del build en https://expo.dev/accounts/camrodriguez22/projects/corria-mobile/builds
-2. Descarga el `.apk` en el teléfono y ábrelo (permite "instalar apps desconocidas").
-3. Abre PIXELRUST, inicia sesión con tu usuario Cognito.
+### Opción 1 — Simulador Web con vista móvil (recomendada para pruebas rápidas)
 
-Para regenerar el APK tras cambios:
+1. Iniciar el servidor web de Expo:
+   ```bash
+   npx expo start --web --port 8082
+   ```
+2. Servir y abrir el simulador responsivo en el navegador:
+   ```bash
+   python3 -m http.server 3005
+   ```
+   Abrir en el navegador: `http://localhost:3005/preview.html`
 
-```
-npx eas-cli build --profile preview --platform android
-```
+### Opción 2 — Dispositivo Android (Dev Client)
 
-### Opción B — Expo dev (con laptop y cable/wifi)
+Debido a los módulos nativos de autenticación de AWS Amplify, se utiliza Expo Dev Client:
 
-Requiere un **dev client** (Expo Go no sirve: la app usa módulos nativos de Amplify).
-
-```
-npx expo install expo-dev-client
-npx eas-cli build --profile development --platform android   # una vez
-npx expo start --dev-client                                  # cada vez que desarrolles
-```
-
-## Flujo de la app
-
-Login → Inicio (dashboard + recientes) → **Nueva medición** → elegir Bloque (G/J/K/L) →
-Cámara/Galería → Revisar foto → Analizar (POST a Lambda, corre YOLO) → Resultado
-(+ observaciones) → se guarda en el backend y en carpeta local.
-Pestañas: Inicio · Carpetas (por bloque) · Actividad (timeline) · Ajustes.
-
-## Arquitectura (nota importante)
-
-El backend **no conoce "bloques"**: trabaja con puntos geolocalizados por GPS. La app usa
-"Bloque G/J/K/L" como etiqueta visual mapeada a coordenadas fijas de Uninorte
-(`src/config.js`), pero **toda llamada de red usa el contrato real verificado**:
-
-| | |
-|---|---|
-| Auth | `Authorization: <ID token>` de Cognito, **sin** `Bearer` |
-| Subir | `POST /medicion` con `imagen_base64` (raw), `ubicacion:{modo}`, `latitud_real/longitud_real` |
-| Historial | `GET /mediciones/recientes?limit=N` → `{ total, mediciones[] }` |
-| Borrar | `DELETE /mediciones/{id_punto}?id_medicion={id_medicion}` |
-| Severidad | `nivel_corrosion` numérico: 0 ninguna · 1 leve · 2 moderada · 3 severa · 4 crítica |
-
-## Estructura
-
-```
-App.js                  — navegación + todas las pantallas
-src/config.js           — endpoints, Cognito, bloques del campus, claves de AsyncStorage
-src/api-real.js         — cliente del backend (contrato verificado en vivo)
-src/utils.js            — GPS, cámara, geocoding, fechas, estadísticas, caché local, agrupación
-src/DesignTokens.js     — colores, tipografía accesible, mapeo de severidad
-src/DesignComponents.js — Button, Field, Spinner, TabBar, MeasurementRow, Screen, etc.
+```bash
+npx expo start --android
 ```
 
-## Pendientes / mejoras futuras
+## Contrato de Backend (pf-corrosion-api)
 
-- `expo-dev-client` no está instalado (por eso el APK es `preview`, no dev build).
-- `react-native-safe-area-context` no se usa: hay un `<Screen>` propio con insets manuales.
-- Sin cola offline con reintentos: solo caché de lectura en AsyncStorage.
-- Las observaciones (espesor/nota) se guardan localmente; el backend no expone PATCH de medición.
+La aplicación consume directamente los endpoints verificados del backend:
+
+| Operación | Método y Ruta | Descripción |
+|---|---|---|
+| Autenticación | AWS Cognito | Token JWT ID sin prefijo Bearer |
+| Perfil | `GET /usuarios/me` | Datos de usuario, rol y empresa |
+| Indicadores | `GET /indicadores` | Resumen de mediciones a 30 días y puntos activos |
+| Historial | `GET /mediciones/recientes?limit=30&cursor=...` | Mediciones con paginación real |
+| Puntos | `GET /bloques` | Puntos de inspección asociados a la empresa |
+| Subida directa | `POST /medicion/upload-url` | Obtención de URL prefirmada S3 para imágenes grandes |
+| Análisis IA | `POST /medicion` | Procesamiento del modelo de segmentación |
+| Renombrar | `PATCH /mediciones/{id_punto}` / `POST /mediciones/lote/renombrar` | Actualización de etiquetas |
+| Eliminar | `DELETE /mediciones/{id_punto}?id_medicion=...` | Eliminación de mediciones |

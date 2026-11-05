@@ -974,10 +974,10 @@ function LoginScreen({
                 Ingresa tu usuario y contraseña
               </Text>
               <Field
-                label="Usuario"
+                label="Usuario o correo"
                 value={email}
                 onChangeText={setEmail}
-                placeholder="correo@uninorte.edu.co"
+                placeholder="usuario@ejemplo.com"
                 keyboardType="email-address"
               />
               <Field

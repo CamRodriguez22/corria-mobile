@@ -14,7 +14,7 @@ export const AWS_CONFIG = {
   //   GET  /mediciones/recientes?limit=N        -> { total, mediciones: [...] }   (máx 100)
   //   GET  /mediciones/{id_punto}               -> [ ...mediciones ]
   //   GET  /alertas?horas=N&nivel_minimo=LEVE|MODERADA|SEVERA|CRITICA
-  //   POST /medicion                            -> objeto medición (corre YOLO); requiere bloque_id en la raíz
+  //   POST /medicion                            -> objeto medición (corre análisis IA); requiere bloque_id en la raíz
   //   DELETE /mediciones/{id_punto}?id_medicion={id_medicion}  -> { ok: true }
   // NOTA (2026-09-12): /puntos quedó retirado tras la fusión Punto→Bloque del backend real.
   apiBase: 'https://yzesth1il5.execute-api.us-east-1.amazonaws.com/prod',

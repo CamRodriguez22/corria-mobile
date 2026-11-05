@@ -11,7 +11,7 @@
 //   POST   /bloques                           -> bloque creado (tecnico/admin; NO cliente)
 //   GET    /mediciones/recientes?limit=N      -> { total, mediciones:[...] }   (máx 100)
 //   GET    /mediciones/{id_punto}             -> [ ...mediciones ]
-//   POST   /medicion                          -> objeto medición (corre YOLO)
+//   POST   /medicion                          -> objeto medición (corre análisis IA)
 //   PATCH  /mediciones/{id_punto}?id_medicion={id} -> renombra foto { nombre }
 //   POST   /mediciones/lote/renombrar         -> renombra lote { mediciones: [{id_punto, id_medicion}], nombre }
 //   DELETE /mediciones/{id_punto}?id_medicion={id_medicion}  -> { ok:true }
