@@ -39,26 +39,11 @@ export const APP_CONFIG = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Contexto institucional del proyecto (demo Uninorte).
-// El backend real SÍ tiene concepto de bloque (GET/POST /bloques, con bloque_id
-// obligatorio en POST /medicion). BLOQUES_CAMPUS queda como catálogo de RESPALDO
-// para cuando no hay red o el backend aún no tiene bloques cargados para la
-// empresa — la app real prioriza siempre los bloques que devuelve el backend
-// (ver getBloques() en src/api-real.js) y sólo cae aquí si esa llamada falla.
+// Contexto institucional por defecto (fallback hasta cargar perfil).
 // ─────────────────────────────────────────────────────────────
-export const ENTIDAD = 'Uninorte';
+export const ENTIDAD = 'PixelRust';
 export const CIUDAD = 'Barranquilla';
-// TODO: el backend real exige "departamento" en POST /bloques. La app apunta a
-// un único campus (Uninorte, Barranquilla), así que se asume fijo. Si el alcance
-// crece a otras ciudades/empresas, esto debe salir de GPS/reverse-geocode en vez
-// de un valor fijo.
 export const DEPARTAMENTO = 'Atlántico';
 
-export const BLOQUES_CAMPUS = {
-  G: { clave: 'G', nombre: 'Bloque G', detalle: 'Aulas', lat: 11.0192, lng: -74.8515, radio: 60 },
-  J: { clave: 'J', nombre: 'Bloque J', detalle: 'Laboratorios', lat: 11.0180, lng: -74.8503, radio: 60 },
-  K: { clave: 'K', nombre: 'Bloque K', detalle: 'Oficinas', lat: 11.0198, lng: -74.8495, radio: 60 },
-  L: { clave: 'L', nombre: 'Bloque L', detalle: 'Biblioteca', lat: 11.0175, lng: -74.8522, radio: 60 },
-};
-
-export const LISTA_BLOQUES = Object.values(BLOQUES_CAMPUS);
+export const BLOQUES_CAMPUS = {};
+export const LISTA_BLOQUES = [];

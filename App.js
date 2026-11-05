@@ -389,14 +389,8 @@ function Root() {
       // Usa el nombre legible del bloque en la nota (bloqueSel puede ser un
       // id_bloque real, no una letra corta como antes).
       const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), descripcion);
-      // bloqueElegido puede venir del catálogo real (ya trae id_bloque) o del
-      // respaldo offline (BLOQUES_CAMPUS, sin id_bloque real): resolverBloqueId
-      // crea el bloque de verdad en ese segundo caso (equivalente al viejo
-      // modo "planta_nueva", ahora contra el endpoint real /bloques).
       const bloqueIdReal = await resolverBloqueId({
         bloque: bloqueElegido,
-        lat: gpsUsar.lat,
-        lng: gpsUsar.lng,
       });
       const loteIdGenerado = loteNombreInput ? `lote_${Date.now()}` : undefined;
       const { medicion } = await subirMedicion({
@@ -409,16 +403,6 @@ function Root() {
       });
       clearInterval(timer);
       setProgress(100);
-
-      // Si el bloque se acababa de crear (no estaba en el catálogo cargado),
-      // se agrega localmente para que Carpetas/Detalle lo resuelvan sin esperar
-      // otro refresh.
-      if (!bloqueElegido?.id_bloque) {
-        setBloques((prev) => [
-          ...prev,
-          { ...bloqueElegido, id_bloque: bloqueIdReal, clave: bloqueIdReal },
-        ]);
-      }
 
       // etiquetar bloque + guardar foto local + refrescar lista
       const nuevoMap = { ...bloqueMap, [medicion.id_medicion]: bloqueIdReal };
@@ -1146,40 +1130,51 @@ function ContextScreen({ gps, gpsError, lugar, bloques, bloqueSel, setBloqueSel,
         />
 
         <Text style={{ fontSize: TOKENS.fontSizes.h6, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: TOKENS.colors.neutral600, marginTop: 14, marginBottom: 12 }}>
-          Bloques disponibles
+          Puntos disponibles
         </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-          {bloques.map((b) => {
-            const active = bloqueSel === b.clave;
-            return (
-              <Pressable
-                key={b.clave}
-                onPress={() => setBloqueSel(b.clave)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`${b.nombre}, ${b.detalle}`}
-                style={{
-                  width: '47%',
-                  minHeight: 64,
-                  borderRadius: TOKENS.radius.md,
-                  borderWidth: 1.5,
-                  borderColor: active ? TOKENS.colors.accent : TOKENS.colors.neutral300,
-                  backgroundColor: active ? TOKENS.colors.accent : 'transparent',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 12,
-                }}
-              >
-                <Text style={{ fontSize: TOKENS.fontSizes.h5, fontWeight: '800', color: active ? '#fff' : TOKENS.colors.text }}>
-                  {b.nombre}
-                </Text>
-                <Text style={{ fontSize: TOKENS.fontSizes.xs, color: active ? 'rgba(255,255,255,0.85)' : TOKENS.colors.neutral600, marginTop: 2 }}>
-                  {b.detalle}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        {bloques.length ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            {bloques.map((b) => {
+              const active = bloqueSel === b.clave;
+              return (
+                <Pressable
+                  key={b.clave}
+                  onPress={() => setBloqueSel(b.clave)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${b.nombre}, ${b.detalle}`}
+                  style={{
+                    width: '47%',
+                    minHeight: 64,
+                    borderRadius: TOKENS.radius.md,
+                    borderWidth: 1.5,
+                    borderColor: active ? TOKENS.colors.accent : TOKENS.colors.neutral300,
+                    backgroundColor: active ? TOKENS.colors.accent : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 12,
+                  }}
+                >
+                  <Text style={{ fontSize: TOKENS.fontSizes.h5, fontWeight: '800', color: active ? '#fff' : TOKENS.colors.text }}>
+                    {b.nombre}
+                  </Text>
+                  <Text style={{ fontSize: TOKENS.fontSizes.xs, color: active ? 'rgba(255,255,255,0.85)' : TOKENS.colors.neutral600, marginTop: 2 }}>
+                    {b.detalle}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={{ padding: 20, backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, alignItems: 'center' }}>
+            <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '600', color: TOKENS.colors.text, textAlign: 'center' }}>
+              Tu zona aún no tiene puntos registrados.
+            </Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, textAlign: 'center', marginTop: 6 }}>
+              Pide a un administrador que los cree en la plataforma web para poder asociar tus inspecciones.
+            </Text>
+          </View>
+        )}
 
         <View style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: gpsError ? TOKENS.colors.warningTint : TOKENS.colors.accent2_100, borderRadius: TOKENS.radius.pill, paddingHorizontal: 16, paddingVertical: 12 }}>
           <Text style={{ fontSize: 14 }}>{gpsError ? '⚠️' : '📡'}</Text>

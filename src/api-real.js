@@ -147,25 +147,11 @@ export async function eliminarMedicion(id_punto, id_medicion, token) {
   return req('DELETE', `/mediciones/${id_punto}?id_medicion=${encodeURIComponent(id_medicion)}`, { token });
 }
 
-// ─────────────────────────── Resolución de bloque_id ───────────────────────────
-// El bloque elegido en ContextScreen puede venir de dos orígenes:
-//   - catálogo real (GET /bloques): ya trae id_bloque -> se usa tal cual.
-//   - catálogo de respaldo offline (BLOQUES_CAMPUS, sin backend): no tiene
-//     id_bloque real, así que hay que CREARLO de verdad antes de subir la
-//     medición. Esto reemplaza al viejo modo "planta_nueva" (que creaba un
-//     "punto" con nombre) contra el endpoint real /bloques.
-export async function resolverBloqueId({ bloque, lat, lng, ciudad = CIUDAD, departamento = DEPARTAMENTO, token } = {}) {
-  if (!bloque) throw new Error('Selecciona un bloque antes de continuar.');
-  if (bloque.id_bloque) return bloque.id_bloque; // ya es un bloque real del backend
-  const creado = await crearBloque({
-    nombre: bloque.nombre,
-    lat: bloque.lat ?? lat,
-    lng: bloque.lng ?? lng,
-    ciudad,
-    departamento,
-    token,
-  });
-  return creado.id_bloque;
+// ─────────────────────────── Resolución de bloque_id (punto) ───────────────────────────
+export async function resolverBloqueId({ bloque } = {}) {
+  if (!bloque) throw new Error('Selecciona un punto antes de continuar.');
+  if (bloque.id_bloque) return bloque.id_bloque;
+  throw new Error('El punto seleccionado no tiene un identificador válido.');
 }
 
 // ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
