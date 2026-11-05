@@ -969,19 +969,34 @@ function FolderScreen({ clave, mediciones, bloqueMap, bloquesMap, listaBloques, 
 // ═══════════════════════════ ACTIVITY ═══════════════════════════
 function ActivityScreen({ mediciones, bloqueMap, bloquesMap, refreshing, onRefresh, onOpen }) {
   const [filtro, setFiltro] = useState('all');
+
   const filtradas = useMemo(() => {
     if (filtro === 'all') return mediciones;
     return mediciones.filter((m) => severidad(m).short === filtro);
   }, [mediciones, filtro]);
+
+  // Agrupación cronológica por día (como en la web)
+  const eventosPorDia = useMemo(() => {
+    const grupos = {};
+    for (const m of filtradas) {
+      const fecha = m.timestamp ? new Date(m.timestamp) : new Date();
+      const fechaClave = !isNaN(fecha.getTime())
+        ? fecha.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })
+        : 'Recientes';
+      if (!grupos[fechaClave]) grupos[fechaClave] = [];
+      grupos[fechaClave].push(m);
+    }
+    return Object.entries(grupos);
+  }, [filtradas]);
 
   return (
     <ScrollView
       contentContainerStyle={{ padding: PAD, paddingBottom: 32 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
     >
-      <Text style={{ fontSize: TOKENS.fontSizes.h2, fontWeight: '800', color: TOKENS.colors.text }}>Actividad</Text>
-      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 6, marginBottom: 14 }}>
-        Línea de tiempo del equipo
+      <Text style={{ fontSize: TOKENS.fontSizes.h2, fontWeight: '800', color: TOKENS.colors.text }}>Línea de tiempo</Text>
+      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 14 }}>
+        Historial cronológico de inspecciones
       </Text>
 
       <Segmented
@@ -997,29 +1012,67 @@ function ActivityScreen({ mediciones, bloqueMap, bloquesMap, refreshing, onRefre
         ]}
       />
 
-      <View style={{ marginTop: 18, paddingLeft: 22 }}>
-        <View style={{ position: 'absolute', left: 5, top: 6, bottom: 6, width: 2, backgroundColor: TOKENS.colors.neutral200 }} />
-        {filtradas.length ? (
-          filtradas.map((m) => {
-            const s = severidad(m);
-            return (
-              <Pressable
-                key={m.id_medicion}
-                onPress={() => onOpen(m)}
-                accessibilityRole="button"
-                style={{ marginBottom: 20 }}
-              >
-                <View style={{ position: 'absolute', left: -22, top: 4, width: 14, height: 14, borderRadius: 7, backgroundColor: s.color, borderWidth: 3, borderColor: TOKENS.colors.bg }} />
-                <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral500 }}>{relativeDate(m.timestamp)}</Text>
-                <Text style={{ fontSize: TOKENS.fontSizes.h5, fontWeight: '700', color: TOKENS.colors.text, marginTop: 3 }}>
-                  {tituloBloque(m, bloqueMap, bloquesMap)} · {num(m.area_corroida_pct, 0).toFixed(0)}%
+      <View style={{ marginTop: 18 }}>
+        {eventosPorDia.length ? (
+          eventosPorDia.map(([dia, items]) => (
+            <View key={dia} style={{ marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: TOKENS.colors.accent }} />
+                <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.neutral800, textTransform: 'capitalize' }}>
+                  {dia}
                 </Text>
-                <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
-                  {s.label} · confianza {confianzaPct(m.confianza_promedio)}%
+                <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500 }}>
+                  ({items.length} {items.length === 1 ? 'medición' : 'mediciones'})
                 </Text>
-              </Pressable>
-            );
-          })
+              </View>
+
+              <View style={{ paddingLeft: 18, borderLeftWidth: 2, borderLeftColor: TOKENS.colors.neutral200, marginLeft: 3 }}>
+                {items.map((m) => {
+                  const s = severidad(m);
+                  const hora = m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                  const titulo = m.nombre || tituloBloque(m, bloqueMap, bloquesMap);
+                  return (
+                    <Pressable
+                      key={m.id_medicion}
+                      onPress={() => onOpen(m)}
+                      accessibilityRole="button"
+                      style={{
+                        backgroundColor: TOKENS.colors.surfaceAlt,
+                        borderRadius: TOKENS.radius.md,
+                        padding: 12,
+                        marginBottom: 10,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                        ...TOKENS.shadow.sm,
+                      }}
+                    >
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s.color }} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text }}>
+                            {titulo}
+                          </Text>
+                          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500 }}>
+                            {hora}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: TOKENS.fontSizes.small, color: s.color, fontWeight: '600', marginTop: 2 }}>
+                          {num(m.area_corroida_pct, 0).toFixed(1)}% · {s.label}
+                        </Text>
+                        {!!m.lote_nombre && (
+                          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500, marginTop: 1 }}>
+                            Lote: {m.lote_nombre}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 16, color: TOKENS.colors.neutral400 }}>›</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ))
         ) : (
           <View style={{ paddingVertical: 30 }}>
             <EmptyState title="Nada por aquí" subtitle="No hay mediciones con ese filtro." />
@@ -1160,19 +1213,20 @@ function ContextScreen({ gps, gpsError, lugar, bloques, bloqueSel, setBloqueSel,
 function CameraScreen({ bloqueSel, onBack, onPick }) {
   return (
     <Screen>
-      <Header title="Capturar" subtitle={`Bloque ${bloqueSel}`} onBack={onBack} />
-      <View style={{ flex: 1, padding: PAD, justifyContent: 'center', alignItems: 'center', gap: 26 }}>
+      <Header title="Capturar inspección" subtitle={`Bloque ${bloqueSel}`} onBack={onBack} />
+      <View style={{ flex: 1, padding: PAD, justifyContent: 'center', alignItems: 'center', gap: 20 }}>
         <View style={{ width: 220, height: 220, borderRadius: 24, borderWidth: 2, borderColor: TOKENS.colors.neutral300, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 44 }}>📷</Text>
           <Text style={{ color: TOKENS.colors.neutral600, marginTop: 8, fontSize: TOKENS.fontSizes.small }}>Mín. 800 × 600 px</Text>
         </View>
-        <Text style={{ textAlign: 'center', color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.small }}>
-          Enfoca la zona con óxido y toma la foto de frente, con buena luz.
+        <Text style={{ textAlign: 'center', color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.small, maxWidth: 280 }}>
+          Enfoca la probeta o zona metálica de frente. Podés tomar una foto en campo o elegir varias fotos de la galería en lote.
         </Text>
       </View>
       <View style={{ padding: PAD, gap: 12 }}>
-        <Button label="Abrir cámara" onPress={() => onPick(true)} />
-        <Button variant="ghost" label="Elegir de la galería" onPress={() => onPick(false)} />
+        <Button label="Tomar foto con cámara" onPress={() => onPick(true)} />
+        <Button variant="secondary" label="Elegir foto(s) de la galería" onPress={() => onPick(false)} />
+        <Button variant="ghost" label="Volver" onPress={onBack} />
       </View>
     </Screen>
   );

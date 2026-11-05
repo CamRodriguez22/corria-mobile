@@ -62,8 +62,8 @@ export async function reverseGeocode(lat, lng) {
 }
 
 // ───────────────────────────── Cámara / galería ─────────────────────────────
-// Devuelve { uri, base64, width, height } o null si se canceló.
-export async function pickPhoto({ fromCamera = true } = {}) {
+// Devuelve array de fotos [{ uri, base64, width, height }] o null si se canceló.
+export async function pickPhotos({ fromCamera = false, allowsMultiple = true } = {}) {
   const perm = fromCamera
     ? await ImagePicker.requestCameraPermissionsAsync()
     : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -80,15 +80,25 @@ export async function pickPhoto({ fromCamera = true } = {}) {
     mediaTypes: ['images'],
     quality: 0.6,
     base64: true,
-    allowsEditing: true,
-    exif: false,
+    allowsMultipleSelection: !fromCamera && allowsMultiple,
   };
   const res = fromCamera
-    ? await ImagePicker.launchCameraAsync(opts)
+    ? await ImagePicker.launchCameraAsync({ ...opts, allowsEditing: true })
     : await ImagePicker.launchImageLibraryAsync(opts);
   if (res.canceled || !res.assets?.length) return null;
-  const a = res.assets[0];
-  return { uri: a.uri, base64: a.base64 || null, width: a.width, height: a.height, mimeType: a.mimeType };
+  return res.assets.map((a) => ({
+    uri: a.uri,
+    base64: a.base64 || null,
+    width: a.width,
+    height: a.height,
+    mimeType: a.mimeType,
+  }));
+}
+
+// Devuelve { uri, base64, width, height } o null si se canceló (compatibilidad).
+export async function pickPhoto({ fromCamera = true } = {}) {
+  const fotos = await pickPhotos({ fromCamera, allowsMultiple: false });
+  return fotos?.[0] || null;
 }
 
 // Valida que la foto sirva para el modelo (mín. 800x600 según el mockup).
