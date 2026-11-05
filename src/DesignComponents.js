@@ -17,6 +17,7 @@ import {
   Modal,
 } from 'react-native';
 import { TOKENS, severidad, confianzaPct, num } from './DesignTokens';
+import { IconHome, IconLotes, IconPuntos, IconActivity, IconSettings } from './Icons';
 
 // ─────────────────────────────────────────────────────────────
 // Screen — contenedor de pantalla con "safe area" sin dependencias nativas extra.
@@ -501,7 +502,22 @@ export const Header = ({ title, subtitle, onBack = null, right = null }) => (
 // ─────────────────────────────────────────────────────────────
 // Barra de pestañas inferior
 // ─────────────────────────────────────────────────────────────
-const TAB_ICON = { home: '⌂', folders: '▤', activity: '◷', settings: '⚙' };
+const renderTabIcon = (key, color) => {
+  switch (key) {
+    case 'home':
+      return <IconHome size={20} color={color} />;
+    case 'lotes':
+      return <IconLotes size={20} color={color} />;
+    case 'folders':
+      return <IconPuntos size={20} color={color} />;
+    case 'activity':
+      return <IconActivity size={20} color={color} />;
+    case 'settings':
+      return <IconSettings size={20} color={color} />;
+    default:
+      return <Text style={{ fontSize: 18, color }}>•</Text>;
+  }
+};
 
 export const TabBar = ({ current, onChange, items }) => (
   <View
@@ -525,10 +541,10 @@ export const TabBar = ({ current, onChange, items }) => (
           accessibilityRole="tab"
           accessibilityState={{ selected: active }}
           accessibilityLabel={it.label}
-          style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 6, minHeight: TOKENS.tapTarget, justifyContent: 'center' }}
+          style={{ flex: 1, alignItems: 'center', gap: 4, paddingVertical: 6, minHeight: TOKENS.tapTarget, justifyContent: 'center' }}
         >
-          <Text style={{ fontSize: 20, color }}>{TAB_ICON[it.key] || '•'}</Text>
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color }}>{it.label}</Text>
+          {renderTabIcon(it.key, color)}
+          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: active ? '800' : '600', color }}>{it.label}</Text>
         </Pressable>
       );
     })}

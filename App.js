@@ -40,6 +40,7 @@ import {
   ConfirmModal,
   PromptModal,
 } from './src/DesignComponents';
+import { IconLotes, IconPuntos } from './src/Icons';
 import {
   AWS_CONFIG,
   APP_CONFIG,
@@ -1271,9 +1272,7 @@ function LotesScreen({ mediciones, bloqueMap, bloquesMap, refreshing, onRefresh,
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: '800', color: lote.maxNivel?.color || TOKENS.colors.text }}>
-                📦
-              </Text>
+              <IconLotes size={22} color={lote.maxNivel?.color || TOKENS.colors.text} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text }}>
@@ -1311,7 +1310,7 @@ function FoldersScreen({ mediciones, bloqueMap, listaBloques, refreshing, onRefr
       </Text>
 
       <View style={{ marginTop: 20, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: TOKENS.colors.accent2_100, borderRadius: TOKENS.radius.lg, padding: 16 }}>
-        <Text style={{ fontSize: 18 }}>📍</Text>
+        <IconPuntos size={20} color={TOKENS.colors.accent2_900} />
         <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.accent2_900, flex: 1 }}>
           {CIUDAD} · {ENTIDAD}
         </Text>
