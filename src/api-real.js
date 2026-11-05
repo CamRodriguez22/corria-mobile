@@ -158,21 +158,68 @@ export async function resolverBloqueId({ bloque } = {}) {
   throw new Error('El punto seleccionado no tiene un identificador válido.');
 }
 
-// ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
-export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng, loteId, loteNombre, notas = '' }) {
-  let img = base64;
-  if (!img && uri) {
-    img = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+// ─────────────────────────── Subida de fotos grandes (upload-url + S3) ───────────────────────────
+export async function pedirUploadUrl(contentType = 'image/jpeg', token) {
+  return req('POST', '/medicion/upload-url', {
+    token,
+    body: { content_type: contentType },
+  });
+}
+
+export async function subirFotoAS3({ url, fields }, uri) {
+  const form = new FormData();
+  Object.entries(fields).forEach(([k, v]) => form.append(k, v));
+  form.append('file', {
+    uri,
+    name: 'foto.jpg',
+    type: fields['Content-Type'] || 'image/jpeg',
+  });
+
+  const res = await fetch(url, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    throw new Error(`Error al subir la imagen al almacenamiento (${res.status}).`);
   }
-  if (!img) throw new Error('No se pudo leer la imagen.');
+}
+
+// ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
+export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng, loteId, loteNombre, notas = '', onEtapa }) {
   if (!bloqueId) throw new Error('bloque_id es requerido para subir la medición.');
 
+  let imgB64 = base64;
+  let imagenKey = null;
+
+  // Si la foto es grande o no viene en base64, usa upload-url a S3
+  const debeUsarS3 = !imgB64 || (imgB64.length > 3.5 * 1024 * 1024);
+
+  if (debeUsarS3 && uri) {
+    if (onEtapa) onEtapa('preparando_subida');
+    const presigned = await pedirUploadUrl('image/jpeg', token);
+    imagenKey = presigned.imagen_key;
+    if (onEtapa) onEtapa('subiendo_s3');
+    await subirFotoAS3(presigned, uri);
+    imgB64 = null; // no viaja en el body si se subió a S3
+  } else if (!imgB64 && uri) {
+    imgB64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+  }
+
+  if (onEtapa) onEtapa('analizando_ia');
+
   const body = {
-    imagen_base64: img, // CRUDO, sin prefijo "data:image/jpeg;base64," (verificado)
     fuente: 'movil',
     bloque_id: bloqueId,
     notas: notas || `movil-bloque-${bloqueId}`,
   };
+  if (imagenKey) {
+    body.imagen_key = imagenKey;
+  } else if (imgB64) {
+    body.imagen_base64 = imgB64;
+  } else {
+    throw new Error('No se pudo preparar la imagen para el análisis.');
+  }
+
   if (lat != null && lng != null) {
     body.latitud_real = lat;
     body.longitud_real = lng;
@@ -185,7 +232,7 @@ export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng
 
 // ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
 // foto: { uri, base64 }  ·  gps: { lat, lng } (opcional) ·  bloqueId: id_bloque real
-export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, notas = '' }) {
+export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, notas = '', onEtapa }) {
   if (!bloqueId) throw new Error('No se pudo determinar el punto de la medición.');
   const medicion = await subirMedicionReal({
     uri: foto?.uri,
@@ -196,6 +243,7 @@ export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, n
     loteId,
     loteNombre,
     notas,
+    onEtapa,
   });
   return { medicion };
 }
