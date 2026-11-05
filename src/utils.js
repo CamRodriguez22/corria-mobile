@@ -101,12 +101,11 @@ export async function pickPhoto({ fromCamera = true } = {}) {
   return fotos?.[0] || null;
 }
 
-// Valida que la foto sirva para el modelo (mín. 800x600 según el mockup).
+// Valida que la foto tenga una resolución mínima adecuada para análisis (mín. 640x480).
 export function validarFoto(foto) {
   if (!foto?.uri) return 'No se recibió ninguna foto.';
-  if (!foto.base64) return 'La foto no se pudo leer. Vuelve a capturarla.';
   if (foto.width && foto.height && (foto.width < 640 || foto.height < 480)) {
-    return 'La foto es muy pequeña. Usa al menos 800 × 600 px.';
+    return 'La foto es muy pequeña. Usa al menos 640 × 480 px.';
   }
   return '';
 }
