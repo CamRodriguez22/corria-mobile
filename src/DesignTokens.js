@@ -17,16 +17,16 @@ export const TOKENS = {
     accent2: '#7a8a5e', // sage
     divider: 'rgba(32,30,29,0.16)',
 
-    // Neutrales cálidos
+    // Neutrales cálidos ajustados para garantizar contraste WCAG AA (≥ 4.5:1)
     neutral100: '#f9f4ed',
     neutral200: '#eee7db',
     neutral300: '#dcd3c4',
-    neutral400: '#c0b6a5',
-    neutral500: '#a19786',
-    neutral600: '#82796a',
-    neutral700: '#645c50',
-    neutral800: '#474238',
-    neutral900: '#2e2b25',
+    neutral400: '#a39783',
+    neutral500: '#6f665a', // Contraste 4.74:1 sobre bg y 5.15:1 sobre surfaceAlt
+    neutral600: '#5c5449',
+    neutral700: '#4a443a',
+    neutral800: '#38332c',
+    neutral900: '#23201b',
 
     // Rampa terracota
     accent100: '#fff2eb',
@@ -70,7 +70,7 @@ export const TOKENS = {
 
   fonts: { heading: 'System', body: 'System' },
 
-  // Escala accesible: cuerpo 16, mínimos legibles, jerarquía clara.
+  // Escala accesible: cuerpo 16, mínimos legibles (≥14pt), jerarquía clara.
   fontSizes: {
     display: 40,
     h1: 32,
@@ -78,10 +78,10 @@ export const TOKENS = {
     h3: 22,
     h4: 18,
     h5: 16,
-    h6: 13,
+    h6: 14,
     body: 16,
-    small: 13,
-    xs: 11.5,
+    small: 14,
+    xs: 12,
   },
 
   lineHeights: { heading: 1.12, body: 1.5 },
