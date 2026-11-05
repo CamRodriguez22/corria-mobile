@@ -108,11 +108,18 @@ export async function crearBloque({
   return req('POST', '/bloques', { token, body });
 }
 
+// ─────────────────────────── Indicadores y resumen del servidor ───────────────────────────
+export async function getIndicadores(token) {
+  return req('GET', '/indicadores', { token });
+}
+
 // ─────────────────────────── Mediciones ───────────────────────────
-export async function getMedicionesRecientes(token, limit = APP_CONFIG.limiteHistorialMovil) {
+export async function getMedicionesRecientes(token, limit = APP_CONFIG.limiteHistorialMovil, cursor = null) {
   const lim = Math.min(limit, APP_CONFIG.limiteHistorialMax);
-  const data = await req('GET', `/mediciones/recientes?limit=${lim}`, { token });
-  return Array.isArray(data) ? data : data.mediciones || data.items || [];
+  let path = `/mediciones/recientes?limit=${lim}`;
+  if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
+  const data = await req('GET', path, { token });
+  return data;
 }
 // Alias con nombre pedido en el prompt.
 export const listarMediciones = (limit) => getMedicionesRecientes(undefined, limit);

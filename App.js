@@ -49,6 +49,7 @@ import {
 } from './src/config';
 import {
   getMiPerfil,
+  getIndicadores,
   getMedicionesRecientes,
   getBloques,
   resolverBloqueId,
@@ -121,7 +122,11 @@ function Root() {
 
   // sesión / datos
   const [perfil, setPerfil] = useState(null);
+  const [indicadoresServidor, setIndicadoresServidor] = useState(null);
   const [mediciones, setMediciones] = useState([]);
+  const [cursorPaginacion, setCursorPaginacion] = useState(null);
+  const [hayMasMediciones, setHayMasMediciones] = useState(false);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [bloques, setBloques] = useState([]); // catálogo real (GET /bloques), adaptado
   const [bloqueMap, setBloqueMap] = useState({});
   const [obsMap, setObsMap] = useState({});
@@ -253,17 +258,21 @@ function Root() {
     if (Array.isArray(cache) && cache.length) setMediciones(cache);
 
     try {
-      const [p, meds, blqs] = await Promise.all([
+      const [p, respMeds, blqs, inds] = await Promise.all([
         getMiPerfil().catch(() => null),
-        getMedicionesRecientes(undefined, APP_CONFIG.limiteHistorialMovil),
+        getMedicionesRecientes(undefined, 30).catch(() => ({ mediciones: [] })),
         getBloques().catch(() => null),
+        getIndicadores().catch(() => null),
       ]);
       if (p) setPerfil(p);
-      // Si falla o la empresa aún no tiene bloques cargados, queda el catálogo
-      // de respaldo offline (ver `listaBloques` más abajo); no se pisa con [].
+      if (inds) setIndicadoresServidor(inds);
       if (Array.isArray(blqs)) setBloques(blqs.map(adaptarBloque));
-      // Sin las máscaras (cientos de KB c/u): no se usan en el móvil y saturan memoria/AsyncStorage.
-      const limpio = (meds || [])
+
+      const lista = Array.isArray(respMeds) ? respMeds : respMeds?.mediciones || respMeds?.items || [];
+      setCursorPaginacion(respMeds?.cursor || null);
+      setHayMasMediciones(Boolean(respMeds?.cursor));
+
+      const limpio = lista
         .map(({ mascaras, ...rest }) => rest)
         .sort((a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0));
       setMediciones(limpio);
@@ -280,6 +289,30 @@ function Root() {
       setRefreshing(false);
     }
   }, []);
+
+  const cargarMasMediciones = async () => {
+    if (!cursorPaginacion || cargandoMas) return;
+    setCargandoMas(true);
+    try {
+      const resp = await getMedicionesRecientes(undefined, 30, cursorPaginacion);
+      const lista = Array.isArray(resp) ? resp : resp?.mediciones || resp?.items || [];
+      setCursorPaginacion(resp?.cursor || null);
+      setHayMasMediciones(Boolean(resp?.cursor));
+      if (lista.length) {
+        const nuevo = lista
+          .map(({ mascaras, ...rest }) => rest)
+          .sort((a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0));
+        setMediciones((prev) => {
+          const ids = new Set(prev.map((m) => m.id_medicion));
+          return [...prev, ...nuevo.filter((m) => !ids.has(m.id_medicion))];
+        });
+      }
+    } catch (e) {
+      console.log('cargarMasMediciones', e?.message);
+    } finally {
+      setCargandoMas(false);
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -794,6 +827,7 @@ function Root() {
             nombre={nombre}
             iniciales={iniciales}
             stats={stats}
+            indicadoresServidor={indicadoresServidor}
             mediciones={mediciones}
             bloqueMap={bloqueMap}
             bloquesMap={bloquesMap}
@@ -826,6 +860,9 @@ function Root() {
             bloqueMap={bloqueMap}
             bloquesMap={bloquesMap}
             refreshing={refreshing}
+            hayMas={hayMasMediciones}
+            cargandoMas={cargandoMas}
+            onCargarMas={cargarMasMediciones}
             onRefresh={onRefresh}
             onOpen={abrirDetalle}
           />
@@ -944,6 +981,7 @@ function HomeScreen({
   nombre,
   iniciales,
   stats,
+  indicadoresServidor,
   mediciones,
   bloqueMap,
   bloquesMap,
@@ -957,6 +995,16 @@ function HomeScreen({
   onSettings,
 }) {
   const recientes = mediciones.slice(0, 4);
+
+  // Totales reales del servidor (como la web) o cálculo de las cargadas como fallback
+  const totalMediciones = indicadoresServidor?.mediciones_30d != null
+    ? indicadoresServidor.mediciones_30d
+    : stats.total;
+  const totalPuntos = indicadoresServidor?.total_puntos != null
+    ? indicadoresServidor.total_puntos
+    : Object.keys(bloquesMap).length;
+  const puntosSeveros = indicadoresServidor?.por_nivel?.[3] ?? stats.severas;
+
   return (
     <ScrollView
       contentContainerStyle={{ padding: PAD, paddingBottom: 32 }}
@@ -988,9 +1036,9 @@ function HomeScreen({
       )}
 
       <View style={{ flexDirection: 'row', gap: TOKENS.spacing.sm, marginTop: 18 }}>
-        <StatCard value={stats.total} label="Mediciones" />
-        <StatCard value={stats.severas} label="Severas" color={TOKENS.colors.danger} />
-        <StatCard value={stats.total ? `${stats.promedioPct}%` : '—'} label="Promedio" color={TOKENS.colors.accent2_800} />
+        <StatCard value={totalMediciones} label="En 30 días" />
+        <StatCard value={puntosSeveros} label="Puntos severos" color={TOKENS.colors.danger} />
+        <StatCard value={totalPuntos} label="Puntos activos" color={TOKENS.colors.accent2_800} />
       </View>
 
       {!esCliente && (
@@ -1119,7 +1167,17 @@ function FolderScreen({ clave, mediciones, bloqueMap, bloquesMap, listaBloques, 
 }
 
 // ═══════════════════════════ ACTIVITY ═══════════════════════════
-function ActivityScreen({ mediciones, bloqueMap, bloquesMap, refreshing, onRefresh, onOpen }) {
+function ActivityScreen({
+  mediciones,
+  bloqueMap,
+  bloquesMap,
+  refreshing,
+  hayMas,
+  cargandoMas,
+  onCargarMas,
+  onRefresh,
+  onOpen,
+}) {
   const [filtro, setFiltro] = useState('all');
 
   const filtradas = useMemo(() => {
@@ -1228,6 +1286,16 @@ function ActivityScreen({ mediciones, bloqueMap, bloquesMap, refreshing, onRefre
         ) : (
           <View style={{ paddingVertical: 30 }}>
             <EmptyState title="Nada por aquí" subtitle="No hay mediciones con ese filtro." />
+          </View>
+        )}
+        {hayMas && (
+          <View style={{ marginTop: 12 }}>
+            <Button
+              variant="secondary"
+              label={cargandoMas ? 'Cargando más…' : 'Cargar mediciones anteriores'}
+              onPress={onCargarMas}
+              loading={cargandoMas}
+            />
           </View>
         )}
       </View>
