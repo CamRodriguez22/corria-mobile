@@ -484,9 +484,9 @@ export const Header = ({ title, subtitle, onBack = null, right = null }) => (
       <Pressable
         onPress={onBack}
         accessibilityRole="button"
-        accessibilityLabel="Volver"
+        accessibilityLabel="Volver a la pantalla anterior"
         hitSlop={TOKENS.hitSlop}
-        style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, borderColor: TOKENS.colors.neutral300, alignItems: 'center', justifyContent: 'center' }}
+        style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: TOKENS.colors.neutral300, alignItems: 'center', justifyContent: 'center' }}
       >
         <Text style={{ fontSize: 22, color: TOKENS.colors.text, marginTop: -2 }}>‹</Text>
       </Pressable>
