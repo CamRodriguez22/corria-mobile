@@ -1547,10 +1547,9 @@ function SettingsScreen({ perfil, nombre, iniciales, onLogout }) {
         <KeyValueCard
           rows={[
             { label: 'Rol', value: perfil?.rol || '—' },
-            { label: 'Entidad', value: ENTIDAD },
-            { label: 'Ciudad', value: CIUDAD },
-            { label: 'Sincronización', value: 'Automática' },
-            { label: 'Versión', value: '2.0.0' },
+            { label: 'Organización', value: perfil?.empresa_nombre || ENTIDAD },
+            { label: 'Ciudad', value: perfil?.empresa_ciudad || CIUDAD },
+            { label: 'Versión', value: require('./app.json').expo.version || '2.0.0' },
           ]}
         />
       </View>
