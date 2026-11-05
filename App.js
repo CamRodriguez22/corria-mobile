@@ -133,6 +133,7 @@ function Root() {
 
   // flujo de medición
   const [bloqueSel, setBloqueSel] = useState('');
+  const [loteIdActual, setLoteIdActual] = useState('');
   const [loteNombreInput, setLoteNombreInput] = useState('');
   const [gps, setGps] = useState(null);
   const [gpsError, setGpsError] = useState('');
@@ -334,9 +335,12 @@ function Root() {
   };
 
   // ───────────────────────── flujo de medición ─────────────────────────
-  const irANuevaMedicion = async () => {
-    setBloqueSel('');
-    setLoteNombreInput('');
+  const irANuevaMedicion = async ({ mantenerLote = false } = {}) => {
+    if (!mantenerLote) {
+      setBloqueSel('');
+      setLoteIdActual('');
+      setLoteNombreInput('');
+    }
     setFoto(null);
     setGps(null);
     setGpsError('');
@@ -346,7 +350,11 @@ function Root() {
     setObsOpen(false);
     setObsSaved(false);
     setLugar(null);
-    setScreen('context');
+    if (mantenerLote && bloqueSel) {
+      setScreen('camera');
+    } else {
+      setScreen('context');
+    }
     try {
       const loc = await getCurrentLocation();
       setGps(loc);
@@ -356,6 +364,14 @@ function Root() {
     } catch (e) {
       setGpsError(e.message || 'No se pudo obtener la ubicación.');
     }
+  };
+
+  const terminarLote = () => {
+    setBloqueSel('');
+    setLoteIdActual('');
+    setLoteNombreInput('');
+    setScreen('home');
+    setTab('home');
   };
 
   const capturar = async (fromCamera) => {
@@ -397,12 +413,16 @@ function Root() {
       const bloqueIdReal = await resolverBloqueId({
         bloque: bloqueElegido,
       });
-      const loteIdGenerado = loteNombreInput ? `lote_${Date.now()}` : undefined;
+      let idLoteParaSubir = loteIdActual;
+      if (!idLoteParaSubir && loteNombreInput) {
+        idLoteParaSubir = `lote_${Date.now()}`;
+        setLoteIdActual(idLoteParaSubir);
+      }
       const { medicion } = await subirMedicion({
         foto,
         gps: gpsUsar,
         bloqueId: bloqueIdReal,
-        loteId: loteIdGenerado,
+        loteId: idLoteParaSubir || undefined,
         loteNombre: loteNombreInput || undefined,
         notas,
       });
@@ -589,6 +609,7 @@ function Root() {
       <ResultScreen
         medicion={resultado}
         bloqueSel={bloqueSelLabel}
+        loteNombre={loteNombreInput}
         espesor={espesor}
         setEspesor={setEspesor}
         descripcion={descripcion}
@@ -597,11 +618,9 @@ function Root() {
         setObsOpen={setObsOpen}
         obsSaved={obsSaved}
         onSaveObs={guardarObs}
-        onNext={irANuevaMedicion}
-        onHome={() => {
-          setScreen('home');
-          setTab('home');
-        }}
+        onNext={() => irANuevaMedicion({ mantenerLote: true })}
+        onTerminarLote={terminarLote}
+        onHome={terminarLote}
       />
     );
 
@@ -1285,6 +1304,7 @@ function AnalyzingScreen({ progress, bloqueSel }) {
 function ResultScreen({
   medicion,
   bloqueSel,
+  loteNombre,
   espesor,
   setEspesor,
   descripcion,
@@ -1294,6 +1314,7 @@ function ResultScreen({
   obsSaved,
   onSaveObs,
   onNext,
+  onTerminarLote,
   onHome,
 }) {
   return (
@@ -1313,7 +1334,7 @@ function ResultScreen({
           />
         ) : null}
 
-        <ResultCard medicion={medicion} ubicacion={`Bloque ${bloqueSel}`} loteNombre={medicion.lote_nombre} />
+        <ResultCard medicion={medicion} ubicacion={`Bloque ${bloqueSel}`} loteNombre={medicion.lote_nombre || loteNombre} />
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, marginBottom: 8 }}>
           <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.small }}>Sincronizado</Text>
@@ -1341,7 +1362,10 @@ function ResultScreen({
       </ScrollView>
       </KeyboardAvoidingView>
       <View style={{ padding: PAD, gap: 10 }}>
-        <Button label="Siguiente medición" onPress={onNext} />
+        <Button label={loteNombre ? "Siguiente foto en este lote" : "Siguiente foto en este punto"} onPress={onNext} />
+        {!!loteNombre && (
+          <Button variant="secondary" label="Terminar lote" onPress={onTerminarLote} />
+        )}
         <Button variant="ghost" label="Volver al inicio" onPress={onHome} />
       </View>
     </Screen>
