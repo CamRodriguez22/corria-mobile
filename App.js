@@ -50,6 +50,8 @@ import {
   getBloques,
   resolverBloqueId,
   subirMedicion,
+  renombrarMedicion,
+  renombrarLote,
   eliminarMedicion,
 } from './src/api-real';
 import {
@@ -130,6 +132,7 @@ function Root() {
 
   // flujo de medición
   const [bloqueSel, setBloqueSel] = useState('');
+  const [loteNombreInput, setLoteNombreInput] = useState('');
   const [gps, setGps] = useState(null);
   const [gpsError, setGpsError] = useState('');
   const [foto, setFoto] = useState(null);
@@ -328,6 +331,7 @@ function Root() {
   // ───────────────────────── flujo de medición ─────────────────────────
   const irANuevaMedicion = async () => {
     setBloqueSel('');
+    setLoteNombreInput('');
     setFoto(null);
     setGps(null);
     setGpsError('');
@@ -394,10 +398,13 @@ function Root() {
         lat: gpsUsar.lat,
         lng: gpsUsar.lng,
       });
+      const loteIdGenerado = loteNombreInput ? `lote_${Date.now()}` : undefined;
       const { medicion } = await subirMedicion({
         foto,
         gps: gpsUsar,
         bloqueId: bloqueIdReal,
+        loteId: loteIdGenerado,
+        loteNombre: loteNombreInput || undefined,
         notas,
       });
       clearInterval(timer);
@@ -464,11 +471,39 @@ function Root() {
       await Share.share({
         message:
           `PIXELRUST — ${bloqueDeMedicion(m, bloqueMap) ? 'Bloque ' + bloqueDeMedicion(m, bloqueMap) : 'Medición'}\n` +
-          `Corrosión: ${s.label} (${num(m.area_corroida_pct, 0).toFixed(0)}%)\n` +
+          `Corrosión: ${s.label} (${num(m.area_corroida_pct, 0).toFixed(1)}%)\n` +
           `Confianza: ${confianzaPct(m.confianza_promedio)}%\n` +
           `Fecha: ${formatDateTime(m.timestamp)}`,
       });
     } catch {}
+  };
+
+  const renombrarFoto = (m) => {
+    Alert.prompt
+      ? Alert.prompt(
+          'Renombrar foto',
+          'Ingresa el nuevo nombre:',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Guardar',
+              onPress: async (nuevoNombre) => {
+                if (!nuevoNombre || !nuevoNombre.trim()) return;
+                try {
+                  await renombrarMedicion(m.id_punto, m.id_medicion, nuevoNombre.trim());
+                  const act = { ...m, nombre: nuevoNombre.trim() };
+                  setDetalle(act);
+                  setMediciones((prev) => prev.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
+                } catch (e) {
+                  Alert.alert('No se pudo renombrar', e.message || 'Error del servidor.');
+                }
+              },
+            },
+          ],
+          'plain-text',
+          m.nombre || ''
+        )
+      : Alert.alert('Aviso', 'Función disponible en la web o dispositivo compatible.');
   };
 
   const borrar = (m) => {
@@ -531,6 +566,8 @@ function Root() {
         bloques={listaBloques}
         bloqueSel={bloqueSel}
         setBloqueSel={setBloqueSel}
+        loteNombre={loteNombreInput}
+        setLoteNombre={setLoteNombreInput}
         onBack={() => setScreen('home')}
         onNext={() => setScreen('camera')}
       />
@@ -581,14 +618,16 @@ function Root() {
 
   if (screen === 'detail' && detalle) {
     const detalleClaveBloque = bloqueDeMedicion(detalle, bloqueMap, listaBloques);
+    const puedeGestionar = !esCliente;
     return (
       <DetailScreen
         medicion={detalle}
         bloque={detalleClaveBloque ? nombreCortoBloque(bloquesMap[detalleClaveBloque], detalleClaveBloque) : null}
         obs={obsMap[detalle.id_medicion]}
-        esAdmin={esAdmin}
+        puedeGestionar={puedeGestionar}
         onBack={() => setScreen(folderClave ? 'folder' : tab)}
         onShare={() => compartir(detalle)}
+        onRename={() => renombrarFoto(detalle)}
         onDelete={() => borrar(detalle)}
       />
     );
@@ -1025,11 +1064,11 @@ function SettingsScreen({ perfil, nombre, iniciales, onLogout }) {
 }
 
 // ═══════════════════════════ CONTEXT ═══════════════════════════
-function ContextScreen({ gps, gpsError, lugar, bloques, bloqueSel, setBloqueSel, onBack, onNext }) {
+function ContextScreen({ gps, gpsError, lugar, bloques, bloqueSel, setBloqueSel, loteNombre, setLoteNombre, onBack, onNext }) {
   const ciudadDetectada = lugar?.ciudad || CIUDAD;
   return (
     <Screen>
-      <Header title="Nueva medición" subtitle="Selecciona el bloque" onBack={onBack} />
+      <Header title="Nueva medición" subtitle="Selecciona el bloque y lote" onBack={onBack} />
       <ScrollView contentContainerStyle={{ padding: PAD, flexGrow: 1 }}>
         <View style={{ backgroundColor: TOKENS.colors.accent2_100, borderRadius: TOKENS.radius.lg, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <Text style={{ fontSize: 20 }}>🏛️</Text>
@@ -1043,7 +1082,17 @@ function ContextScreen({ gps, gpsError, lugar, bloques, bloqueSel, setBloqueSel,
           </View>
         </View>
 
-        <Text style={{ fontSize: TOKENS.fontSizes.h6, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: TOKENS.colors.neutral600, marginTop: 24, marginBottom: 12 }}>
+        <Text style={{ fontSize: TOKENS.fontSizes.h6, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: TOKENS.colors.neutral600, marginTop: 20, marginBottom: 8 }}>
+          Lote / Campaña (opcional)
+        </Text>
+        <Field
+          label="Nombre del lote"
+          placeholder="Ej. Inspección Noviembre, Probeta #4"
+          value={loteNombre}
+          onChangeText={setLoteNombre}
+        />
+
+        <Text style={{ fontSize: TOKENS.fontSizes.h6, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: TOKENS.colors.neutral600, marginTop: 14, marginBottom: 12 }}>
           Bloques disponibles
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -1210,7 +1259,7 @@ function ResultScreen({
           />
         ) : null}
 
-        <ResultCard medicion={medicion} ubicacion={`Bloque ${bloqueSel}`} />
+        <ResultCard medicion={medicion} ubicacion={`Bloque ${bloqueSel}`} loteNombre={medicion.lote_nombre} />
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, marginBottom: 8 }}>
           <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.small }}>Sincronizado</Text>
@@ -1246,17 +1295,19 @@ function ResultScreen({
 }
 
 // ═══════════════════════════ DETAIL ═══════════════════════════
-function DetailScreen({ medicion, bloque, obs, esAdmin, onBack, onShare, onDelete }) {
+function DetailScreen({ medicion, bloque, obs, puedeGestionar, onBack, onShare, onRename, onDelete }) {
   const s = severidad(medicion);
   const uri = medicion._localUri || medicion.url_imagen || medicion.url_thumbnail;
   const lat = medicion.latitud_real ?? medicion.punto_info?.coordenadas?.lat;
   const lng = medicion.longitud_real ?? medicion.punto_info?.coordenadas?.lng;
   const clima = medicion.clima || {};
+  const tituloFoto = medicion.nombre || medicion.id_medicion;
+
   return (
     <Screen>
       <Header
-        title={bloque ? `Bloque ${bloque}` : 'Medición'}
-        subtitle={formatDateTime(medicion.timestamp)}
+        title={tituloFoto}
+        subtitle={bloque ? `Bloque ${bloque} · ${formatDateTime(medicion.timestamp)}` : formatDateTime(medicion.timestamp)}
         onBack={onBack}
       />
       <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 32 }}>
@@ -1268,7 +1319,7 @@ function DetailScreen({ medicion, bloque, obs, esAdmin, onBack, onShare, onDelet
           <SeverityBadge medicion={medicion} />
         </View>
         <Text style={{ fontSize: 44, fontWeight: '800', color: TOKENS.colors.text, marginTop: 8 }}>
-          {num(medicion.area_corroida_pct, 0).toFixed(0)}%
+          {num(medicion.area_corroida_pct, 0).toFixed(1)}%
         </Text>
         <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600 }}>
           {s.label} · confianza {confianzaPct(medicion.confianza_promedio)}%
@@ -1278,6 +1329,7 @@ function DetailScreen({ medicion, bloque, obs, esAdmin, onBack, onShare, onDelet
           <KeyValueCard
             rows={[
               { label: 'Entidad', value: ENTIDAD },
+              { label: 'Lote', value: medicion.lote_nombre || 'Sin lote' },
               { label: 'Ciudad', value: medicion.ciudad || medicion.punto_info?.ciudad || CIUDAD },
               {
                 label: 'Coordenadas',
@@ -1294,10 +1346,15 @@ function DetailScreen({ medicion, bloque, obs, esAdmin, onBack, onShare, onDelet
           />
         </View>
 
-        <Button variant="ghost" label="Compartir" onPress={onShare} />
-        {esAdmin && (
-          <Button variant="danger" label="Eliminar medición" onPress={onDelete} style={{ marginTop: 10 }} />
-        )}
+        <View style={{ gap: 10, marginTop: 16 }}>
+          <Button variant="ghost" label="Compartir" onPress={onShare} />
+          {puedeGestionar && (
+            <Button variant="secondary" label="Renombrar foto" onPress={onRename} />
+          )}
+          {puedeGestionar && (
+            <Button variant="danger" label="Eliminar medición" onPress={onDelete} />
+          )}
+        </View>
       </ScrollView>
     </Screen>
   );

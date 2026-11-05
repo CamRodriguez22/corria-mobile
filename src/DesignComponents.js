@@ -534,18 +534,30 @@ export const TabBar = ({ current, onChange, items }) => (
   </View>
 );
 
-// ResultCard heredado (compat) — usa la severidad real del backend.
-export const ResultCard = ({ nivel, percentage, confidence, ubicacion, medicion }) => {
+// ResultCard — muestra resultado real del backend con soporte de placa y lote.
+export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombre, medicion }) => {
   const m = medicion || { nivel_corrosion: nivel, area_corroida_pct: percentage, confianza_promedio: confidence };
   const s = severidad(m);
+  const porcentaje = num(m.area_corroida_pct, 0).toFixed(1);
+  const esSobrePlaca = m.area_base === 'placa' || m.area_corroida_pct_foto != null;
+
   return (
     <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, ...TOKENS.shadow.md, marginBottom: TOKENS.spacing.base }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 6 }}>
-        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
-        <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: s.color }}>{s.short}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
+          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: s.color }}>{s.short}</Text>
+        </View>
+        {esSobrePlaca && (
+          <View style={{ backgroundColor: TOKENS.colors.accent100, paddingHorizontal: 8, paddingVertical: 2, borderRadius: TOKENS.radius.sm }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: TOKENS.colors.accent800 }}>Sobre placa</Text>
+          </View>
+        )}
       </View>
-      <Text style={{ fontSize: 42, fontWeight: '800', color: TOKENS.colors.text }}>{num(m.area_corroida_pct, 0).toFixed(0)}%</Text>
-      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>Corrosión detectada</Text>
+      <Text style={{ fontSize: 42, fontWeight: '800', color: TOKENS.colors.text }}>{porcentaje}%</Text>
+      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
+        {esSobrePlaca ? 'Corrosión sobre la probeta/placa' : 'Corrosión detectada'}
+      </Text>
       <Divider />
       <View style={{ gap: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -557,6 +569,12 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, medicion 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
             <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.body }}>Ubicación</Text>
             <Text style={{ fontWeight: '700', fontSize: TOKENS.fontSizes.body }}>{ubicacion}</Text>
+          </View>
+        )}
+        {!!(loteNombre || m.lote_nombre) && (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+            <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.body }}>Lote</Text>
+            <Text style={{ fontWeight: '700', fontSize: TOKENS.fontSizes.body }}>{loteNombre || m.lote_nombre}</Text>
           </View>
         )}
       </View>

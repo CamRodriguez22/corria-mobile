@@ -11,8 +11,9 @@
 //   POST   /bloques                           -> bloque creado (tecnico/admin; NO cliente)
 //   GET    /mediciones/recientes?limit=N      -> { total, mediciones:[...] }   (máx 100)
 //   GET    /mediciones/{id_punto}             -> [ ...mediciones ]
-//   GET    /alertas?horas=N&nivel_minimo=LEVE|MODERADA|SEVERA|CRITICA
 //   POST   /medicion                          -> objeto medición (corre YOLO)
+//   PATCH  /mediciones/{id_punto}?id_medicion={id} -> renombra foto { nombre }
+//   POST   /mediciones/lote/renombrar         -> renombra lote { mediciones: [{id_punto, id_medicion}], nombre }
 //   DELETE /mediciones/{id_punto}?id_medicion={id_medicion}  -> { ok:true }
 //
 // Forma de una medición (POST y listados):
@@ -122,9 +123,22 @@ export async function getMedicionesDelPunto(token, id_punto) {
   return Array.isArray(data) ? data : data.mediciones || data.items || [];
 }
 
-export async function getAlertas(token, horas = 24, nivel_minimo = 'MODERADA') {
-  const data = await req('GET', `/alertas?horas=${horas}&nivel_minimo=${nivel_minimo}`, { token });
-  return Array.isArray(data) ? data : data.items || data.alertas || [];
+// PATCH /mediciones/{id_punto}?id_medicion={id_medicion} (renombrar foto)
+export async function renombrarMedicion(id_punto, id_medicion, nuevoNombre, token) {
+  if (!id_punto || !id_medicion) throw new Error('Faltan id_punto o id_medicion.');
+  return req('PATCH', `/mediciones/${id_punto}?id_medicion=${encodeURIComponent(id_medicion)}`, {
+    token,
+    body: { nombre: nuevoNombre },
+  });
+}
+
+// POST /mediciones/lote/renombrar (renombrar lote)
+export async function renombrarLote(mediciones, nuevoNombre, token) {
+  if (!Array.isArray(mediciones) || mediciones.length === 0) throw new Error('Se requiere lista de mediciones.');
+  return req('POST', '/mediciones/lote/renombrar', {
+    token,
+    body: { mediciones, nombre: nuevoNombre },
+  });
 }
 
 // DELETE /mediciones/{id_punto}?id_medicion={id_medicion}
@@ -155,7 +169,7 @@ export async function resolverBloqueId({ bloque, lat, lng, ciudad = CIUDAD, depa
 }
 
 // ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
-export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng, notas = '' }) {
+export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng, loteId, loteNombre, notas = '' }) {
   let img = base64;
   if (!img && uri) {
     img = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
@@ -171,14 +185,15 @@ export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng
     longitud_real: lng,
     notas: notas || `movil-bloque-${bloqueId}`,
   };
+  if (loteId) body.lote_id = loteId;
+  if (loteNombre) body.lote_nombre = loteNombre;
+
   return req('POST', '/medicion', { token, body, timeoutMs: 120000 });
 }
 
 // ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
 // foto: { uri, base64 }  ·  gps: { lat, lng }  ·  bloqueId: id_bloque real ya resuelto
-// (ver resolverBloqueId). El backend ya no acepta mediciones sin bloque, así que no
-// hay modo "coordenadas_libres" de respaldo: si falta bloqueId, falla explícito.
-export async function subirMedicion({ foto, gps, bloqueId, notas = '' }) {
+export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, notas = '' }) {
   if (!gps?.lat || !gps?.lng) throw new Error('No hay coordenadas GPS para la medición.');
   if (!bloqueId) throw new Error('No se pudo determinar el bloque de la medición.');
   const medicion = await subirMedicionReal({
@@ -187,6 +202,8 @@ export async function subirMedicion({ foto, gps, bloqueId, notas = '' }) {
     lat: gps.lat,
     lng: gps.lng,
     bloqueId,
+    loteId,
+    loteNombre,
     notas,
   });
   return { medicion };
