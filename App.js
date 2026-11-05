@@ -640,7 +640,11 @@ function Root() {
 
   if (screen === 'detail' && detalle) {
     const detalleClaveBloque = bloqueDeMedicion(detalle, bloqueMap, listaBloques);
-    const puedeGestionar = !esCliente;
+    const rol = (perfil?.rol || '').toLowerCase();
+    const esAdminOSuper = rol === 'admin' || rol === 'super_admin';
+    const esPropia = Boolean(perfil?.sub) && (detalle?.tomado_por_id === perfil?.sub || detalle?.usuario_id === perfil?.sub);
+    const puedeGestionar = esAdminOSuper || (rol === 'tecnico' && esPropia);
+
     return (
       <DetailScreen
         medicion={detalle}
