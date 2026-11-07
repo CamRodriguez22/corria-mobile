@@ -14,17 +14,39 @@ export function inicialBloque(nombre = '') {
   return (sinPrefijo[0] || String(nombre)[0] || '?').toUpperCase();
 }
 
-// Reglas de permisos alineadas con la web:
+// Reglas de permisos alineadas con el backend (api_mediciones: ROLES_GESTION =
+// super_admin, admin, tecnico; el técnico solo toca lo que él tomó):
 // - admin / super_admin: gestión total de cualquier foto
 // - tecnico: solo fotos tomadas por él mismo
-// - cliente: solo lectura
+// - cliente (y cualquier otro rol): solo lectura
+function normalizarRol(perfil) {
+  return String(perfil?.rol || '').trim().toLowerCase();
+}
+
+// GET /usuarios/me no trae `sub`: el sub de Cognito llega como `cognito_sub`
+// (`id_usuario` es un USR-uuid distinto). Las mediciones guardan ese sub en
+// tomado_por_id / usuario_id.
+function subDelPerfil(perfil) {
+  return perfil?.cognito_sub || perfil?.sub || '';
+}
+
+function esMedicionPropia(perfil, medicion) {
+  const sub = subDelPerfil(perfil);
+  return Boolean(sub) && (medicion?.tomado_por_id === sub || medicion?.usuario_id === sub);
+}
+
 export function puedeGestionarMedicion(perfil, medicion) {
   if (!perfil) return false;
-  const rol = (perfil.rol || '').toLowerCase();
-  const esAdminOSuper = rol === 'admin' || rol === 'super_admin';
-  const sub = perfil.sub;
-  const esPropia = Boolean(sub) && (medicion?.tomado_por_id === sub || medicion?.usuario_id === sub);
-  return esAdminOSuper || (rol === 'tecnico' && esPropia);
+  const rol = normalizarRol(perfil);
+  if (rol === 'admin' || rol === 'super_admin') return true;
+  return rol === 'tecnico' && esMedicionPropia(perfil, medicion);
+}
+
+// Renombrar un lote: el backend exige poder gestionar TODAS las mediciones del
+// lote (el técnico solo si todas son suyas).
+export function puedeGestionarLote(perfil, mediciones = []) {
+  if (!perfil || !mediciones.length) return false;
+  return mediciones.every((m) => puedeGestionarMedicion(perfil, m));
 }
 
 // Traducción humana de errores de autenticación (Cognito) sin jerga técnica

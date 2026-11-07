@@ -22,6 +22,7 @@ export default function LotesScreen({
   onRefresh,
   onOpen,
   onRenameLote,
+  puedeRenombrarLote,
 }) {
   const [loteSeleccionado, setLoteSeleccionado] = useState(null);
   const [renombrandoLote, setRenombrandoLote] = useState(null);
@@ -91,7 +92,7 @@ export default function LotesScreen({
               {lote.puntoTitulo} · {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'}
             </Text>
           </View>
-          {onRenameLote && lote.id !== 'Sin lote' && (
+          {onRenameLote && puedeRenombrarLote?.(lote.items) && lote.id !== 'Sin lote' && (
             <Button
               label="Renombrar"
               variant="outline"

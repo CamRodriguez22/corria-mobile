@@ -48,6 +48,7 @@ import {
   tituloBloque,
   nombreCortoBloque,
   puedeGestionarMedicion,
+  puedeGestionarLote,
   traducirAuthError,
 } from './src/helpers';
 import {
@@ -641,6 +642,7 @@ function Root() {
   };
 
   const renombrarFoto = (m) => {
+    if (!puedeGestionarMedicion(perfil, m)) return;
     setPromptModal({
       visible: true,
       title: 'Renombrar foto',
@@ -663,6 +665,7 @@ function Root() {
   };
 
   const borrar = (m) => {
+    if (!puedeGestionarMedicion(perfil, m)) return;
     setConfirmModal({
       visible: true,
       title: 'Eliminar medición',
@@ -866,6 +869,7 @@ function Root() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             onOpen={abrirDetalle}
+            puedeRenombrarLote={(items) => puedeGestionarLote(perfil, items)}
             onRenameLote={async (items, nuevo) => {
               try {
                 await renombrarLote(items, nuevo);

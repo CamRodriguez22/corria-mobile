@@ -5,32 +5,57 @@ import {
   nombreCortoBloque,
   inicialBloque,
   puedeGestionarMedicion,
+  puedeGestionarLote,
   traducirAuthError,
   calcularNivelCorrosion,
   calcularMetricasLote,
 } from '../src/logic.js';
 
-test('puedeGestionarMedicion - permisos por rol (alineados con web)', () => {
+test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
   const medicionPropia = { id_medicion: 'm1', tomado_por_id: 'sub-123' };
   const medicionPropiaAlt = { id_medicion: 'm1b', usuario_id: 'sub-123' };
   const medicionAjena = { id_medicion: 'm2', tomado_por_id: 'sub-456' };
+  // /usuarios/me no trae `sub`: trae cognito_sub e id_usuario (USR-uuid distinto)
+  const perfil = (rol, cognito_sub = 'sub-123') => ({ rol, cognito_sub, id_usuario: 'USR-abc' });
 
   // Super admin y Admin pueden todo
-  assert.equal(puedeGestionarMedicion({ rol: 'super_admin', sub: 'sub-999' }, medicionAjena), true);
-  assert.equal(puedeGestionarMedicion({ rol: 'admin', sub: 'sub-999' }, medicionAjena), true);
+  assert.equal(puedeGestionarMedicion(perfil('super_admin', 'sub-999'), medicionAjena), true);
+  assert.equal(puedeGestionarMedicion(perfil('admin', 'sub-999'), medicionAjena), true);
+  // Rol tolerante a mayúsculas y espacios
+  assert.equal(puedeGestionarMedicion(perfil(' Admin '), medicionAjena), true);
 
   // Técnico solo lo propio (tomado_por_id o usuario_id)
-  assert.equal(puedeGestionarMedicion({ rol: 'tecnico', sub: 'sub-123' }, medicionPropia), true);
-  assert.equal(puedeGestionarMedicion({ rol: 'tecnico', sub: 'sub-123' }, medicionPropiaAlt), true);
-  assert.equal(puedeGestionarMedicion({ rol: 'tecnico', sub: 'sub-123' }, medicionAjena), false);
+  assert.equal(puedeGestionarMedicion(perfil('tecnico'), medicionPropia), true);
+  assert.equal(puedeGestionarMedicion(perfil('Tecnico'), medicionPropiaAlt), true);
+  assert.equal(puedeGestionarMedicion(perfil('tecnico'), medicionAjena), false);
+  // id_usuario NO es el sub
+  assert.equal(
+    puedeGestionarMedicion({ rol: 'tecnico', id_usuario: 'sub-123' }, medicionPropia),
+    false
+  );
 
   // Cliente nunca puede gestionar (editar/eliminar)
-  assert.equal(puedeGestionarMedicion({ rol: 'cliente', sub: 'sub-123' }, medicionPropia), false);
-  assert.equal(puedeGestionarMedicion({ rol: 'cliente', sub: 'sub-999' }, medicionAjena), false);
+  assert.equal(puedeGestionarMedicion(perfil('cliente'), medicionPropia), false);
+  assert.equal(puedeGestionarMedicion(perfil('cliente', 'sub-999'), medicionAjena), false);
 
   // Perfil nulo o sin sub
   assert.equal(puedeGestionarMedicion(null, medicionPropia), false);
   assert.equal(puedeGestionarMedicion({ rol: 'tecnico' }, medicionPropia), false);
+});
+
+test('puedeGestionarLote - el técnico solo si todas las fotos son suyas', () => {
+  const propia = { id_medicion: 'a', tomado_por_id: 'sub-123' };
+  const otra = { id_medicion: 'b', usuario_id: 'sub-123' };
+  const ajena = { id_medicion: 'c', tomado_por_id: 'sub-456' };
+  const tec = { rol: 'tecnico', cognito_sub: 'sub-123' };
+
+  assert.equal(puedeGestionarLote(tec, [propia, otra]), true);
+  assert.equal(puedeGestionarLote(tec, [propia, ajena]), false);
+  assert.equal(puedeGestionarLote({ rol: 'admin', cognito_sub: 'x' }, [propia, ajena]), true);
+  assert.equal(puedeGestionarLote({ rol: 'super_admin' }, [ajena]), true);
+  assert.equal(puedeGestionarLote({ rol: 'cliente', cognito_sub: 'sub-123' }, [propia]), false);
+  assert.equal(puedeGestionarLote(tec, []), false);
+  assert.equal(puedeGestionarLote(null, [propia]), false);
 });
 
 test('nombreCortoBloque y inicialBloque', () => {
