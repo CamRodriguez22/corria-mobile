@@ -1,10 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, RefreshControl } from 'react-native';
 import { Button, Segmented, EmptyState } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
-import { TOKENS, severidad } from '../DesignTokens';
+import MapaCalor from '../MapaCalor';
+import { TOKENS } from '../DesignTokens';
 import { nombrePuntoDe } from '../helpers';
 import { filasDeGaleria } from '../galeria';
+import { filtrarMediciones, FILTROS_VACIOS, hayFiltros, textoResultados } from '../linea';
+import { hoyLocal, partesDia } from '../fechas';
+import { bloqueDeMedicion } from '../utils';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -19,26 +23,61 @@ export default function ActivityScreen({
   onRefresh,
   onOpen,
   onAbrirLote,
+  resumenes = {},
+  onCargarResumen,
+  onCargarRango,
 }) {
-  const [filtro, setFiltro] = useState('all');
+  const hoy = hoyLocal();
+  const [anio, setAnio] = useState(partesDia(hoy)?.anio || 2026);
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+  const resumen = resumenes[anio];
 
-  const filtradas = useMemo(() => {
-    if (filtro === 'all') return mediciones;
-    return mediciones.filter((m) => severidad(m).i === filtro);
-  }, [mediciones, filtro]);
+  // Mapa de días del año elegido (se guarda por año en App).
+  useEffect(() => {
+    onCargarResumen?.(anio);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anio, refreshing]);
 
-  const filas = useMemo(() => filasDeGaleria(filtradas), [filtradas]);
+  // Al elegir un día se traen TODAS sus fotos (pueden ser más antiguas que las ya cargadas).
+  useEffect(() => {
+    if (filtros.dia) onCargarRango?.({ desde: filtros.dia, hasta: filtros.dia });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtros.dia, refreshing]);
+
+  const listaPuntos = useMemo(() => Object.values(bloquesMap || {}), [bloquesMap]);
+  const filtradas = useMemo(
+    () =>
+      filtrarMediciones(mediciones, filtros, {
+        hoy,
+        clavePunto: (m) => bloqueDeMedicion(m, bloqueMap, listaPuntos.length ? listaPuntos : undefined),
+      }),
+    [mediciones, filtros, hoy, bloqueMap, listaPuntos]
+  );
+  const filas = useMemo(() => filasDeGaleria(filtradas, { hoy }), [filtradas, hoy]);
+  const filtrado = hayFiltros(filtros);
+
+  const nivelSel = filtros.niveles.length === 1 ? filtros.niveles[0] : 'all';
 
   const cabecera = (
     <View style={{ padding: PAD, paddingBottom: 4 }}>
       <Text style={{ ...TOKENS.type.headlineMedium, color: TOKENS.colors.text }}>Actividad</Text>
-      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 14 }}>
+      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 18 }}>
         Todas las fotos, día por día
       </Text>
+      <MapaCalor
+        anio={anio}
+        setAnio={setAnio}
+        resumen={resumen}
+        diaSel={filtros.dia}
+        onSelDia={(dia) => setFiltros((f) => ({ ...f, dia }))}
+        onReintentar={() => onCargarResumen?.(anio, { forzar: true })}
+        hoy={hoy}
+      />
+      <View style={{ height: 18 }} />
       <Segmented
         scroll
-        value={filtro}
-        onChange={setFiltro}
+        value={nivelSel}
+        onChange={(v) => setFiltros((f) => ({ ...f, niveles: v === 'all' ? [] : [v] }))}
         options={[
           { value: 'all', label: 'Todas' },
           { value: 0, label: 'Sin corrosión' },
@@ -47,6 +86,9 @@ export default function ActivityScreen({
           { value: 3, label: 'Severa' },
         ]}
       />
+      <Text accessibilityLiveRegion="polite" style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 12 }}>
+        {textoResultados(filtradas.length, filtrado)}
+      </Text>
     </View>
   );
 
@@ -59,11 +101,11 @@ export default function ActivityScreen({
       ListHeaderComponent={cabecera}
       ListEmptyComponent={
         <View style={{ paddingVertical: 30 }}>
-          <EmptyState title="Sin mediciones registradas" subtitle="No hay inspecciones que coincidan con este filtro." />
+          <EmptyState title="Sin fotos" subtitle="No hay fotos que coincidan con estos filtros." />
         </View>
       }
       ListFooterComponent={
-        hayMas ? (
+        hayMas && !filtros.dia ? (
           <View style={{ padding: PAD }}>
             <Button
               variant="tonal"

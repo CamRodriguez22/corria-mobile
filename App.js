@@ -68,6 +68,7 @@ import {
   getIndicadores,
   getMedicionesRecientes,
   getMedicionesPunto,
+  getResumenDiario,
   getMedicionCompleta,
   getBloques,
   resolverBloqueId,
@@ -159,6 +160,13 @@ function Root() {
   // Va aparte de `mediciones` (la lista continua de Inicio/Actividad, que pagina por fecha).
   const [porPunto, setPorPunto] = useState({});
   const porPuntoRef = useRef({});
+  // Fotos traídas por rango de fechas (día del mapa de calor, 7/30/90 días): van aparte de
+  // `mediciones` para no romper su paginación por fecha. Actividad ve la unión de las dos.
+  const [extras, setExtras] = useState([]);
+  const rangosCargados = useRef(new Set());
+  // Resumen por día de cada año: { [anio]: { estado: 'cargando'|'ok'|'error', dias, truncado, error } }.
+  const [resumenes, setResumenes] = useState({});
+  const resumenesRef = useRef({});
 
   // navegación
   const [tab, setTab] = useState('home');
@@ -248,6 +256,7 @@ function Root() {
 
   medicionesRef.current = mediciones;
   porPuntoRef.current = porPunto;
+  resumenesRef.current = resumenes;
 
   const nombre = perfil?.nombre || (perfil?.email || email).split('@')[0] || 'Usuario';
   const iniciales = nombre
@@ -261,6 +270,7 @@ function Root() {
   const esCliente = (perfil?.rol || '').toLowerCase() === 'cliente';
   const empresa = useMemo(() => datosEmpresa(perfil), [perfil]);
   const stats = useMemo(() => calcularEstadisticas(mediciones), [mediciones]);
+  const medicionesTodas = useMemo(() => mezclarMediciones(mediciones, extras).lista, [mediciones, extras]);
 
   // Catálogo de bloques a usar: el real del backend si cargó, si no el de
   // respaldo offline (BLOQUES_CAMPUS/LISTA_BLOQUES, ver src/config.js).
@@ -487,6 +497,7 @@ function Root() {
   // Aplica un cambio (renombrar, borrar...) a la lista general y a los historiales por punto.
   const mapearTodo = (fn) => {
     setMediciones((prev) => fn(prev));
+    setExtras((prev) => fn(prev));
     setPorPunto((prev) =>
       Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, lista: fn(v.lista || []) }]))
     );
@@ -537,6 +548,46 @@ function Root() {
     }
   };
 
+  // Mapa de calor: GET /mediciones/resumen-diario?anio=. Se guarda por año; `forzar` ignora lo guardado.
+  const cargarResumen = async (anio, { forzar = false } = {}) => {
+    const previo = resumenesRef.current[anio];
+    if (!forzar && previo && (previo.estado === 'ok' || previo.estado === 'cargando')) return;
+    const sesion = sesionRef.current;
+    setResumenes((r) => ({ ...r, [anio]: { ...(previo || { dias: [] }), estado: 'cargando', error: '' } }));
+    try {
+      const resp = await getResumenDiario(anio);
+      if (sesion !== sesionRef.current) return;
+      setResumenes((r) => ({ ...r, [anio]: { estado: 'ok', dias: resp?.dias || [], truncado: Boolean(resp?.truncado), error: '' } }));
+    } catch (e) {
+      if (sesion !== sesionRef.current) return;
+      if (esSesionVencida(e)) avisarSesionVencida();
+      setResumenes((r) => ({
+        ...r,
+        [anio]: { estado: 'error', dias: r[anio]?.dias || [], truncado: false, error: e?.message || 'No se pudo cargar el mapa de días.' },
+      }));
+    }
+  };
+
+  // Trae TODAS las fotos de un rango de días (inclusivo, UTC-5) y las suma a `extras`.
+  const cargarRango = async ({ desde, hasta }) => {
+    if (!desde && !hasta) return { truncado: false };
+    const clave = `${desde || ''}|${hasta || ''}`;
+    if (rangosCargados.current.has(clave)) return { truncado: false };
+    rangosCargados.current.add(clave);
+    const sesion = sesionRef.current;
+    try {
+      const resp = await getMedicionesRecientes(undefined, 500, { desde, hasta });
+      if (sesion !== sesionRef.current) return { truncado: false };
+      const nuevas = marcarCarga(listaDeRespuesta(resp).map(({ mascaras, ...rest }) => rest));
+      setExtras((prev) => mezclarMediciones(prev, nuevas).lista);
+      return { truncado: Boolean(resp?.truncado) };
+    } catch (e) {
+      rangosCargados.current.delete(clave); // se podrá reintentar
+      if (sesion === sesionRef.current && esSesionVencida(e)) avisarSesionVencida();
+      return { truncado: false, error: e?.message || 'No se pudieron cargar las fotos de ese rango.' };
+    }
+  };
+
   // Reintento puntual de GET /bloques (sin recargar todo lo demás). Si falla, se conserva
   // el catálogo que ya hubiera y se muestra el error: nunca "tu zona no tiene puntos".
   const recargarBloques = async () => {
@@ -569,6 +620,9 @@ function Root() {
 
   const onRefresh = () => {
     setRefreshing(true);
+    setResumenes({});
+    setExtras([]);
+    rangosCargados.current = new Set();
     cargarTodo(false);
   };
 
@@ -657,6 +711,9 @@ function Root() {
     setHayMasMediciones(false);
     setCargandoMas(false);
     setPorPunto({});
+    setExtras([]);
+    rangosCargados.current = new Set();
+    setResumenes({});
     setBloques([]);
     setBloqueMap({});
     setObsMap({});
@@ -1293,7 +1350,10 @@ function Root() {
         )}
         {tab === 'activity' && (
           <ActivityScreen
-            mediciones={mediciones}
+            mediciones={medicionesTodas}
+            resumenes={resumenes}
+            onCargarResumen={cargarResumen}
+            onCargarRango={cargarRango}
             bloqueMap={bloqueMap}
             bloquesMap={bloquesMap}
             refreshing={refreshing}
