@@ -26,7 +26,7 @@
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
 import { Platform } from 'react-native';
-import { parteArchivoForm } from './logic';
+import { parteArchivoForm, dividirEnTandas } from './logic';
 import { AWS_CONFIG, APP_CONFIG } from './config';
 import { getIdToken } from './utils';
 
@@ -81,12 +81,6 @@ async function req(method, path, { token, body, timeoutMs = 60000 } = {}) {
 }
 
 // ─────────────────────────── Perfil ───────────────────────────
-export async function getUsuarioMe(token) {
-  return req('GET', '/usuarios/me', { token });
-}
-export async function updateUsuarioMe(token, data) {
-  return req('PUT', '/usuarios/me', { token, body: data });
-}
 export const getMiPerfil = () => req('GET', '/usuarios/me');
 
 // ─────────────────────────── Bloques ───────────────────────────
@@ -122,9 +116,6 @@ export async function getMedicionesRecientes(
   if (hasta) path += `&hasta=${encodeURIComponent(hasta)}`;
   return req('GET', path, { token });
 }
-// Alias con nombre pedido en el prompt.
-export const listarMediciones = (limit) => getMedicionesRecientes(undefined, limit);
-export const fetchUserMeasurements = (limit) => getMedicionesRecientes(undefined, limit);
 
 // Una medición con TODOS sus campos (detecciones, clima, ...), aunque sea antigua: el
 // backend filtra por id_medicion y pagina hasta hallarla. Devuelve null si no existe.
@@ -152,17 +143,33 @@ export async function renombrarMedicion(id_punto, id_medicion, nuevoNombre, toke
   });
 }
 
-// POST /mediciones/lote/renombrar (renombrar lote)
+// POST /mediciones/lote/renombrar (renombrar lote). El backend acepta como máximo LOTE_MAX (100)
+// mediciones por solicitud: un lote más grande se envía por tandas, en orden. Si una tanda
+// falla, las anteriores ya quedaron renombradas: el error trae `idsRenombrados` (para que la
+// app actualice solo esas) y un mensaje que lo aclara.
 export async function renombrarLote(items, nuevoNombre, token) {
   if (!Array.isArray(items) || items.length === 0) throw new Error('Se requiere lista de mediciones.');
   const formateados = items.map((it) => ({
     id_punto: it.id_punto,
     id_medicion: it.id_medicion,
   }));
-  return req('POST', '/mediciones/lote/renombrar', {
-    token,
-    body: { items: formateados, nombre: nuevoNombre },
-  });
+  const idsRenombrados = [];
+  for (const tanda of dividirEnTandas(formateados)) {
+    try {
+      await req('POST', '/mediciones/lote/renombrar', {
+        token,
+        body: { items: tanda, nombre: nuevoNombre },
+      });
+    } catch (e) {
+      if (idsRenombrados.length) {
+        e.message = `Se renombraron ${idsRenombrados.length} de ${formateados.length} fotos. ${e.message}`;
+      }
+      e.idsRenombrados = idsRenombrados;
+      throw e;
+    }
+    idsRenombrados.push(...tanda.map((t) => t.id_medicion));
+  }
+  return { idsRenombrados };
 }
 
 // DELETE /mediciones/{id_punto}?id_medicion={id_medicion}
@@ -278,15 +285,4 @@ export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, n
     onImagenKey,
   });
   return { medicion };
-}
-
-// Guardar observaciones (espesor/nota) tras el análisis: se hace un PUT del perfil no aplica;
-// el backend actual no expone PATCH de medición, así que las observaciones se conservan
-// localmente y se reenvían en la nota de la siguiente subida. Se expone para que App.js
-// pueda persistirlas en AsyncStorage.
-export function componerObservaciones({ bloqueClave, espesor, descripcion }) {
-  const partes = [`Bloque ${bloqueClave}`];
-  if (espesor) partes.push(`espesor ${espesor} mm`);
-  if (descripcion) partes.push(descripcion);
-  return partes.join(' · ');
 }

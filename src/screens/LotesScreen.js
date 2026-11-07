@@ -103,8 +103,8 @@ export default function LotesScreen({
           {onRenameLote && puedeRenombrarLote?.(lote.items) && lote.id !== 'Sin lote' && (
             <Button
               label="Renombrar"
-              variant="outline"
-              size="sm"
+              variant="secondary"
+              fullWidth={false}
               onPress={() => {
                 setNuevoNombre(lote.nombre);
                 setRenombrandoLote(lote);

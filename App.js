@@ -52,6 +52,7 @@ import {
   navegarAtras,
   pendientesAlSalir,
   datosEmpresa,
+  clasificarErrorSubida,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -141,6 +142,7 @@ function Root() {
   const [refreshing, setRefreshing] = useState(false);
   const [offline, setOffline] = useState(false);
   const [errorBloques, setErrorBloques] = useState(false); // GET /bloques falló (distinto de "sin puntos")
+  const [cargandoBloques, setCargandoBloques] = useState(false);
   const sesionVencidaAvisada = useRef(false);
 
   // navegación
@@ -417,6 +419,25 @@ function Root() {
     }
   };
 
+  // Reintento puntual de GET /bloques (sin recargar todo lo demás). Si falla, se conserva
+  // el catálogo que ya hubiera y se muestra el error: nunca "tu zona no tiene puntos".
+  const recargarBloques = async () => {
+    const sesion = sesionRef.current;
+    setCargandoBloques(true);
+    try {
+      const blqs = await getBloques();
+      if (sesion !== sesionRef.current) return;
+      setBloques(blqs.map(adaptarBloque));
+      setErrorBloques(false);
+    } catch (e) {
+      if (sesion !== sesionRef.current) return;
+      if (esSesionVencida(e)) avisarSesionVencida();
+      setErrorBloques(true);
+    } finally {
+      setCargandoBloques(false);
+    }
+  };
+
   // Los KPI del inicio vienen del servidor: se refrescan tras subir o borrar. Si falla,
   // se conservan los últimos (el siguiente pull-to-refresh los vuelve a pedir).
   const refrescarIndicadores = () => {
@@ -633,16 +654,21 @@ function Root() {
     if (pend.fallidas) partes.push(`${pend.fallidas} ${pend.fallidas === 1 ? 'foto no se analizó' : 'fotos no se analizaron'}`);
     if (pend.obsSinGuardar) partes.push('tienes observaciones sin guardar');
     const mensaje = `${partes.join(' y ')}. Si continúas, se perderán.`;
+    // Solo fallidas definitivas (410) y sin notas: no hay nada que reintentar ni guardar.
+    const soloDescartar = !pend.reintentables && !pend.obsSinGuardar;
     setConfirmModal({
       visible: true,
       title: 'Hay cambios sin resolver',
       message: mensaje.charAt(0).toUpperCase() + mensaje.slice(1),
-      confirmLabel: pend.fallidas ? 'Reintentar las fallidas' : 'Guardar notas y continuar',
-      extraLabel: 'Descartar y continuar',
+      confirmLabel: soloDescartar ? 'Descartar y continuar' : pend.reintentables ? 'Reintentar las fallidas' : 'Guardar notas y continuar',
+      variant: soloDescartar ? 'danger' : 'primary',
+      extraLabel: soloDescartar ? '' : 'Descartar y continuar',
       cancelLabel: 'Quedarme aquí',
       onConfirm: async () => {
         cerrarConfirm();
-        if (pend.fallidas) {
+        if (soloDescartar) {
+          continuar();
+        } else if (pend.reintentables) {
           analizar();
         } else {
           await guardarObs();
@@ -720,7 +746,7 @@ function Root() {
 
       for (let i = 0; i < colaRef.current.length; i++) {
         const itemFoto = colaRef.current[i];
-        if (itemFoto.status === 'lista') continue;
+        if (itemFoto.status === 'lista' || itemFoto.definitivo) continue;
         actualizarFoto(i, { status: 'subiendo', error: undefined });
 
         try {
@@ -757,7 +783,9 @@ function Root() {
           const medConFoto = { ...ligera, url_imagen: medicion.url_imagen || itemFoto.uri, _localUri: itemFoto.uri };
           setMediciones((prev) => [medConFoto, ...prev.filter((m) => m.id_medicion !== medicion.id_medicion)]);
         } catch (errFoto) {
-          actualizarFoto(i, { status: 'error', error: errFoto.message || 'No se pudo analizar la foto.' });
+          const { mensaje, reintentable } = clasificarErrorSubida(errFoto);
+          actualizarFoto(i, { status: 'error', error: mensaje, definitivo: !reintentable });
+          if (esSesionVencida(errFoto)) avisarSesionVencida();
         }
       }
 
@@ -957,6 +985,8 @@ function Root() {
           lugar={lugar}
           empresa={empresa}
           bloques={listaBloques}
+          estadoBloques={cargandoBloques || loadingData ? 'cargando' : errorBloques ? 'error' : 'ok'}
+          onReintentarBloques={recargarBloques}
           bloqueSel={bloqueSel}
           setBloqueSel={setBloqueSel}
           loteNombre={loteNombreInput}
@@ -1089,10 +1119,14 @@ function Root() {
             onCargarMas={cargarMasMediciones}
             puedeRenombrarLote={(items) => puedeGestionarLote(perfil, items)}
             onRenameLote={async (items, nuevo) => {
+              // Se actualiza el estado local (sin recargar: cargarTodo reiniciaría las páginas ya cargadas).
+              const aplicar = (ids) =>
+                setMediciones((prev) => prev.map((x) => (ids.includes(x.id_medicion) ? { ...x, lote_nombre: nuevo } : x)));
               try {
-                await renombrarLote(items, nuevo);
-                await cargarTodo(false);
+                const { idsRenombrados } = await renombrarLote(items, nuevo);
+                aplicar(idsRenombrados);
               } catch (e) {
+                if (e.idsRenombrados?.length) aplicar(e.idsRenombrados);
                 avisarError('No se pudo renombrar el lote', e);
               }
             }}

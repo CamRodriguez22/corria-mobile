@@ -13,6 +13,8 @@ export default function ContextScreen({
   lugar,
   empresa,
   bloques,
+  estadoBloques = 'ok', // 'cargando' | 'error' | 'ok'
+  onReintentarBloques,
   bloqueSel,
   setBloqueSel,
   loteNombre,
@@ -148,6 +150,29 @@ export default function ContextScreen({
                 </Pressable>
               );
             })}
+          </View>
+        ) : estadoBloques === 'cargando' ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ fontSize: TOKENS.fontSizes.body, color: TOKENS.colors.neutral600 }}>Cargando puntos…</Text>
+          </View>
+        ) : estadoBloques === 'error' ? (
+          <View
+            style={{
+              padding: 20,
+              backgroundColor: TOKENS.colors.surfaceAlt,
+              borderRadius: TOKENS.radius.lg,
+              borderWidth: 1,
+              borderColor: TOKENS.colors.border,
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text, textAlign: 'center' }}>
+              No se pudieron cargar los puntos.
+            </Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, textAlign: 'center', lineHeight: 20 }}>
+              Revisa tu conexión e inténtalo de nuevo.
+            </Text>
+            {!!onReintentarBloques && <Button variant="secondary" label="Reintentar" onPress={onReintentarBloques} />}
           </View>
         ) : (
           <View

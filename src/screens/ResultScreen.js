@@ -86,7 +86,7 @@ export default function ResultScreen({
                   {resumenLote.primerError}
                 </Text>
               )}
-              {hayFallidas && onReintentar && (
+              {resumenLote?.reintentables > 0 && onReintentar && (
                 <Button variant="secondary" label="Reintentar las fallidas" onPress={onReintentar} />
               )}
             </View>

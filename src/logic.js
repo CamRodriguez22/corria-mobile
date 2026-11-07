@@ -85,32 +85,35 @@ export function traducirAuthError(e) {
   return msg;
 }
 
-// Umbrales de severidad del backend (pf_corrosion_infra/lambda_src/inference/handler.py)
-// 0: Sin corrosión (< 0.05%)
-// 1: Leve (< 10%)
-// 2: Moderada (10% a < 25%)
-// 3: Severa (>= 25%)
-export function calcularNivelCorrosion(areaPct) {
-  const n = Number(areaPct);
-  if (Number.isNaN(n) || n < 0.05) return 0;
-  if (n < 10) return 1;
-  if (n < 25) return 2;
-  return 3;
+// Umbrales de severidad: ver src/niveles.js (única fuente; DesignTokens.severidadDePct delega ahí).
+export { nivelDePct, num } from './niveles.js';
+
+// El backend limita las acciones en lote a LOTE_MAX = 100 mediciones por solicitud
+// (api_mediciones/handler.py); un lote más grande se envía por tandas.
+export const LOTE_MAX_BACKEND = 100;
+export function dividirEnTandas(items = [], tam = LOTE_MAX_BACKEND) {
+  const tandas = [];
+  for (let i = 0; i < items.length; i += tam) tandas.push(items.slice(i, i + tam));
+  return tandas;
 }
 
-// Cálculo agregado de métricas para un lote de mediciones
-export function calcularMetricasLote(items = []) {
-  if (!items.length) return { total: 0, avgPct: 0, maxPct: 0, maxNivel: 0 };
-  const pcts = items.map((m) => Math.max(0, Number(m.area_corroida_pct || 0)));
-  const total = items.length;
-  const maxPct = Math.max(...pcts);
-  const avgPct = pcts.reduce((acc, v) => acc + v, 0) / total;
-  return {
-    total,
-    avgPct,
-    maxPct,
-    maxNivel: calcularNivelCorrosion(maxPct),
-  };
+// Clasifica el error de subir una foto. 409 = la misma foto aún se está analizando (esperar y
+// reintentar). 410 = la foto ya se procesó antes y el backend no la reanaliza: reintentar con
+// la misma imagen_key daría 410 siempre, así que no es reintentable (el mensaje del backend
+// ya dice qué hacer). El resto (red, 5xx) sí se puede reintentar.
+export function clasificarErrorSubida(e) {
+  const msg = e?.message || 'No se pudo analizar la foto.';
+  if (e?.status === 409) {
+    return { mensaje: msg, reintentable: true };
+  }
+  if (e?.status === 410) {
+    return {
+      mensaje: msg || 'Esta foto ya se procesó antes. Revisa la galería: si no aparece, vuelve a subirla.',
+      reintentable: false,
+    };
+  }
+  if (e?.status === 401) return { mensaje: 'Tu sesión expiró. Inicia sesión nuevamente.', reintentable: false };
+  return { mensaje: msg, reintentable: true };
 }
 
 // ───────────────────────── Paginación de GET /mediciones/recientes ─────────────────────────
@@ -210,6 +213,8 @@ export function resumirCola(cola = []) {
     total: cola.length,
     listas: listas.length,
     fallidas: fallidas.length,
+    // Las fallidas con `definitivo` (410) no se reintentan: se descartan o se vuelven a tomar.
+    reintentables: fallidas.filter((f) => !f.definitivo).length,
     primerError: fallidas[0]?.error || '',
     // Última foto analizada con éxito: su imagen y su medición siempre van juntas.
     ultimaLista: listas.length ? listas[listas.length - 1] : null,
@@ -220,11 +225,12 @@ export function resumirCola(cola = []) {
 // observaciones escritas que no coinciden con lo ya guardado en el teléfono.
 export function pendientesAlSalir({ cola = [], espesor = '', descripcion = '', guardada = null } = {}) {
   const fallidas = cola.filter((f) => f.status === 'error').length;
+  const reintentables = cola.filter((f) => f.status === 'error' && !f.definitivo).length;
   const e = String(espesor || '').trim();
   const d = String(descripcion || '').trim();
   const obsSinGuardar =
     Boolean(e || d) && (String(guardada?.espesor || '').trim() !== e || String(guardada?.descripcion || '').trim() !== d);
-  return { fallidas, obsSinGuardar, hay: fallidas > 0 || obsSinGuardar };
+  return { fallidas, reintentables, obsSinGuardar, hay: fallidas > 0 || obsSinGuardar };
 }
 
 // Texto de resumen para un lote con varias fotos ("3 de 5 fotos analizadas; 2 fallaron").

@@ -7,8 +7,10 @@ import {
   puedeGestionarMedicion,
   puedeGestionarLote,
   traducirAuthError,
-  calcularNivelCorrosion,
-  calcularMetricasLote,
+  nivelDePct,
+  dividirEnTandas,
+  LOTE_MAX_BACKEND,
+  clasificarErrorSubida,
   paginaAnterior,
   mezclarMediciones,
   hayMasMediciones,
@@ -106,37 +108,37 @@ test('traducirAuthError - mensajes amigables sin jerga técnica', () => {
   );
 });
 
-test('calcularNivelCorrosion - umbrales reales del backend (0-3)', () => {
-  assert.equal(calcularNivelCorrosion(0), 0);
-  assert.equal(calcularNivelCorrosion(null), 0);
-  assert.equal(calcularNivelCorrosion(-5), 0);
-  assert.equal(calcularNivelCorrosion(0.04), 0); // < 0.05 sigue siendo Sin corrosión
-  assert.equal(calcularNivelCorrosion(0.05), 1); // Leve desde 0.05
-  assert.equal(calcularNivelCorrosion(5.2), 1); // Leve (<10)
-  assert.equal(calcularNivelCorrosion(9.99), 1); // Leve (<10)
-  assert.equal(calcularNivelCorrosion(10.0), 2); // Moderada (10-25)
-  assert.equal(calcularNivelCorrosion(24.9), 2); // Moderada (10-25)
-  assert.equal(calcularNivelCorrosion(25.0), 3); // Severa (>=25)
-  assert.equal(calcularNivelCorrosion(75.5), 3); // Severa (>=25)
+test('nivelDePct - umbrales reales del backend (única fuente, la usa severidadDePct)', () => {
+  assert.equal(nivelDePct(0), 0);
+  assert.equal(nivelDePct(null), 0);
+  assert.equal(nivelDePct(-5), 0);
+  assert.equal(nivelDePct('0.04'), 0); // los GET traen el % como string
+  assert.equal(nivelDePct(0.05), 1); // Leve desde 0.05
+  assert.equal(nivelDePct('5.2'), 1);
+  assert.equal(nivelDePct(9.99), 1);
+  assert.equal(nivelDePct(10.0), 2); // Moderada 10-25
+  assert.equal(nivelDePct(24.9), 2);
+  assert.equal(nivelDePct(25.0), 3); // Severa >= 25
+  assert.equal(nivelDePct(75.5), 3);
 });
 
-test('calcularMetricasLote - agregación de fotos en tanda/lote', () => {
-  const loteVacio = calcularMetricasLote([]);
-  assert.equal(loteVacio.total, 0);
-  assert.equal(loteVacio.avgPct, 0);
-  assert.equal(loteVacio.maxPct, 0);
-  assert.equal(loteVacio.maxNivel, 0);
+test('dividirEnTandas - respeta el máximo de 100 por solicitud del backend', () => {
+  const items = Array.from({ length: 250 }, (_, i) => i);
+  const tandas = dividirEnTandas(items);
+  assert.deepEqual(tandas.map((t) => t.length), [100, 100, 50]);
+  assert.deepEqual(tandas.flat(), items);
+  assert.deepEqual(dividirEnTandas([]), []);
+  assert.equal(LOTE_MAX_BACKEND, 100);
+});
 
-  const fotos = [
-    { area_corroida_pct: 5 },
-    { area_corroida_pct: 15 },
-    { area_corroida_pct: 25 },
-  ];
-  const resultado = calcularMetricasLote(fotos);
-  assert.equal(resultado.total, 3);
-  assert.equal(resultado.avgPct, 15);
-  assert.equal(resultado.maxPct, 25);
-  assert.equal(resultado.maxNivel, 3); // Severa
+test('clasificarErrorSubida - 409 se reintenta, 410 no, 401 no', () => {
+  assert.equal(clasificarErrorSubida({ status: 409, message: 'Se está analizando' }).reintentable, true);
+  const r410 = clasificarErrorSubida({ status: 410, message: 'Ya se procesó antes' });
+  assert.equal(r410.reintentable, false);
+  assert.equal(r410.mensaje, 'Ya se procesó antes');
+  assert.equal(clasificarErrorSubida({ status: 401 }).reintentable, false);
+  assert.equal(clasificarErrorSubida({ status: 500, message: 'Error en el servidor.' }).reintentable, true);
+  assert.equal(clasificarErrorSubida(new Error('Sin conexión con el servidor.')).reintentable, true);
 });
 
 test('paginaAnterior - hasta = día de la más antigua, límite cubre las ya cargadas', () => {
@@ -283,6 +285,7 @@ test('pendientesAlSalir - avisa de fotos fallidas y observaciones sin guardar', 
   assert.equal(pendientesAlSalir({ cola: ok }).hay, false);
   assert.deepEqual(pendientesAlSalir({ cola: [{ status: 'lista' }, { status: 'error' }] }), {
     fallidas: 1,
+    reintentables: 1,
     obsSinGuardar: false,
     hay: true,
   });
@@ -305,4 +308,12 @@ test('datosEmpresa - sale del perfil y no inventa ciudad ni organización', () =
   assert.equal(datosEmpresa({ empresa_nombre: 'Acme' }).linea, 'Acme');
   assert.equal(datosEmpresa({ empresa_ciudad: 'Cali' }).linea, 'Cali');
   assert.deepEqual(datosEmpresa(null), { nombre: '', ciudad: '', departamento: '', linea: '' });
+});
+
+test('resumirCola/pendientesAlSalir - una fallida definitiva (410) no es reintentable', () => {
+  const cola = [{ status: 'lista' }, { status: 'error', definitivo: true, error: 'ya procesada' }];
+  assert.equal(resumirCola(cola).fallidas, 1);
+  assert.equal(resumirCola(cola).reintentables, 0);
+  assert.equal(pendientesAlSalir({ cola }).reintentables, 0);
+  assert.equal(pendientesAlSalir({ cola }).hay, true);
 });

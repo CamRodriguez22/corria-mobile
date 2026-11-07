@@ -2,6 +2,7 @@
 // Base: _ds/organic-33a52a4e-dd64-41a7-8990-ae2bbb2371cc/styles.css (mockup PIXELRUST v2)
 
 import { StyleSheet } from 'react-native';
+import { num, nivelDePct } from './niveles';
 
 // ─────────────────────────────────────────────────────────────
 // Tokens
@@ -134,10 +135,7 @@ export const NIVELES = [
   { i: 3, label: 'Severa', short: 'SEVERA', color: '#ef4444', texto: '#b91c1c', tint: 'rgba(239, 68, 68, 0.12)' },
 ];
 
-export function num(v, fallback = 0) {
-  const n = typeof v === 'string' ? parseFloat(v) : Number(v);
-  return Number.isFinite(n) ? n : fallback;
-}
+export { num };
 
 // Metadatos de severidad a partir del nivel numérico del backend.
 export function nivelMeta(nivelCorrosion) {
@@ -147,11 +145,7 @@ export function nivelMeta(nivelCorrosion) {
 
 // Fallback exacto a la función _calcular_nivel de inference/handler.py (10% y 25%).
 export function severidadDePct(pct) {
-  const p = num(pct, 0);
-  if (p < 0.05) return NIVELES[0];
-  if (p < 10) return NIVELES[1];
-  if (p < 25) return NIVELES[2];
-  return NIVELES[3];
+  return NIVELES[nivelDePct(pct)];
 }
 
 // Severidad "efectiva": usa el nivel del backend, cae al % si el nivel no viene.

@@ -190,6 +190,7 @@ export const Field = ({
   multiline = false,
   error = '',
   editable = true,
+  autoFocus = false,
   style = {},
 }) => {
   const [focused, setFocused] = useState(false);
@@ -206,6 +207,7 @@ export const Field = ({
         autoCapitalize={autoCapitalize}
         multiline={multiline}
         editable={editable}
+        autoFocus={autoFocus}
         accessibilityLabel={label || placeholder}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
