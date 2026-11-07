@@ -62,6 +62,16 @@ export function puedeGestionarLote(perfil, mediciones = []) {
   return mediciones.every((m) => puedeGestionarMedicion(perfil, m));
 }
 
+// Datos de la empresa para encabezados: salen de GET /usuarios/me (empresa_nombre,
+// empresa_ciudad, empresa_departamento). Sin perfil o sin esos campos, no se inventa
+// ninguna ciudad ni organización: `linea` queda vacía y la pantalla omite la línea.
+export function datosEmpresa(perfil) {
+  const nombre = String(perfil?.empresa_nombre || '').trim();
+  const ciudad = String(perfil?.empresa_ciudad || '').trim();
+  const departamento = String(perfil?.empresa_departamento || '').trim();
+  return { nombre, ciudad, departamento, linea: [nombre, ciudad].filter(Boolean).join(' · ') };
+}
+
 // Traducción humana de errores de autenticación (Cognito) sin jerga técnica
 export function traducirAuthError(e) {
   const name = e?.name || '';

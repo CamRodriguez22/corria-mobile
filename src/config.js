@@ -38,12 +38,5 @@ export const APP_CONFIG = {
   carpetaFotos: 'PIXELRUST_Mediciones',
 };
 
-// ─────────────────────────────────────────────────────────────
-// Contexto institucional por defecto (fallback hasta cargar perfil).
-// ─────────────────────────────────────────────────────────────
-export const ENTIDAD = 'PixelRust';
-export const CIUDAD = 'Barranquilla';
-export const DEPARTAMENTO = 'Atlántico';
-
 export const BLOQUES_CAMPUS = {};
 export const LISTA_BLOQUES = [];

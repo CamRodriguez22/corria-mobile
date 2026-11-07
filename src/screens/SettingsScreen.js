@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { Button, KeyValueCard } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
-import { ENTIDAD, CIUDAD } from '../config';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -63,8 +62,8 @@ export default function SettingsScreen({ perfil, nombre, iniciales, onLogout }) 
         <KeyValueCard
           rows={[
             { label: 'Rol', value: perfil?.rol || '—' },
-            { label: 'Organización', value: perfil?.empresa_nombre || ENTIDAD },
-            { label: 'Ciudad', value: perfil?.empresa_ciudad || CIUDAD },
+            { label: 'Organización', value: perfil?.empresa_nombre || '—' },
+            { label: 'Ciudad', value: perfil?.empresa_ciudad || '—' },
             { label: 'Versión', value: appVersion },
           ]}
         />

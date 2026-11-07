@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, ScrollView, Image } from 'react-native';
 import { Screen, Header, SeverityBadge, KeyValueCard, Button } from '../DesignComponents';
 import { TOKENS, num, severidad, confianzaPct } from '../DesignTokens';
-import { ENTIDAD, CIUDAD } from '../config';
 import { formatDateTime } from '../utils';
 
 const PAD = TOKENS.spacing.lg;
@@ -10,6 +9,7 @@ const PAD = TOKENS.spacing.lg;
 export default function DetailScreen({
   medicion,
   bloque,
+  empresa,
   obs,
   puedeGestionar,
   onBack,
@@ -59,9 +59,9 @@ export default function DetailScreen({
         <View style={{ marginTop: 18 }}>
           <KeyValueCard
             rows={[
-              { label: 'Entidad', value: ENTIDAD },
+              { label: 'Entidad', value: empresa?.nombre || '—' },
               { label: 'Lote', value: medicion.lote_nombre || (medicion.lote_id ? `Lote ${medicion.lote_id.slice(-6)}` : 'Sin lote') },
-              { label: 'Ciudad', value: medicion.ciudad || medicion.punto_info?.ciudad || CIUDAD },
+              { label: 'Ciudad', value: medicion.ciudad || medicion.punto_info?.ciudad || empresa?.ciudad || '—' },
               {
                 label: 'Coordenadas',
                 value: lat != null && lng != null ? `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : '—',

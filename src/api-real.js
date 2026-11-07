@@ -247,7 +247,7 @@ export async function subirMedicionReal({
   const body = {
     fuente: 'movil',
     bloque_id: bloqueId,
-    notas: notas || `movil-bloque-${bloqueId}`,
+    notas: notas || `movil-punto-${bloqueId}`,
     imagen_key: imagenKey,
   };
 

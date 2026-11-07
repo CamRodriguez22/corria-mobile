@@ -3,7 +3,6 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { Screen, Header, Field, Button } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconBuilding, IconGps, IconAlertTriangle } from '../Icons';
-import { ENTIDAD, CIUDAD } from '../config';
 import { formatDateTime } from '../utils';
 
 const PAD = TOKENS.spacing.lg;
@@ -12,6 +11,7 @@ export default function ContextScreen({
   gps,
   gpsError,
   lugar,
+  empresa,
   bloques,
   bloqueSel,
   setBloqueSel,
@@ -20,7 +20,7 @@ export default function ContextScreen({
   onBack,
   onNext,
 }) {
-  const ciudadDetectada = lugar?.ciudad || CIUDAD;
+  const ciudadDetectada = lugar?.ciudad || empresa?.ciudad || '';
 
   return (
     <Screen>
@@ -52,12 +52,13 @@ export default function ContextScreen({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.accent2_900 }}>
-              Entidad: {ENTIDAD}
+              {empresa?.nombre ? `Entidad: ${empresa.nombre}` : 'Nueva medición'}
             </Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.accent2_800, marginTop: 2 }}>
-              Ciudad: {ciudadDetectada}
-              {lugar?.barrio ? ` · ${lugar.barrio}` : ''}
-            </Text>
+            {!!(ciudadDetectada || lugar?.barrio) && (
+              <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.accent2_800, marginTop: 2 }}>
+                {[ciudadDetectada && `Ciudad: ${ciudadDetectada}`, lugar?.barrio].filter(Boolean).join(' · ')}
+              </Text>
+            )}
             <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.accent2_700, marginTop: 2 }}>
               {formatDateTime()}
             </Text>

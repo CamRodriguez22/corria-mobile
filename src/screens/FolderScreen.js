@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { ScrollView } from 'react-native';
 import { Screen, Header, MeasurementRow, EmptyState } from '../DesignComponents';
 import { TOKENS, num } from '../DesignTokens';
-import { ENTIDAD, CIUDAD } from '../config';
 import { formatDateTime, agruparPorBloque } from '../utils';
 
 const PAD = TOKENS.spacing.lg;
@@ -13,10 +12,11 @@ export default function FolderScreen({
   bloqueMap,
   bloquesMap,
   listaBloques,
+  empresaLinea,
   onBack,
   onOpen,
 }) {
-  const bloque = bloquesMap[clave] || { nombre: 'Sin bloque' };
+  const bloque = bloquesMap[clave] || { nombre: 'Sin punto' };
   const items = useMemo(
     () =>
       agruparPorBloque(mediciones, bloqueMap, listaBloques).find((g) => g.clave === clave)?.items || [],
@@ -27,7 +27,7 @@ export default function FolderScreen({
     <Screen>
       <Header
         title={bloque.nombre}
-        subtitle={`${CIUDAD} · ${ENTIDAD}`}
+        subtitle={empresaLinea || undefined}
         onBack={onBack}
       />
       <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 36 }}>

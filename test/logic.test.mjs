@@ -20,6 +20,7 @@ import {
   parteArchivoForm,
   navegarAtras,
   pendientesAlSalir,
+  datosEmpresa,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -294,4 +295,14 @@ test('pendientesAlSalir - avisa de fotos fallidas y observaciones sin guardar', 
   assert.equal(pendientesAlSalir({ cola: ok, espesor: '2.5', descripcion: 'Cara norte', guardada }).obsSinGuardar, true);
   // Vacías -> nada
   assert.equal(pendientesAlSalir({ cola: ok, espesor: ' ', descripcion: '' }).hay, false);
+});
+
+test('datosEmpresa - sale del perfil y no inventa ciudad ni organización', () => {
+  assert.deepEqual(
+    datosEmpresa({ empresa_nombre: 'Acme', empresa_ciudad: 'Medellín', empresa_departamento: 'Antioquia' }),
+    { nombre: 'Acme', ciudad: 'Medellín', departamento: 'Antioquia', linea: 'Acme · Medellín' }
+  );
+  assert.equal(datosEmpresa({ empresa_nombre: 'Acme' }).linea, 'Acme');
+  assert.equal(datosEmpresa({ empresa_ciudad: 'Cali' }).linea, 'Cali');
+  assert.deepEqual(datosEmpresa(null), { nombre: '', ciudad: '', departamento: '', linea: '' });
 });

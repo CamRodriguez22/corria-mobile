@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-import { APP_CONFIG, LISTA_BLOQUES, CIUDAD } from './config';
+import { APP_CONFIG, LISTA_BLOQUES } from './config';
 import { num, severidad } from './DesignTokens';
 
 // ───────────────────────────── Geometría ─────────────────────────────
@@ -272,16 +272,17 @@ export function bloqueMasCercano(lat, lng, maxMetros = 120, listaBloques = LISTA
   return best && bestD <= maxMetros ? best.clave : null;
 }
 
-// notas del backend: guardamos el bloque como prefijo legible "Bloque K · <texto>".
+// notas del backend: guardamos el punto como prefijo legible "Punto K · <texto>".
+// (Las mediciones antiguas usan el prefijo "Bloque K": parseBloqueDeNotas acepta ambos.)
 export function construirNotas(bloque, texto = '') {
   const t = (texto || '').trim();
-  return t ? `Bloque ${bloque} · ${t}` : `Bloque ${bloque}`;
+  return t ? `Punto ${bloque} · ${t}` : `Punto ${bloque}`;
 }
 
 export function parseBloqueDeNotas(notas = '') {
   // Incluye guiones: los id_bloque reales (uuid) los usan; las claves de
   // BLOQUES_CAMPUS (letras) también matchean igual que antes.
-  const m = /bloque\s+([a-z0-9-]+)/i.exec(notas || '');
+  const m = /(?:punto|bloque)\s+([a-z0-9-]+)/i.exec(notas || '');
   return m ? m[1].toUpperCase() : null;
 }
 
@@ -335,7 +336,7 @@ export function agruparPorBloque(mediciones = [], mapaLocal = {}, listaBloques =
   if (sinBloque.length) {
     salida.push({
       clave: 'SIN_BLOQUE',
-      bloque: { clave: 'SIN_BLOQUE', nombre: 'Sin bloque', detalle: 'Fuera del campus' },
+      bloque: { clave: 'SIN_BLOQUE', nombre: 'Sin punto', detalle: 'Sin punto asignado' },
       items: orden(sinBloque),
       peorPct: Math.max(...sinBloque.map((m) => num(m.area_corroida_pct, 0))),
     });
@@ -385,4 +386,3 @@ export function agruparMedicionesEnCiudades(mediciones) {
     }));
 }
 
-export { CIUDAD };

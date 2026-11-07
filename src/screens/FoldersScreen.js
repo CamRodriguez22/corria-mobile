@@ -9,7 +9,6 @@ import {
 import { EmptyState } from '../DesignComponents';
 import { TOKENS, severidad } from '../DesignTokens';
 import { IconPuntos, IconChevronRight } from '../Icons';
-import { ENTIDAD, CIUDAD } from '../config';
 import { agruparPorBloque } from '../utils';
 import { inicialBloque } from '../helpers';
 
@@ -19,6 +18,7 @@ export default function FoldersScreen({
   mediciones,
   bloqueMap,
   listaBloques,
+  empresaLinea,
   refreshing,
   onRefresh,
   onOpen,
@@ -54,7 +54,7 @@ export default function FoldersScreen({
       >
         <IconPuntos size={22} color={TOKENS.colors.accent2_900} />
         <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.accent2_900, flex: 1 }}>
-          {CIUDAD} · {ENTIDAD}
+          {empresaLinea || 'Tu zona'}
         </Text>
         <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.accent2_800 }}>
           {mediciones.length} {mediciones.length === 1 ? 'inspección' : 'inspecciones'}

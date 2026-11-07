@@ -51,6 +51,7 @@ import {
   conAutor,
   navegarAtras,
   pendientesAlSalir,
+  datosEmpresa,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -233,6 +234,7 @@ function Root() {
   // El backend bloquea con 403 a cliente en POST /medicion: se oculta la entrada
   // a "Nueva medición" para que la UX no rompa con un error del servidor.
   const esCliente = (perfil?.rol || '').toLowerCase() === 'cliente';
+  const empresa = useMemo(() => datosEmpresa(perfil), [perfil]);
   const stats = useMemo(() => calcularEstadisticas(mediciones), [mediciones]);
 
   // Catálogo de bloques a usar: el real del backend si cargó, si no el de
@@ -829,9 +831,12 @@ function Root() {
   const compartir = async (m) => {
     try {
       const s = severidad(m);
+      // Nombre legible del punto (no el id crudo); si no se conoce, solo "Medición".
+      const claveBloque = bloqueDeMedicion(m, bloqueMap, listaBloques);
+      const nombrePunto = claveBloque ? nombreCortoBloque(bloquesMap[claveBloque], '') : '';
       await Share.share({
         message:
-          `PIXELRUST — ${bloqueDeMedicion(m, bloqueMap) ? 'Bloque ' + bloqueDeMedicion(m, bloqueMap) : 'Medición'}\n` +
+          `PIXELRUST — ${nombrePunto ? 'Punto ' + nombrePunto : 'Medición'}\n` +
           `Corrosión: ${s.label} (${num(m.area_corroida_pct, 0).toFixed(1)}%)\n` +
           `Confianza: ${confianzaPct(m.confianza_promedio)}%\n` +
           `Fecha: ${formatDateTime(m.timestamp)}`,
@@ -950,6 +955,7 @@ function Root() {
           gps={gps}
           gpsError={gpsError}
           lugar={lugar}
+          empresa={empresa}
           bloques={listaBloques}
           bloqueSel={bloqueSel}
           setBloqueSel={setBloqueSel}
@@ -1012,6 +1018,7 @@ function Root() {
       return (
         <DetailScreen
           medicion={detalle}
+          empresa={empresa}
           bloque={detalleClaveBloque ? nombreCortoBloque(bloquesMap[detalleClaveBloque], detalleClaveBloque) : null}
           obs={obsMap[detalle.id_medicion]}
           puedeGestionar={puedeGestionar}
@@ -1031,6 +1038,7 @@ function Root() {
           bloqueMap={bloqueMap}
           bloquesMap={bloquesMap}
           listaBloques={listaBloques}
+          empresaLinea={empresa.linea}
           onBack={volver}
           onOpen={abrirDetalle}
         />
@@ -1095,6 +1103,7 @@ function Root() {
             mediciones={mediciones}
             bloqueMap={bloqueMap}
             listaBloques={listaBloques}
+            empresaLinea={empresa.linea}
             refreshing={refreshing}
             onRefresh={onRefresh}
             onOpen={(clave) => {

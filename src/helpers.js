@@ -9,7 +9,7 @@ export * from './logic';
 export function tituloBloque(m, bloqueMap, bloquesMap = {}) {
   const listaReal = Object.values(bloquesMap);
   const b = bloqueDeMedicion(m, bloqueMap, listaReal.length ? listaReal : undefined);
-  return b ? (bloquesMap[b]?.nombre || `Bloque ${b}`) : 'Sin bloque';
+  return b ? (bloquesMap[b]?.nombre || 'Punto sin nombre') : 'Sin punto';
 }
 
 export function ErrorText({ text }) {
