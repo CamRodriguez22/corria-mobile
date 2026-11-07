@@ -83,7 +83,7 @@ export default function LotesScreen({
           accessibilityLabel="Volver a la lista de lotes"
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14, minHeight: 44, justifyContent: 'flex-start' }}
         >
-          <Text style={{ fontSize: 16, color: TOKENS.colors.accent, fontWeight: '700' }}>← Volver a lotes</Text>
+          <Text style={{ fontSize: 16, color: TOKENS.colors.accentText, fontWeight: '700' }}>← Volver a lotes</Text>
         </Pressable>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -115,7 +115,7 @@ export default function LotesScreen({
           </View>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
             <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.neutral600, textTransform: 'uppercase', fontWeight: '700' }}>Máximo</Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: lote.maxNivel?.color || TOKENS.colors.text, marginTop: 2 }}>{lote.maxPct.toFixed(1)}%</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2 }}>{lote.maxPct.toFixed(1)}%</Text>
           </View>
         </View>
 
@@ -216,7 +216,7 @@ export default function LotesScreen({
               <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.neutral600, marginTop: 2 }}>
                 {lote.puntoTitulo} · {formatDate(lote.fechaReciente)}
               </Text>
-              <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: lote.maxNivel?.color || TOKENS.colors.text, marginTop: 2, fontWeight: '600' }}>
+              <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2, fontWeight: '600' }}>
                 {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'} · Máx {lote.maxPct.toFixed(1)}% (Nivel {lote.maxNivel?.i ?? '—'})
               </Text>
             </View>

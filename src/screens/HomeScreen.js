@@ -102,7 +102,7 @@ export default function HomeScreen({
           }}
         >
           <IconAlertTriangle size={20} color={TOKENS.colors.warning} />
-          <Text style={{ color: TOKENS.colors.warning, fontSize: TOKENS.fontSizes.small, fontWeight: '600', flex: 1 }}>
+          <Text style={{ color: TOKENS.colors.warningText, fontSize: TOKENS.fontSizes.small, fontWeight: '600', flex: 1 }}>
             Sin conexión — mostrando datos guardados en este dispositivo.
           </Text>
         </View>

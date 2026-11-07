@@ -190,7 +190,7 @@ export default function ContextScreen({
           <Text
             style={{
               fontSize: TOKENS.fontSizes.small,
-              color: gpsError ? TOKENS.colors.warning : TOKENS.colors.accent2_800,
+              color: gpsError ? TOKENS.colors.warningText : TOKENS.colors.accent2_800,
               flex: 1,
               fontWeight: '500',
             }}

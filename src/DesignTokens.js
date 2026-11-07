@@ -13,8 +13,9 @@ export const TOKENS = {
     surfaceAlt: '#f9f4ed', // tarjetas claras (neutral-100 del mockup)
     text: '#201e1d', // marrón muy oscuro
     textOnAccent: '#ffffff',
-    accent: '#c67139', // terracota (marca)
-    accent2: '#7a8a5e', // sage
+    accent: '#C1460B', // terracota de marca (= --accent-amber de la web): fondos con texto blanco (5.06:1)
+    accentText: '#9a4a1e', // acento como TEXTO sobre bg/surface/surfaceAlt (≥ 4.65:1)
+    accent2: '#7a8a5e', // sage: solo rellenos/barras (no texto ni fondo de texto blanco)
     divider: 'rgba(32,30,29,0.16)',
     border: '#dcd3c4', // borde sutil de tarjetas y campos (= neutral300)
 
@@ -23,7 +24,7 @@ export const TOKENS = {
     neutral200: '#eee7db',
     neutral300: '#dcd3c4',
     neutral400: '#a39783',
-    neutral500: '#6f665a', // Contraste 4.74:1 sobre bg y 5.15:1 sobre surfaceAlt
+    neutral500: '#665e53', // 4.76:1 sobre surface, 5.36:1 sobre bg, 5.83:1 sobre surfaceAlt
     neutral600: '#5c5449',
     neutral700: '#4a443a',
     neutral800: '#38332c',
@@ -54,7 +55,8 @@ export const TOKENS = {
     // Semánticos
     success: '#5f6d47',
     successTint: 'rgba(122,138,94,0.16)',
-    warning: '#c25f2a',
+    warning: '#c25f2a', // solo rellenos/íconos (3.55:1 como texto)
+    warningText: '#9a4516', // advertencia como TEXTO (≥ 4.84:1 sobre bg/surface/surfaceAlt)
     warningTint: 'rgba(194,95,42,0.14)',
     danger: '#8c3524',
     dangerTint: 'rgba(140,53,36,0.14)',
@@ -120,13 +122,16 @@ export const TOKENS = {
 // ─────────────────────────────────────────────────────────────
 // Severidad de corrosión
 // El backend devuelve nivel_corrosion como NÚMERO: 0=ninguna 1=leve 2=moderada 3=severa.
+// `color` = relleno/punto (brillante); `texto` = variante oscura para usar COMO TEXTO
+// (≥ 4.5:1 sobre bg, surface, surfaceAlt y la tinta); parte de --nivel-N-texto de la web, oscurecida
+// porque el fondo de la app es crema y no blanco.
 // area_corroida_pct y confianza_promedio llegan como string en los GET y como number en el POST.
 // ─────────────────────────────────────────────────────────────
 export const NIVELES = [
-  { i: 0, label: 'Sin corrosión', short: 'NINGUNA', color: '#10b981', tint: 'rgba(16, 185, 129, 0.12)' },
-  { i: 1, label: 'Leve', short: 'LEVE', color: '#0ea5e9', tint: 'rgba(14, 165, 233, 0.12)' },
-  { i: 2, label: 'Moderada', short: 'MODERADA', color: '#f59e0b', tint: 'rgba(245, 158, 11, 0.12)' },
-  { i: 3, label: 'Severa', short: 'SEVERA', color: '#ef4444', tint: 'rgba(239, 68, 68, 0.12)' },
+  { i: 0, label: 'Sin corrosión', short: 'NINGUNA', color: '#10b981', texto: '#126d34', tint: 'rgba(16, 185, 129, 0.12)' },
+  { i: 1, label: 'Leve', short: 'LEVE', color: '#0ea5e9', texto: '#994708', tint: 'rgba(14, 165, 233, 0.12)' },
+  { i: 2, label: 'Moderada', short: 'MODERADA', color: '#f59e0b', texto: '#af3a0b', tint: 'rgba(245, 158, 11, 0.12)' },
+  { i: 3, label: 'Severa', short: 'SEVERA', color: '#ef4444', texto: '#b91c1c', tint: 'rgba(239, 68, 68, 0.12)' },
 ];
 
 export function num(v, fallback = 0) {

@@ -60,7 +60,7 @@ export default function AnalyzingScreen({ etapa, colaFotos, bloqueSel }) {
             {total > 1 ? `Foto ${Math.min(procesadas + 1, total)} de ${total}` : 'Foto en proceso'}
             {conError ? ` · ${conError} con error` : ''}
           </Text>
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.accent, fontWeight: '700' }}>
+          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.accentText, fontWeight: '700' }}>
             {total > 1 ? `${progresoPct}%` : (etapa === 'analizando_ia' ? 'Fase 2 de 2' : 'Fase 1 de 2')}
           </Text>
         </View>

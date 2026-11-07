@@ -67,8 +67,8 @@ export const Logo = ({ size = 14, gap = 3 }) => {
 // Botón único con variantes (accesible)
 // ─────────────────────────────────────────────────────────────
 const VARIANTS = {
-  primary: { bg: TOKENS.colors.accent, bgPressed: TOKENS.colors.accent600, fg: '#fff', border: 'transparent' },
-  secondary: { bg: TOKENS.colors.accent2, bgPressed: TOKENS.colors.accent2_600, fg: '#fff', border: 'transparent' },
+  primary: { bg: TOKENS.colors.accent, bgPressed: TOKENS.colors.accent700, fg: '#fff', border: 'transparent' },
+  secondary: { bg: TOKENS.colors.accent2_700, bgPressed: TOKENS.colors.accent2_800, fg: '#fff', border: 'transparent' },
   ghost: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.neutral700, border: TOKENS.colors.neutral300 },
   danger: { bg: 'transparent', bgPressed: TOKENS.colors.dangerTint, fg: TOKENS.colors.danger, border: TOKENS.colors.danger },
 };
@@ -241,7 +241,7 @@ export const Badge = ({ label, color = TOKENS.colors.accent700, tint = TOKENS.co
 // Badge de severidad a partir de una medición (o de {nivel_corrosion}/{area_corroida_pct})
 export const SeverityBadge = ({ medicion, style }) => {
   const s = severidad(medicion || {});
-  return <Badge label={s.short} color={s.color} tint={s.tint} style={style} />;
+  return <Badge label={s.short} color={s.texto} tint={s.tint} style={style} />;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -563,7 +563,7 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombr
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
           <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: s.color }}>{s.short}</Text>
+          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: s.texto }}>{s.short}</Text>
         </View>
         {esSobrePlaca && (
           <View style={{ backgroundColor: TOKENS.colors.accent100, paddingHorizontal: 8, paddingVertical: 2, borderRadius: TOKENS.radius.sm }}>

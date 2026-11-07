@@ -116,7 +116,7 @@ export default function ActivityScreen({
                             {hora}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: TOKENS.fontSizes.small, color: s.color, fontWeight: '600', marginTop: 2 }}>
+                        <Text style={{ fontSize: TOKENS.fontSizes.small, color: s.texto, fontWeight: '600', marginTop: 2 }}>
                           {num(m.area_corroida_pct, 0).toFixed(1)}% · {s.label}
                         </Text>
                         {!!m.lote_nombre && (

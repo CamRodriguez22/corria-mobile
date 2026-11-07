@@ -102,7 +102,7 @@ export default function FoldersScreen({
                   justifyContent: 'center',
                 }}
               >
-                <Text style={{ fontSize: TOKENS.fontSizes.h4, fontWeight: '800', color: sev.color }}>
+                <Text style={{ fontSize: TOKENS.fontSizes.h4, fontWeight: '800', color: sev.texto }}>
                   {g.clave === 'SIN_BLOQUE' ? '—' : inicialBloque(g.bloque?.nombre || g.clave)}
                 </Text>
               </View>

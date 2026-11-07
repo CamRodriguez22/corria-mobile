@@ -154,7 +154,7 @@ export default function ResultScreen({
             <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text }}>
               Observaciones de campo <Text style={{ color: TOKENS.colors.neutral500, fontWeight: '400' }}>(opcional)</Text>
             </Text>
-            <Text style={{ fontSize: 20, color: TOKENS.colors.accent, fontWeight: '700' }}>
+            <Text style={{ fontSize: 20, color: TOKENS.colors.accentText, fontWeight: '700' }}>
               {obsOpen ? '−' : '＋'}
             </Text>
           </Pressable>
