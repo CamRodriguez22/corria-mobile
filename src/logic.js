@@ -42,6 +42,19 @@ export function puedeGestionarMedicion(perfil, medicion) {
   return rol === 'tecnico' && esMedicionPropia(perfil, medicion);
 }
 
+// La respuesta de POST /medicion no trae el autor (el backend lo guarda como
+// tomado_por_id/usuario_id = sub de Cognito). Se completa con el sub del perfil para que
+// el técnico pueda gestionar la foto recién subida sin esperar a recargar la lista.
+export function conAutor(medicion, perfil) {
+  const sub = subDelPerfil(perfil);
+  if (!medicion || !sub) return medicion;
+  return {
+    ...medicion,
+    tomado_por_id: medicion.tomado_por_id || sub,
+    usuario_id: medicion.usuario_id || sub,
+  };
+}
+
 // Renombrar un lote: el backend exige poder gestionar TODAS las mediciones del
 // lote (el técnico solo si todas son suyas).
 export function puedeGestionarLote(perfil, mediciones = []) {

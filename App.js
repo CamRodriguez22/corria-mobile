@@ -48,6 +48,7 @@ import {
   resumirCola,
   listaDeRespuesta,
   esSesionVencida,
+  conAutor,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -409,6 +410,17 @@ function Root() {
     }
   };
 
+  // Los KPI del inicio vienen del servidor: se refrescan tras subir o borrar. Si falla,
+  // se conservan los últimos (el siguiente pull-to-refresh los vuelve a pedir).
+  const refrescarIndicadores = () => {
+    const sesion = sesionRef.current;
+    getIndicadores()
+      .then((inds) => {
+        if (inds && sesion === sesionRef.current) setIndicadoresServidor(inds);
+      })
+      .catch(() => {});
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     cargarTodo(false);
@@ -693,7 +705,7 @@ function Root() {
             },
           });
 
-          const { mascaras, ...ligera } = medicion;
+          const { mascaras, ...ligera } = conAutor(medicion, perfil);
           const medConFoto = { ...ligera, url_imagen: medicion.url_imagen || itemFoto.uri, _localUri: itemFoto.uri };
           setMediciones((prev) => [medConFoto, ...prev.filter((m) => m.id_medicion !== medicion.id_medicion)]);
         } catch (errFoto) {
@@ -708,6 +720,7 @@ function Root() {
       }
 
       setEtapaSubida('completado');
+      if (Object.keys(bloquesNuevos).length) refrescarIndicadores();
 
       // La imagen y el análisis que se muestran salen del MISMO ítem de la cola.
       const { ultimaLista } = resumirCola(colaRef.current);
@@ -815,6 +828,7 @@ function Root() {
         try {
           await eliminarMedicion(m.id_punto, m.id_medicion);
           setMediciones((prev) => prev.filter((x) => x.id_medicion !== m.id_medicion));
+          refrescarIndicadores();
           setDetalle(null);
           setScreen(folderClave ? 'folder' : tab);
         } catch (e) {

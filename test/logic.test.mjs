@@ -16,6 +16,7 @@ import {
   textoResumenCola,
   listaDeRespuesta,
   esSesionVencida,
+  conAutor,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -214,4 +215,18 @@ test('esSesionVencida - solo el 401 del backend', () => {
   assert.equal(esSesionVencida({ status: 403 }), false);
   assert.equal(esSesionVencida(new Error('Sin conexión con el servidor.')), false);
   assert.equal(esSesionVencida(null), false);
+});
+
+test('conAutor - completa tomado_por_id/usuario_id para que el técnico gestione su foto nueva', () => {
+  const perfil = { rol: 'tecnico', cognito_sub: 'sub-123', id_usuario: 'USR-abc' };
+  const nueva = conAutor({ id_medicion: 'm1' }, perfil);
+  assert.equal(nueva.tomado_por_id, 'sub-123');
+  assert.equal(nueva.usuario_id, 'sub-123');
+  assert.equal(puedeGestionarMedicion(perfil, nueva), true);
+  // Respeta lo que ya traiga la respuesta y no muta el original
+  const original = { id_medicion: 'm2', tomado_por_id: 'otro' };
+  assert.equal(conAutor(original, perfil).tomado_por_id, 'otro');
+  assert.equal(original.usuario_id, undefined);
+  // Sin perfil/sub no inventa autor
+  assert.deepEqual(conAutor({ id_medicion: 'm3' }, null), { id_medicion: 'm3' });
 });
