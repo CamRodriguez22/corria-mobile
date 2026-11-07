@@ -167,8 +167,24 @@ function Root() {
   const [obsSaved, setObsSaved] = useState(false);
 
   // modales interactivos (reemplazo de Alert.alert y Alert.prompt en web y móvil)
-  const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', variant: 'primary', onConfirm: null });
+  const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', variant: 'primary', onConfirm: null, onCancel: null });
   const [promptModal, setPromptModal] = useState({ visible: false, title: '', message: '', initialValue: '', onConfirm: null });
+
+  const cerrarConfirm = () => setConfirmModal((prev) => ({ ...prev, visible: false }));
+  const cancelarConfirm = () => {
+    const alCancelar = confirmModal.onCancel;
+    cerrarConfirm();
+    if (alCancelar) alCancelar();
+  };
+  const avisar = (title, message) =>
+    setConfirmModal({
+      visible: true,
+      title,
+      message,
+      confirmLabel: 'Entendido',
+      cancelLabel: '',
+      onConfirm: cerrarConfirm,
+    });
 
   const nombre = perfil?.nombre || (perfil?.email || email).split('@')[0] || 'Usuario';
   const iniciales = nombre
@@ -473,14 +489,7 @@ function Root() {
         if (!f) return;
         const err = validarFoto(f);
         if (err) {
-          setConfirmModal({
-            visible: true,
-            title: 'Foto no válida',
-            message: err,
-            confirmLabel: 'Entendido',
-            cancelLabel: '',
-            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
-          });
+          avisar('Foto no válida', err);
           return;
         }
         setFoto(f);
@@ -496,14 +505,7 @@ function Root() {
           }
         }
         if (!validas.length) {
-          setConfirmModal({
-            visible: true,
-            title: 'Fotos no válidas',
-            message: 'Ninguna de las fotos seleccionadas cumple los requisitos de resolución.',
-            confirmLabel: 'Entendido',
-            cancelLabel: '',
-            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
-          });
+          avisar('Fotos no válidas', 'Ninguna de las fotos seleccionadas cumple los requisitos de resolución.');
           return;
         }
         setFoto(validas[0]);
@@ -511,14 +513,7 @@ function Root() {
         setScreen('preview');
       }
     } catch (e) {
-      setConfirmModal({
-        visible: true,
-        title: 'Cámara / Galería',
-        message: e.message || 'No se pudo acceder a las fotos.',
-        confirmLabel: 'Entendido',
-        cancelLabel: '',
-        onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
-      });
+      avisar('Cámara / Galería', e.message || 'No se pudo acceder a las fotos.');
     }
   };
 
@@ -610,9 +605,11 @@ function Root() {
         confirmLabel: 'Reintentar',
         cancelLabel: 'Volver',
         onConfirm: () => {
-          setConfirmModal((prev) => ({ ...prev, visible: false }));
+          cerrarConfirm();
           analizar();
         },
+        // Nunca dejar al usuario atrapado en "analyzing": volver a revisar la foto.
+        onCancel: () => setScreen('preview'),
       });
     }
   };
@@ -659,14 +656,7 @@ function Root() {
           setDetalle(act);
           setMediciones((prev) => prev.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
         } catch (e) {
-          setConfirmModal({
-            visible: true,
-            title: 'No se pudo renombrar',
-            message: e.message || 'Error del servidor.',
-            confirmLabel: 'Entendido',
-            cancelLabel: '',
-            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
-          });
+          avisar('No se pudo renombrar', e.message || 'Error del servidor.');
         }
       },
     });
@@ -686,144 +676,164 @@ function Root() {
           setDetalle(null);
           setScreen(folderClave ? 'folder' : tab);
         } catch (e) {
-          setConfirmModal({
-            visible: true,
-            title: 'No se pudo eliminar',
-            message: e.message || 'Error del servidor.',
-            confirmLabel: 'Entendido',
-            cancelLabel: '',
-            onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
-          });
+          avisar('No se pudo eliminar', e.message || 'Error del servidor.');
         }
       },
     });
   };
 
   // ───────────────────────── render ─────────────────────────
-  if (booting) {
-    return (
-      <Screen center style={{ gap: 18 }}>
-        <Logo size={16} />
-        <Spinner />
-      </Screen>
-    );
-  }
-
-  if (!logged) {
-    return (
-      <LoginScreen
-        {...{
-          email,
-          setEmail,
-          pass,
-          setPass,
-          newPass,
-          setNewPass,
-          needsNewPass,
-          authBusy,
-          authError,
-          onLogin: handleLogin,
-          onNewPassword: handleNewPassword,
-        }}
+  // Los modales se montan una sola vez en la raíz para que sean visibles en
+  // todas las pantallas (detalle, carpeta, contexto, cámara, análisis, etc.).
+  const modales = (
+    <>
+      <ConfirmModal
+        visible={confirmModal.visible}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmLabel={confirmModal.confirmLabel}
+        cancelLabel={confirmModal.cancelLabel}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={cancelarConfirm}
       />
-    );
-  }
-
-  // pantallas de flujo (sin tab bar)
-  if (screen === 'context')
-    return (
-      <ContextScreen
-        gps={gps}
-        gpsError={gpsError}
-        lugar={lugar}
-        bloques={listaBloques}
-        bloqueSel={bloqueSel}
-        setBloqueSel={setBloqueSel}
-        loteNombre={loteNombreInput}
-        setLoteNombre={setLoteNombreInput}
-        onBack={() => setScreen('home')}
-        onNext={() => setScreen('camera')}
+      <PromptModal
+        visible={promptModal.visible}
+        title={promptModal.title}
+        message={promptModal.message}
+        initialValue={promptModal.initialValue}
+        placeholder={promptModal.placeholder}
+        onConfirm={promptModal.onConfirm}
+        onCancel={() => setPromptModal((prev) => ({ ...prev, visible: false }))}
       />
-    );
+    </>
+  );
 
-  if (screen === 'camera')
-    return (
-      <CameraScreen
-        bloqueSel={bloqueSelLabel}
-        onBack={() => setScreen('context')}
-        onPick={capturar}
-      />
-    );
+  const renderPantalla = () => {
+    if (booting) {
+      return (
+        <Screen center style={{ gap: 18 }}>
+          <Logo size={16} />
+          <Spinner />
+        </Screen>
+      );
+    }
 
-  if (screen === 'preview')
-    return (
-      <PreviewScreen
-        foto={foto}
-        bloqueSel={bloqueSelLabel}
-        onBack={() => setScreen('camera')}
-        onConfirm={analizar}
-      />
-    );
+    if (!logged) {
+      return (
+        <LoginScreen
+          {...{
+            email,
+            setEmail,
+            pass,
+            setPass,
+            newPass,
+            setNewPass,
+            needsNewPass,
+            authBusy,
+            authError,
+            onLogin: handleLogin,
+            onNewPassword: handleNewPassword,
+          }}
+        />
+      );
+    }
 
-  if (screen === 'analyzing')
-    return <AnalyzingScreen etapa={etapaSubida} colaFotos={colaFotos} bloqueSel={bloqueSelLabel} />;
+    // pantallas de flujo (sin tab bar)
+    if (screen === 'context')
+      return (
+        <ContextScreen
+          gps={gps}
+          gpsError={gpsError}
+          lugar={lugar}
+          bloques={listaBloques}
+          bloqueSel={bloqueSel}
+          setBloqueSel={setBloqueSel}
+          loteNombre={loteNombreInput}
+          setLoteNombre={setLoteNombreInput}
+          onBack={() => setScreen('home')}
+          onNext={() => setScreen('camera')}
+        />
+      );
 
-  if (screen === 'result' && resultado)
-    return (
-      <ResultScreen
-        medicion={resultado}
-        bloqueSel={bloqueSelLabel}
-        loteNombre={loteNombreInput}
-        espesor={espesor}
-        setEspesor={setEspesor}
-        descripcion={descripcion}
-        setDescripcion={setDescripcion}
-        obsOpen={obsOpen}
-        setObsOpen={setObsOpen}
-        obsSaved={obsSaved}
-        onSaveObs={guardarObs}
-        onNext={() => irANuevaMedicion({ mantenerLote: true })}
-        onTerminarLote={terminarLote}
-        onHome={terminarLote}
-      />
-    );
+    if (screen === 'camera')
+      return (
+        <CameraScreen
+          bloqueSel={bloqueSelLabel}
+          onBack={() => setScreen('context')}
+          onPick={capturar}
+        />
+      );
 
-  if (screen === 'detail' && detalle) {
-    const detalleClaveBloque = bloqueDeMedicion(detalle, bloqueMap, listaBloques);
-    const puedeGestionar = puedeGestionarMedicion(perfil, detalle);
+    if (screen === 'preview')
+      return (
+        <PreviewScreen
+          foto={foto}
+          bloqueSel={bloqueSelLabel}
+          onBack={() => setScreen('camera')}
+          onConfirm={analizar}
+        />
+      );
 
-    return (
-      <DetailScreen
-        medicion={detalle}
-        bloque={detalleClaveBloque ? nombreCortoBloque(bloquesMap[detalleClaveBloque], detalleClaveBloque) : null}
-        obs={obsMap[detalle.id_medicion]}
-        puedeGestionar={puedeGestionar}
-        onBack={() => setScreen(folderClave ? 'folder' : tab)}
-        onShare={() => compartir(detalle)}
-        onRename={() => renombrarFoto(detalle)}
-        onDelete={() => borrar(detalle)}
-      />
-    );
-  }
+    if (screen === 'analyzing')
+      return <AnalyzingScreen etapa={etapaSubida} colaFotos={colaFotos} bloqueSel={bloqueSelLabel} />;
 
-  if (screen === 'folder' && folderClave)
-    return (
-      <FolderScreen
-        clave={folderClave}
-        mediciones={mediciones}
-        bloqueMap={bloqueMap}
-        bloquesMap={bloquesMap}
-        listaBloques={listaBloques}
-        onBack={() => setScreen('folders')}
-        onOpen={abrirDetalle}
-      />
-    );
+    if (screen === 'result' && resultado)
+      return (
+        <ResultScreen
+          medicion={resultado}
+          bloqueSel={bloqueSelLabel}
+          loteNombre={loteNombreInput}
+          espesor={espesor}
+          setEspesor={setEspesor}
+          descripcion={descripcion}
+          setDescripcion={setDescripcion}
+          obsOpen={obsOpen}
+          setObsOpen={setObsOpen}
+          obsSaved={obsSaved}
+          onSaveObs={guardarObs}
+          onNext={() => irANuevaMedicion({ mantenerLote: true })}
+          onTerminarLote={terminarLote}
+          onHome={terminarLote}
+        />
+      );
 
-  // pantallas con tab bar
-  const setTabAndScreen = (k) => {
-    setTab(k);
-    setScreen(k);
-    setFolderClave(null);
+    if (screen === 'detail' && detalle) {
+      const detalleClaveBloque = bloqueDeMedicion(detalle, bloqueMap, listaBloques);
+      const puedeGestionar = puedeGestionarMedicion(perfil, detalle);
+
+      return (
+        <DetailScreen
+          medicion={detalle}
+          bloque={detalleClaveBloque ? nombreCortoBloque(bloquesMap[detalleClaveBloque], detalleClaveBloque) : null}
+          obs={obsMap[detalle.id_medicion]}
+          puedeGestionar={puedeGestionar}
+          onBack={() => setScreen(folderClave ? 'folder' : tab)}
+          onShare={() => compartir(detalle)}
+          onRename={() => renombrarFoto(detalle)}
+          onDelete={() => borrar(detalle)}
+        />
+      );
+    }
+
+    if (screen === 'folder' && folderClave)
+      return (
+        <FolderScreen
+          clave={folderClave}
+          mediciones={mediciones}
+          bloqueMap={bloqueMap}
+          bloquesMap={bloquesMap}
+          listaBloques={listaBloques}
+          onBack={() => setScreen('folders')}
+          onOpen={abrirDetalle}
+        />
+      );
+
+    // pantallas con tab bar
+    const setTabAndScreen = (k) => {
+      setTab(k);
+      setScreen(k);
+      setFolderClave(null);
   };
 
   return (
@@ -861,14 +871,7 @@ function Root() {
                 await renombrarLote(items, nuevo);
                 await cargarTodo(false);
               } catch (e) {
-                setConfirmModal({
-                  visible: true,
-                  title: 'No se pudo renombrar el lote',
-                  message: e.message || 'Error del servidor.',
-                  confirmLabel: 'Entendido',
-                  cancelLabel: '',
-                  onConfirm: () => setConfirmModal((prev) => ({ ...prev, visible: false })),
-                });
+                avisar('No se pudo renombrar el lote', e.message || 'Error del servidor.');
               }
             }}
           />
@@ -904,25 +907,14 @@ function Root() {
         )}
       </View>
       <TabBar current={tab} onChange={setTabAndScreen} items={TABS} />
-      <ConfirmModal
-        visible={confirmModal.visible}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        confirmLabel={confirmModal.confirmLabel}
-        cancelLabel={confirmModal.cancelLabel}
-        variant={confirmModal.variant}
-        onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal((prev) => ({ ...prev, visible: false }))}
-      />
-      <PromptModal
-        visible={promptModal.visible}
-        title={promptModal.title}
-        message={promptModal.message}
-        initialValue={promptModal.initialValue}
-        placeholder={promptModal.placeholder}
-        onConfirm={promptModal.onConfirm}
-        onCancel={() => setPromptModal((prev) => ({ ...prev, visible: false }))}
-      />
     </Screen>
+  );
+  };
+
+  return (
+    <>
+      {renderPantalla()}
+      {modales}
+    </>
   );
 }
