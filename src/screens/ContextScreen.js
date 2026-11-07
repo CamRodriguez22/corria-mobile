@@ -136,7 +136,7 @@ export default function ContextScreen({
                   {!!b.detalle && (
                     <Text
                       style={{
-                        fontSize: TOKENS.fontSizes.xs,
+                        fontSize: TOKENS.fontSizes.small,
                         color: active ? 'rgba(255,255,255,0.9)' : TOKENS.colors.neutral600,
                         marginTop: 2,
                         textAlign: 'center',
@@ -212,7 +212,7 @@ export default function ContextScreen({
             disabled={!bloqueSel}
             accessibilityHint={!bloqueSel ? 'Primero selecciona un punto' : undefined}
           />
-          <Text style={{ textAlign: 'center', fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500, marginTop: 12 }}>
+          <Text style={{ textAlign: 'center', fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 12 }}>
             {bloqueSel ? 'Las coordenadas se asociarán a la foto' : 'Selecciona un punto para continuar'}
           </Text>
         </View>

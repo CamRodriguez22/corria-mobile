@@ -115,11 +115,11 @@ export default function LotesScreen({
 
         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.neutral600, textTransform: 'uppercase', fontWeight: '700' }}>Promedio</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, textTransform: 'uppercase', fontWeight: '700' }}>Promedio</Text>
             <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text, marginTop: 2 }}>{lote.avgPct.toFixed(1)}%</Text>
           </View>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.neutral600, textTransform: 'uppercase', fontWeight: '700' }}>Máximo</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, textTransform: 'uppercase', fontWeight: '700' }}>Máximo</Text>
             <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2 }}>{lote.maxPct.toFixed(1)}%</Text>
           </View>
         </View>
@@ -218,10 +218,10 @@ export default function LotesScreen({
               <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text }}>
                 {lote.nombre}
               </Text>
-              <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.neutral600, marginTop: 2 }}>
+              <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
                 {lote.puntoTitulo} · {formatDate(lote.fechaReciente)}
               </Text>
-              <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2, fontWeight: '600' }}>
+              <Text style={{ fontSize: TOKENS.fontSizes.small, color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2, fontWeight: '600' }}>
                 {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'} · Máx {lote.maxPct.toFixed(1)}% (Nivel {lote.maxNivel?.i ?? '—'})
               </Text>
             </View>

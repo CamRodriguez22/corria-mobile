@@ -234,7 +234,7 @@ export const Field = ({
 // ─────────────────────────────────────────────────────────────
 export const Badge = ({ label, color = TOKENS.colors.accent700, tint = TOKENS.colors.accent100, style = {} }) => (
   <View style={[{ alignSelf: 'flex-start', backgroundColor: tint, borderRadius: TOKENS.radius.pill, paddingHorizontal: 11, paddingVertical: 6 }, style]}>
-    <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color }}>{label}</Text>
+    <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color }}>{label}</Text>
   </View>
 );
 
@@ -397,7 +397,7 @@ export const Segmented = ({ options, value, onChange, scroll = false }) => {
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             style={{
-              minHeight: 40,
+              minHeight: 44,
               justifyContent: 'center',
               paddingHorizontal: 15,
               paddingVertical: 9,
@@ -544,7 +544,7 @@ export const TabBar = ({ current, onChange, items }) => (
           style={{ flex: 1, alignItems: 'center', gap: 4, paddingVertical: 6, minHeight: TOKENS.tapTarget, justifyContent: 'center' }}
         >
           {renderTabIcon(it.key, color)}
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: active ? '800' : '600', color }}>{it.label}</Text>
+          <Text numberOfLines={1} style={{ fontSize: TOKENS.fontSizes.small, fontWeight: active ? '800' : '600', color }}>{it.label}</Text>
         </Pressable>
       );
     })}
@@ -563,11 +563,11 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombr
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
           <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: s.texto }}>{s.short}</Text>
+          <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: s.texto }}>{s.short}</Text>
         </View>
         {esSobrePlaca && (
           <View style={{ backgroundColor: TOKENS.colors.accent100, paddingHorizontal: 8, paddingVertical: 2, borderRadius: TOKENS.radius.sm }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color: TOKENS.colors.accent800 }}>Sobre placa</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.accent800 }}>Sobre placa</Text>
           </View>
         )}
       </View>
