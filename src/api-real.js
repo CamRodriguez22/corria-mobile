@@ -17,7 +17,7 @@
 //   DELETE /mediciones/{id_punto}?id_medicion={id_medicion}  -> { ok:true }
 //
 // Forma de una medición (POST y listados):
-//   nivel_corrosion    : number  (0 ninguna · 1 leve · 2 moderada · 3 severa · 4 crítica)
+//   nivel_corrosion    : number  (0 ninguna · 1 leve · 2 moderada · 3 severa)
 //   area_corroida_pct  : string en los GET ("36.66") / number en el POST  -> usar parseFloat
 //   confianza_promedio : 0..1 (string/number)
 //   detecciones, mascaras : arrays (mascaras puede pesar cientos de KB — ignorar en móvil)
@@ -26,7 +26,7 @@
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
 import * as FileSystem from 'expo-file-system/legacy';
-import { AWS_CONFIG, APP_CONFIG, CIUDAD, DEPARTAMENTO } from './config';
+import { AWS_CONFIG, APP_CONFIG } from './config';
 import { getIdToken } from './utils';
 
 const API_BASE = AWS_CONFIG.apiBase;
@@ -94,26 +94,6 @@ export const getMiPerfil = () => req('GET', '/usuarios/me');
 export async function getBloques(token) {
   const data = await req('GET', '/bloques', { token });
   return Array.isArray(data) ? data : data.bloques || data.items || [];
-}
-
-// POST /bloques — permitido a tecnico/admin, NO a cliente. El backend asigna
-// empresa_id solo del caller: nunca lo mandamos nosotros.
-export async function crearBloque({
-  nombre,
-  lat,
-  lng,
-  ciudad = CIUDAD,
-  departamento = DEPARTAMENTO,
-  descripcion,
-  tipo_estructura,
-  grosor_mm,
-  token,
-} = {}) {
-  const body = { nombre, coordenadas: { lat, lng }, ciudad, departamento };
-  if (descripcion) body.descripcion = descripcion;
-  if (tipo_estructura) body.tipo_estructura = tipo_estructura;
-  if (grosor_mm != null) body.grosor_mm = grosor_mm;
-  return req('POST', '/bloques', { token, body });
 }
 
 // ─────────────────────────── Indicadores y resumen del servidor ───────────────────────────

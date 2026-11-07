@@ -217,7 +217,7 @@ export default function LotesScreen({
                 {lote.puntoTitulo} · {formatDate(lote.fechaReciente)}
               </Text>
               <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: lote.maxNivel?.color || TOKENS.colors.text, marginTop: 2, fontWeight: '600' }}>
-                {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'} · Máx {lote.maxPct.toFixed(1)}% (Nivel {lote.maxNivel?.nivel ?? '—'})
+                {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'} · Máx {lote.maxPct.toFixed(1)}% (Nivel {lote.maxNivel?.i ?? '—'})
               </Text>
             </View>
             <Text style={{ fontSize: 18, color: TOKENS.colors.neutral500 }}>›</Text>

@@ -63,13 +63,13 @@ export function traducirAuthError(e) {
 }
 
 // Umbrales de severidad del backend (pf_corrosion_infra/lambda_src/inference/handler.py)
-// 0: Sin corrosión (<= 0%)
+// 0: Sin corrosión (< 0.05%)
 // 1: Leve (< 10%)
 // 2: Moderada (10% a < 25%)
 // 3: Severa (>= 25%)
 export function calcularNivelCorrosion(areaPct) {
   const n = Number(areaPct);
-  if (Number.isNaN(n) || n <= 0) return 0;
+  if (Number.isNaN(n) || n < 0.05) return 0;
   if (n < 10) return 1;
   if (n < 25) return 2;
   return 3;

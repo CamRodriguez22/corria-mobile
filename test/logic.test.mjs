@@ -103,6 +103,8 @@ test('calcularNivelCorrosion - umbrales reales del backend (0-3)', () => {
   assert.equal(calcularNivelCorrosion(0), 0);
   assert.equal(calcularNivelCorrosion(null), 0);
   assert.equal(calcularNivelCorrosion(-5), 0);
+  assert.equal(calcularNivelCorrosion(0.04), 0); // < 0.05 sigue siendo Sin corrosión
+  assert.equal(calcularNivelCorrosion(0.05), 1); // Leve desde 0.05
   assert.equal(calcularNivelCorrosion(5.2), 1); // Leve (<10)
   assert.equal(calcularNivelCorrosion(9.99), 1); // Leve (<10)
   assert.equal(calcularNivelCorrosion(10.0), 2); // Moderada (10-25)

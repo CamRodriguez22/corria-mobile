@@ -567,7 +567,7 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombr
         </View>
         {esSobrePlaca && (
           <View style={{ backgroundColor: TOKENS.colors.accent100, paddingHorizontal: 8, paddingVertical: 2, borderRadius: TOKENS.radius.sm }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: TOKENS.colors.accent800 }}>Sobre placa</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color: TOKENS.colors.accent800 }}>Sobre placa</Text>
           </View>
         )}
       </View>
@@ -575,7 +575,7 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombr
       <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
         {esSobrePlaca ? 'Corrosión sobre la placa' : 'Corrosión detectada'}
       </Text>
-      <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500, marginTop: 4, fontStyle: 'italic' }}>
+      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 4, fontStyle: 'italic' }}>
         * Valor aproximado: depende del encuadre y no reemplaza una inspección en sitio.
       </Text>
       <Divider />

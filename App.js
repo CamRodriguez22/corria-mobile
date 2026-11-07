@@ -1,16 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Text,
   View,
-  ScrollView,
-  Pressable,
-  Alert,
-  RefreshControl,
-  Image,
   StatusBar,
   Share,
-  KeyboardAvoidingView,
-  Platform,
   BackHandler,
 } from 'react-native';
 
@@ -45,7 +37,6 @@ import {
   DetailScreen,
 } from './src/screens';
 import {
-  tituloBloque,
   nombreCortoBloque,
   puedeGestionarMedicion,
   puedeGestionarLote,
@@ -60,8 +51,6 @@ import {
   AWS_CONFIG,
   APP_CONFIG,
   LISTA_BLOQUES,
-  ENTIDAD,
-  CIUDAD,
 } from './src/config';
 import {
   getMiPerfil,
@@ -80,7 +69,6 @@ import {
   pickPhoto,
   pickPhotos,
   validarFoto,
-  formatDate,
   formatDateTime,
   calcularEstadisticas,
   saveLocal,
@@ -88,7 +76,6 @@ import {
   clearLocalData,
   guardarFotoLocal,
   bloqueDeMedicion,
-  agruparPorBloque,
   construirNotas,
   adaptarBloque,
 } from './src/utils';
@@ -111,8 +98,6 @@ const TABS = [
   { key: 'activity', label: 'Actividad' },
   { key: 'settings', label: 'Ajustes' },
 ];
-
-const PAD = TOKENS.spacing.lg;
 
 export default function App() {
   return (
@@ -214,7 +199,6 @@ function Root() {
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase())
     .join('');
-  const esAdmin = (perfil?.rol || '').toLowerCase() === 'admin';
   // El backend bloquea con 403 a cliente en POST /medicion: se oculta la entrada
   // a "Nueva medición" para que la UX no rompa con un error del servidor.
   const esCliente = (perfil?.rol || '').toLowerCase() === 'cliente';

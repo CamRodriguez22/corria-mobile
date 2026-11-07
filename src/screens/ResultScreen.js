@@ -186,7 +186,7 @@ export default function ResultScreen({
                 multiline
                 autoCapitalize="sentences"
               />
-              <Text style={{ fontSize: TOKENS.fontSizes.tiny, color: TOKENS.colors.neutral500, marginBottom: 12, lineHeight: 16 }}>
+              <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginBottom: 12, lineHeight: 20 }}>
                 * El espesor y notas se guardan de forma local en este dispositivo móvil.
               </Text>
               <Button

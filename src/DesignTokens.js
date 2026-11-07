@@ -16,6 +16,7 @@ export const TOKENS = {
     accent: '#c67139', // terracota (marca)
     accent2: '#7a8a5e', // sage
     divider: 'rgba(32,30,29,0.16)',
+    border: '#dcd3c4', // borde sutil de tarjetas y campos (= neutral300)
 
     // Neutrales cálidos ajustados para garantizar contraste WCAG AA (≥ 4.5:1)
     neutral100: '#f9f4ed',
@@ -82,6 +83,7 @@ export const TOKENS = {
     body: 16,
     small: 14,
     xs: 12,
+    tiny: 12, // mínimo absoluto, solo metadatos
   },
 
   lineHeights: { heading: 1.12, body: 1.5 },
@@ -117,7 +119,7 @@ export const TOKENS = {
 
 // ─────────────────────────────────────────────────────────────
 // Severidad de corrosión
-// El backend devuelve nivel_corrosion como NÚMERO: 0=ninguna 1=leve 2=moderada 3=severa (4=crítica).
+// El backend devuelve nivel_corrosion como NÚMERO: 0=ninguna 1=leve 2=moderada 3=severa.
 // area_corroida_pct y confianza_promedio llegan como string en los GET y como number en el POST.
 // ─────────────────────────────────────────────────────────────
 export const NIVELES = [
