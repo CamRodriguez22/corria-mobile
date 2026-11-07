@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Screen, Header, ResultCard, Field, Button } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
@@ -31,15 +33,26 @@ export default function ResultScreen({
   onHome,
 }) {
   const imagenUri = medicion._localUri || medicion.url_imagen;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 280,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
   return (
     <Screen>
       <Header title="Resultado del análisis" onBack={onHome} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
         <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           {imagenUri ? (
             <Image
@@ -148,16 +161,17 @@ export default function ResultScreen({
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={{ padding: PAD, gap: 10, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200 }}>
-        <Button
-          label={loteNombre ? 'Siguiente foto en este lote' : 'Siguiente foto en este punto'}
-          onPress={onNext}
-        />
-        {!!loteNombre && (
-          <Button variant="secondary" label="Terminar lote" onPress={onTerminarLote} />
-        )}
-        <Button variant="ghost" label="Volver al inicio" onPress={onHome} />
-      </View>
+        <View style={{ padding: PAD, gap: 10, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200 }}>
+          <Button
+            label={loteNombre ? 'Siguiente foto en este lote' : 'Siguiente foto en este punto'}
+            onPress={onNext}
+          />
+          {!!loteNombre && (
+            <Button variant="secondary" label="Terminar lote" onPress={onTerminarLote} />
+          )}
+          <Button variant="ghost" label="Volver al inicio" onPress={onHome} />
+        </View>
+      </Animated.View>
     </Screen>
   );
 }
