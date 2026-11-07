@@ -1,13 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, RefreshControl } from 'react-native';
-import { Button, Segmented, EmptyState } from '../DesignComponents';
+import { View, Text, RefreshControl, ScrollView, Pressable } from 'react-native';
+import { Button, Chip, HojaOpciones, EmptyState } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import MapaCalor from '../MapaCalor';
-import { TOKENS } from '../DesignTokens';
+import { TOKENS, NIVELES } from '../DesignTokens';
+import { IconNivel } from '../Icons';
 import { nombrePuntoDe } from '../helpers';
 import { filasDeGaleria } from '../galeria';
-import { filtrarMediciones, FILTROS_VACIOS, hayFiltros, textoResultados } from '../linea';
-import { hoyLocal, partesDia } from '../fechas';
+import {
+  filtrarMediciones, FILTROS_VACIOS, hayFiltros, textoResultados, alternarNivel, rangoEfectivo, PRESETS_RANGO,
+} from '../linea';
+import { hoyLocal, partesDia, fechaMedia } from '../fechas';
+import { tituloPunto } from '../galeria';
 import { bloqueDeMedicion } from '../utils';
 
 const PAD = TOKENS.spacing.lg;
@@ -31,6 +35,8 @@ export default function ActivityScreen({
   const [anio, setAnio] = useState(partesDia(hoy)?.anio || 2026);
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   const resumen = resumenes[anio];
+  const [hoja, setHoja] = useState(null); // 'punto' | 'fechas' | null
+  const [parcial, setParcial] = useState(false);
 
   // Mapa de días del año elegido (se guarda por año en App).
   useEffect(() => {
@@ -38,11 +44,21 @@ export default function ActivityScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anio, refreshing]);
 
-  // Al elegir un día se traen TODAS sus fotos (pueden ser más antiguas que las ya cargadas).
+  // Con un día o un rango de fechas se traen TODAS sus fotos (pueden ser más antiguas que las
+  // ya cargadas). El rango sale de los filtros; el servidor avisa si hubo más de las que caben.
+  const rango = rangoEfectivo(filtros, hoy);
   useEffect(() => {
-    if (filtros.dia) onCargarRango?.({ desde: filtros.dia, hasta: filtros.dia });
+    if (!rango.desde && !rango.hasta) {
+      setParcial(false);
+      return;
+    }
+    let vivo = true;
+    Promise.resolve(onCargarRango?.(rango)).then((r) => vivo && setParcial(Boolean(r?.truncado)));
+    return () => {
+      vivo = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtros.dia, refreshing]);
+  }, [rango.desde, rango.hasta, refreshing]);
 
   const listaPuntos = useMemo(() => Object.values(bloquesMap || {}), [bloquesMap]);
   const filtradas = useMemo(
@@ -56,39 +72,115 @@ export default function ActivityScreen({
   const filas = useMemo(() => filasDeGaleria(filtradas, { hoy }), [filtradas, hoy]);
   const filtrado = hayFiltros(filtros);
 
-  const nivelSel = filtros.niveles.length === 1 ? filtros.niveles[0] : 'all';
+  const puntoSel = filtros.idPunto ? bloquesMap?.[filtros.idPunto] : null;
+  const presetSel = PRESETS_RANGO.find((p) => p.id === filtros.preset) || PRESETS_RANGO[0];
+  const opcionesPunto = [{ value: null, label: 'Todos los puntos' }].concat(
+    listaPuntos.map((b) => ({ value: b.clave, label: tituloPunto(b.nombre) }))
+  );
+  const opcionesFechas = PRESETS_RANGO.map((p) => ({
+    value: p.id,
+    label: p.id === 'todo' ? 'Todas las fechas' : `Últimos ${p.label}`,
+  }));
+  const quitarTodo = () => setFiltros(FILTROS_VACIOS);
 
   const cabecera = (
-    <View style={{ padding: PAD, paddingBottom: 4 }}>
-      <Text style={{ ...TOKENS.type.headlineMedium, color: TOKENS.colors.text }}>Actividad</Text>
-      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 18 }}>
-        Todas las fotos, día por día
+    <View style={{ paddingTop: PAD, paddingBottom: 4 }}>
+      <View style={{ paddingHorizontal: PAD }}>
+        <Text style={{ ...TOKENS.type.headlineMedium, color: TOKENS.colors.text }}>Actividad</Text>
+        <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 18 }}>
+          Todas las fotos, día por día
+        </Text>
+        <MapaCalor
+          anio={anio}
+          setAnio={setAnio}
+          resumen={resumen}
+          diaSel={filtros.dia}
+          onSelDia={(dia) => setFiltros((f) => ({ ...f, dia }))}
+          onReintentar={() => onCargarResumen?.(anio, { forzar: true })}
+          hoy={hoy}
+        />
+      </View>
+
+      <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, paddingHorizontal: PAD, marginTop: 18 }}>
+        Filtrar fotos
       </Text>
-      <MapaCalor
-        anio={anio}
-        setAnio={setAnio}
-        resumen={resumen}
-        diaSel={filtros.dia}
-        onSelDia={(dia) => setFiltros((f) => ({ ...f, dia }))}
-        onReintentar={() => onCargarResumen?.(anio, { forzar: true })}
-        hoy={hoy}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: PAD, gap: 8, alignItems: 'center' }}
+      >
+        {NIVELES.map((n) => {
+          const activo = filtros.niveles.includes(n.i);
+          return (
+            <Chip
+              key={n.i}
+              label={n.label}
+              selected={activo}
+              icon={<IconNivel nivel={n.i} size={16} color={activo ? TOKENS.colors.accent2_900 : n.texto} />}
+              onPress={() => setFiltros((f) => ({ ...f, niveles: alternarNivel(f.niveles, n.i) }))}
+            />
+          );
+        })}
+        <Chip
+          label={puntoSel ? tituloPunto(puntoSel.nombre) : 'Punto'}
+          selected={Boolean(puntoSel)}
+          menu
+          onPress={() => setHoja('punto')}
+          accessibilityLabel={puntoSel ? `Punto: ${tituloPunto(puntoSel.nombre)}` : 'Filtrar por punto'}
+          onQuitar={puntoSel ? () => setFiltros((f) => ({ ...f, idPunto: null })) : undefined}
+        />
+        {filtros.dia ? (
+          <Chip label={`Día: ${fechaMedia(filtros.dia)}`} selected onPress={() => {}} onQuitar={() => setFiltros((f) => ({ ...f, dia: null }))} />
+        ) : (
+          <Chip
+            label={filtros.preset === 'todo' ? 'Fechas' : `Últimos ${presetSel.label}`}
+            selected={filtros.preset !== 'todo'}
+            menu
+            onPress={() => setHoja('fechas')}
+            accessibilityLabel="Filtrar por fechas"
+            onQuitar={filtros.preset !== 'todo' ? () => setFiltros((f) => ({ ...f, preset: 'todo' })) : undefined}
+          />
+        )}
+      </ScrollView>
+
+      <View style={{ paddingHorizontal: PAD, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text accessibilityLiveRegion="polite" style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, flex: 1 }}>
+          {textoResultados(filtradas.length, filtrado)}
+          {parcial ? ' · Datos parciales: hay más fotos de las que se pudieron cargar' : ''}
+        </Text>
+        {filtrado && (
+          <Pressable
+            onPress={quitarTodo}
+            accessibilityRole="button"
+            accessibilityLabel="Limpiar todos los filtros"
+            style={{ minHeight: 48, justifyContent: 'center', paddingLeft: 12 }}
+          >
+            <Text style={{ ...TOKENS.type.labelLarge, color: TOKENS.colors.accentText }}>Limpiar filtros</Text>
+          </Pressable>
+        )}
+      </View>
+      <HojaOpciones
+        visible={hoja === 'punto'}
+        titulo="Filtrar por punto"
+        opciones={opcionesPunto}
+        valor={filtros.idPunto}
+        onElegir={(v) => {
+          setFiltros((f) => ({ ...f, idPunto: v }));
+          setHoja(null);
+        }}
+        onCerrar={() => setHoja(null)}
       />
-      <View style={{ height: 18 }} />
-      <Segmented
-        scroll
-        value={nivelSel}
-        onChange={(v) => setFiltros((f) => ({ ...f, niveles: v === 'all' ? [] : [v] }))}
-        options={[
-          { value: 'all', label: 'Todas' },
-          { value: 0, label: 'Sin corrosión' },
-          { value: 1, label: 'Leve' },
-          { value: 2, label: 'Moderada' },
-          { value: 3, label: 'Severa' },
-        ]}
+      <HojaOpciones
+        visible={hoja === 'fechas'}
+        titulo="Filtrar por fechas"
+        opciones={opcionesFechas}
+        valor={filtros.preset}
+        onElegir={(v) => {
+          setFiltros((f) => ({ ...f, preset: v }));
+          setHoja(null);
+        }}
+        onCerrar={() => setHoja(null)}
       />
-      <Text accessibilityLiveRegion="polite" style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 12 }}>
-        {textoResultados(filtradas.length, filtrado)}
-      </Text>
     </View>
   );
 
@@ -105,7 +197,7 @@ export default function ActivityScreen({
         </View>
       }
       ListFooterComponent={
-        hayMas && !filtros.dia ? (
+        hayMas && !rango.desde && !rango.hasta ? (
           <View style={{ padding: PAD }}>
             <Button
               variant="tonal"

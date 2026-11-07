@@ -23,6 +23,7 @@ import { nivelDeMedicion } from './niveles';
 import { miniaturaDe } from './miniaturas';
 import {
   IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot, IconNivel, IconImageOff,
+  IconChevronDown, IconClose, IconCheck,
 } from './Icons';
 
 // ─────────────────────────────────────────────────────────────
@@ -545,6 +546,112 @@ export const Segmented = ({ options, value, onChange, scroll = false }) => {
         );
       })}
     </Wrap>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Chip de filtro (Material 3): área táctil de 48 con la píldora visible de 36.
+//   icono opcional a la izquierda; `menu` agrega la flecha de lista desplegable;
+//   `onQuitar` agrega una X para limpiar ese filtro.
+// ─────────────────────────────────────────────────────────────
+export const Chip = ({ label, selected = false, onPress, icon = null, menu = false, onQuitar, accessibilityLabel }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: TOKENS.tapTarget }}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || label}
+      accessibilityState={{ selected }}
+      style={{
+        minHeight: 36,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingLeft: icon ? 10 : 14,
+        paddingRight: menu || onQuitar ? 8 : 14,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: selected ? TOKENS.colors.accent2_700 : TOKENS.colors.neutral400,
+        backgroundColor: selected ? TOKENS.colors.accent2_200 : 'transparent',
+      }}
+    >
+      {selected && !icon && <IconCheck size={16} color={TOKENS.colors.accent2_900} />}
+      {icon}
+      <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '600', color: selected ? TOKENS.colors.accent2_900 : TOKENS.colors.neutral700 }}>
+        {label}
+      </Text>
+      {menu && <IconChevronDown size={16} color={selected ? TOKENS.colors.accent2_900 : TOKENS.colors.neutral700} />}
+    </Pressable>
+    {!!onQuitar && (
+      <Pressable
+        onPress={onQuitar}
+        accessibilityRole="button"
+        accessibilityLabel={`Quitar filtro: ${label}`}
+        hitSlop={4}
+        style={{ width: 36, height: 48, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <IconClose size={18} color={TOKENS.colors.neutral700} />
+      </Pressable>
+    )}
+  </View>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Hoja inferior de opciones (Material 3 bottom sheet): una sola elección, filas de 56.
+// ─────────────────────────────────────────────────────────────
+export const HojaOpciones = ({ visible, titulo, opciones, valor, onElegir, onCerrar }) => {
+  if (!visible) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCerrar}>
+      <Pressable
+        onPress={onCerrar}
+        accessibilityLabel="Cerrar"
+        style={{ flex: 1, backgroundColor: 'rgba(32,30,29,0.5)', justifyContent: 'flex-end' }}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            backgroundColor: TOKENS.colors.surfaceAlt,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingTop: 12,
+            paddingBottom: 24,
+            maxHeight: '75%',
+          }}
+        >
+          <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: TOKENS.colors.neutral400, marginBottom: 12 }} />
+          <Text accessibilityRole="header" style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text, paddingHorizontal: 24, paddingBottom: 8 }}>
+            {titulo}
+          </Text>
+          <ScrollView>
+            {opciones.map((o) => {
+              const activa = o.value === valor;
+              return (
+                <Pressable
+                  key={String(o.value)}
+                  onPress={() => onElegir(o.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: activa }}
+                  style={({ pressed }) => ({
+                    minHeight: 56,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingHorizontal: 24,
+                    backgroundColor: pressed ? TOKENS.colors.neutral200 : 'transparent',
+                  })}
+                >
+                  <View style={{ width: 24 }}>{activa ? <IconCheck size={22} color={TOKENS.colors.accentText} /> : null}</View>
+                  <View style={{ flex: 1, paddingVertical: 8 }}>
+                    <Text style={{ ...TOKENS.type.bodyLarge, fontWeight: activa ? '700' : '400', color: TOKENS.colors.text }}>{o.label}</Text>
+                    {!!o.detalle && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{o.detalle}</Text>}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 };
 
