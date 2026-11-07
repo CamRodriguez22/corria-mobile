@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -26,8 +26,10 @@ export default function LotesScreen({
   hayMas,
   cargandoMas,
   onCargarMas,
+  // El lote abierto vive en App para sobrevivir a la pantalla de detalle (volver deja el lote abierto).
+  loteSeleccionado,
+  setLoteSeleccionado,
 }) {
-  const [loteSeleccionado, setLoteSeleccionado] = useState(null);
   const [renombrandoLote, setRenombrandoLote] = useState(null);
   const [nuevoNombre, setNuevoNombre] = useState('');
 
@@ -66,12 +68,14 @@ export default function LotesScreen({
     }).sort((a, b) => new Date(b.fechaReciente) - new Date(a.fechaReciente));
   }, [mediciones, bloqueMap, bloquesMap]);
 
-  if (loteSeleccionado) {
-    const lote = lotes.find((l) => l.id === loteSeleccionado);
-    if (!lote) {
-      setLoteSeleccionado(null);
-      return null;
-    }
+  const loteAbierto = loteSeleccionado ? lotes.find((l) => l.id === loteSeleccionado) : null;
+  // Si el lote ya no existe (se borró su última foto o se recargó), se cierra.
+  useEffect(() => {
+    if (loteSeleccionado && !loteAbierto) setLoteSeleccionado(null);
+  }, [loteSeleccionado, loteAbierto, setLoteSeleccionado]);
+
+  if (loteAbierto) {
+    const lote = loteAbierto;
     return (
       <ScrollView
         contentContainerStyle={{ padding: PAD, paddingBottom: 40 }}

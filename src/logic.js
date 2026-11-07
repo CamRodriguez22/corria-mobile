@@ -178,6 +178,19 @@ export async function parteArchivoForm({ uri, type = 'image/jpeg', nombre = 'fot
   return { valor: blob, nombre };
 }
 
+// ───────────────────────── Navegación hacia atrás ─────────────────────────
+// Devuelve los cambios de estado de navegación para "atrás" desde detalle, carpeta o
+// pantallas con pestañas, o null si no hay a dónde volver (en Android, salir de la app).
+// Salir de una carpeta siempre limpia folderClave y salir de un lote limpia loteSel, para
+// que un "atrás" posterior nunca caiga en una carpeta o lote viejo.
+export function navegarAtras({ screen, tab, folderClave = null, loteSel = null }) {
+  if (screen === 'detail') return { screen: folderClave ? 'folder' : tab };
+  if (screen === 'folder') return { screen: 'folders', folderClave: null };
+  if (tab === 'lotes' && loteSel) return { loteSel: null };
+  if (tab !== 'home') return { tab: 'home', screen: 'home', folderClave: null, loteSel: null };
+  return null;
+}
+
 // ───────────────────────── Cola de fotos (lote en análisis) ─────────────────────────
 // Cada ítem: { uri, base64, status: 'esperando'|'subiendo'|'lista'|'error', error?, imagenKey?, medicion? }
 export function resumirCola(cola = []) {

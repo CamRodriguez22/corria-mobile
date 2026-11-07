@@ -49,6 +49,7 @@ import {
   listaDeRespuesta,
   esSesionVencida,
   conAutor,
+  navegarAtras,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -144,6 +145,7 @@ function Root() {
   const [tab, setTab] = useState('home');
   const [screen, setScreen] = useState('home'); // home | folders | folder | activity | settings | context | camera | preview | analyzing | result | detail
   const [folderClave, setFolderClave] = useState(null);
+  const [loteSel, setLoteSel] = useState(null); // lote abierto en la pestaña Lotes (sobrevive al detalle)
   const [detalle, setDetalle] = useState(null);
 
   // flujo de medición
@@ -264,6 +266,17 @@ function Root() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged]);
 
+  const aplicarNavegacion = (cambios) => {
+    if ('tab' in cambios) setTab(cambios.tab);
+    if ('screen' in cambios) setScreen(cambios.screen);
+    if ('folderClave' in cambios) setFolderClave(cambios.folderClave);
+    if ('loteSel' in cambios) setLoteSel(cambios.loteSel);
+  };
+  const volver = () => {
+    const atras = navegarAtras({ screen, tab, folderClave, loteSel });
+    if (atras) aplicarNavegacion(atras);
+  };
+
   // Manejador del botón atrás de Android (BackHandler)
   useEffect(() => {
     const onBackPress = () => {
@@ -279,15 +292,6 @@ function Root() {
       // Durante el análisis no se puede cancelar la subida: atrás no debe sacar de la app.
       if (screen === 'analyzing') {
         avisar('Análisis en curso', 'Espera a que termine el análisis de las fotos.');
-        return true;
-      }
-      if (screen === 'detail') {
-        setScreen(folderClave ? 'folder' : tab);
-        return true;
-      }
-      if (screen === 'folder') {
-        setScreen('folders');
-        setFolderClave(null);
         return true;
       }
       if (screen === 'preview') {
@@ -306,9 +310,9 @@ function Root() {
         irAInicioConservandoLote();
         return true;
       }
-      if (tab !== 'home') {
-        setTab('home');
-        setScreen('home');
+      const atras = navegarAtras({ screen, tab, folderClave, loteSel });
+      if (atras) {
+        aplicarNavegacion(atras);
         return true;
       }
       return false; // permite salir de la app en la pantalla inicial
@@ -316,7 +320,7 @@ function Root() {
 
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [screen, tab, folderClave, confirmModal, promptModal]);
+  }, [screen, tab, folderClave, loteSel, confirmModal, promptModal]);
 
   const cargarTodo = useCallback(async (first = false) => {
     const sesion = sesionRef.current;
@@ -524,6 +528,7 @@ function Root() {
     setTab('home');
     setScreen('home');
     setFolderClave(null);
+    setLoteSel(null);
     setDetalle(null);
     // flujo de medición
     setBloqueSel('');
@@ -967,7 +972,7 @@ function Root() {
           bloque={detalleClaveBloque ? nombreCortoBloque(bloquesMap[detalleClaveBloque], detalleClaveBloque) : null}
           obs={obsMap[detalle.id_medicion]}
           puedeGestionar={puedeGestionar}
-          onBack={() => setScreen(folderClave ? 'folder' : tab)}
+          onBack={volver}
           onShare={() => compartir(detalle)}
           onRename={() => renombrarFoto(detalle)}
           onDelete={() => borrar(detalle)}
@@ -983,7 +988,7 @@ function Root() {
           bloqueMap={bloqueMap}
           bloquesMap={bloquesMap}
           listaBloques={listaBloques}
-          onBack={() => setScreen('folders')}
+          onBack={volver}
           onOpen={abrirDetalle}
         />
       );
@@ -993,6 +998,7 @@ function Root() {
       setTab(k);
       setScreen(k);
       setFolderClave(null);
+      setLoteSel(null);
   };
 
   return (
@@ -1025,6 +1031,8 @@ function Root() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             onOpen={abrirDetalle}
+            loteSeleccionado={loteSel}
+            setLoteSeleccionado={setLoteSel}
             hayMas={hayMasMediciones}
             cargandoMas={cargandoMas}
             onCargarMas={cargarMasMediciones}

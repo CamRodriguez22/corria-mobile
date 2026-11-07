@@ -18,6 +18,7 @@ import {
   esSesionVencida,
   conAutor,
   parteArchivoForm,
+  navegarAtras,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -250,4 +251,27 @@ test('parteArchivoForm - nativo usa {uri,name,type}; web descarga un Blob con no
   assert.equal(pedida, 'blob:http://x/1');
   assert.equal(web.valor, blobFalso);
   assert.equal(web.nombre, 'foto.jpg');
+});
+
+test('navegarAtras - limpia carpeta y lote al salir y nunca cae en uno viejo', () => {
+  // detalle abierto desde una carpeta -> vuelve a la carpeta
+  assert.deepEqual(navegarAtras({ screen: 'detail', tab: 'folders', folderClave: 'B1' }), { screen: 'folder' });
+  // salir de la carpeta limpia folderClave
+  assert.deepEqual(navegarAtras({ screen: 'folder', tab: 'folders', folderClave: 'B1' }), {
+    screen: 'folders',
+    folderClave: null,
+  });
+  // detalle abierto desde un lote -> vuelve a la pestaña Lotes (el lote sigue abierto)
+  assert.deepEqual(navegarAtras({ screen: 'detail', tab: 'lotes', loteSel: 'L1' }), { screen: 'lotes' });
+  // atrás dentro de un lote -> lista de lotes, no inicio
+  assert.deepEqual(navegarAtras({ screen: 'lotes', tab: 'lotes', loteSel: 'L1' }), { loteSel: null });
+  // desde la lista de lotes u otra pestaña -> inicio
+  assert.deepEqual(navegarAtras({ screen: 'lotes', tab: 'lotes' }), {
+    tab: 'home',
+    screen: 'home',
+    folderClave: null,
+    loteSel: null,
+  });
+  // en inicio no hay a dónde volver (Android sale de la app)
+  assert.equal(navegarAtras({ screen: 'home', tab: 'home' }), null);
 });
