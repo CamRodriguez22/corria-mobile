@@ -261,3 +261,10 @@ export function textoResumenCola({ total, listas, fallidas }) {
   if (!fallidas) return base + '.';
   return `${base}; ${fallidas} ${fallidas === 1 ? 'falló' : 'fallaron'}.`;
 }
+
+// Rol del backend a texto para la persona (nunca se muestra el identificador crudo).
+const NOMBRES_ROL = { tecnico: 'Técnico', admin: 'Administrador', super_admin: 'Superadministrador', cliente: 'Cliente' };
+export function nombreRol(rol) {
+  const r = String(rol || '').trim().toLowerCase();
+  return NOMBRES_ROL[r] || (r ? r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, ' ') : '');
+}

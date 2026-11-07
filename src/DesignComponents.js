@@ -15,9 +15,34 @@ import {
   Platform,
   StatusBar,
   Modal,
+  StyleSheet,
+  AccessibilityInfo,
 } from 'react-native';
-import { TOKENS, severidad, confianzaPct, num } from './DesignTokens';
-import { IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot } from './Icons';
+import { TOKENS, NIVELES, severidad, confianzaPct, num } from './DesignTokens';
+import { nivelDeMedicion } from './niveles';
+import { miniaturaDe } from './miniaturas';
+import {
+  IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot, IconNivel, IconImageOff,
+} from './Icons';
+
+// ─────────────────────────────────────────────────────────────
+// Movimiento reducido: true si el usuario pidió quitar animaciones (Ajustes del sistema).
+// ─────────────────────────────────────────────────────────────
+export function useReducedMotion() {
+  const [reducido, setReducido] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    AccessibilityInfo.isReduceMotionEnabled?.()
+      .then((v) => vivo && setReducido(Boolean(v)))
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (v) => setReducido(Boolean(v)));
+    return () => {
+      vivo = false;
+      sub?.remove?.();
+    };
+  }, []);
+  return reducido;
+}
 
 // ─────────────────────────────────────────────────────────────
 // Screen — contenedor de pantalla con "safe area" sin dependencias nativas extra.
@@ -240,10 +265,67 @@ export const Badge = ({ label, color = TOKENS.colors.accent700, tint = TOKENS.co
   </View>
 );
 
+// Badge de nivel: color + ícono + nombre (nunca solo color). Texto en minúscula salvo la inicial.
+export const NivelBadge = ({ nivel = 0, style, compacto = false }) => {
+  const s = NIVELES[Math.max(0, Math.min(3, nivel))];
+  return (
+    <View
+      accessible
+      accessibilityLabel={s.label}
+      style={[
+        {
+          alignSelf: 'flex-start',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: s.tint,
+          borderRadius: TOKENS.radius.pill,
+          paddingHorizontal: compacto ? 9 : 11,
+          paddingVertical: compacto ? 4 : 6,
+        },
+        style,
+      ]}
+    >
+      <IconNivel nivel={s.i} size={compacto ? 14 : 16} color={s.texto} />
+      <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: s.texto }}>{s.label}</Text>
+    </View>
+  );
+};
+
 // Badge de severidad a partir de una medición (o de {nivel_corrosion}/{area_corroida_pct})
-export const SeverityBadge = ({ medicion, style }) => {
-  const s = severidad(medicion || {});
-  return <Badge label={s.short} color={s.texto} tint={s.tint} style={style} />;
+export const SeverityBadge = ({ medicion, style, compacto }) => (
+  <NivelBadge nivel={nivelDeMedicion(medicion || {})} style={style} compacto={compacto} />
+);
+
+// Ficha sobre una foto: fondo oscuro translúcido (texto blanco >= 9:1 sobre cualquier foto),
+// ícono del nivel en su color de estado y el valor.
+export const NivelChip = ({ nivel = 0, texto, style }) => {
+  const s = NIVELES[Math.max(0, Math.min(3, nivel))];
+  return (
+    <View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          alignSelf: 'flex-start',
+          backgroundColor: 'rgba(32,30,29,0.84)',
+          borderRadius: TOKENS.radius.pill,
+          paddingLeft: 6,
+          paddingRight: 8,
+          paddingVertical: 3,
+        },
+        style,
+      ]}
+    >
+      <IconNivel nivel={s.i} size={14} color={s.color} />
+      {!!texto && (
+        <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color: '#fff', fontVariant: ['tabular-nums'] }}>
+          {texto}
+        </Text>
+      )}
+    </View>
+  );
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -257,19 +339,61 @@ export const StatCard = ({ value, label, color = TOKENS.colors.text }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// Miniatura de foto (con placeholder de "óxido")
+// Foto con marcador de posición y respaldo si falla: llena su contenedor.
+//   sin uri (p. ej. URL vencida) -> marcador con ícono; cargando -> marcador que respira (quieto si
+//   el sistema pide menos movimiento); onError -> marcador con ícono. Nunca queda un hueco negro.
 // ─────────────────────────────────────────────────────────────
-export const Thumb = ({ uri, size = 52, radius = 14 }) => {
-  const base = {
-    width: size,
-    height: size,
-    borderRadius: radius,
-    backgroundColor: '#5c4133',
-    overflow: 'hidden',
-  };
-  if (uri) return <Image source={{ uri }} style={base} resizeMode="cover" />;
-  return <View style={base} />;
+const COLOR_MARCADOR = '#e6dac4';
+
+export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24 }) => {
+  const [estado, setEstado] = useState(uri ? 'cargando' : 'vacia');
+  const reducido = useReducedMotion();
+  const pulso = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    setEstado(uri ? 'cargando' : 'vacia');
+  }, [uri]);
+  useEffect(() => {
+    if (estado !== 'cargando' || reducido) {
+      pulso.setValue(0);
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulso, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulso, { toValue: 0, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [estado, reducido, pulso]);
+  const opacidad = pulso.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] });
+  return (
+    <View style={[{ overflow: 'hidden', backgroundColor: COLOR_MARCADOR }, style]}>
+      {estado === 'cargando' && (
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#d9cbb0', opacity: opacidad }]} />
+      )}
+      {!!uri && estado !== 'error' && (
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={resizeMode}
+          onLoad={() => setEstado('lista')}
+          onError={() => setEstado('error')}
+          accessibilityIgnoresInvertColors
+        />
+      )}
+      {(estado === 'vacia' || estado === 'error') && (
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+          <IconImageOff size={iconSize} color={TOKENS.colors.neutral500} />
+        </View>
+      )}
+    </View>
+  );
 };
+
+export const Thumb = ({ uri, size = 52, radius = 14, style }) => (
+  <Foto uri={uri} style={[{ width: size, height: size, borderRadius: radius }, style]} iconSize={Math.round(size * 0.4)} />
+);
 
 // ─────────────────────────────────────────────────────────────
 // Fila de medición (lista de historial / recientes / carpeta)
@@ -295,7 +419,7 @@ export const MeasurementRow = ({ medicion, title, subtitle, onPress }) => {
         },
       ]}
     >
-      <Thumb uri={medicion?.url_thumbnail || medicion?.url_imagen} />
+      <Thumb uri={miniaturaDe(medicion)} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: TOKENS.fontSizes.h5, fontWeight: '700', color: TOKENS.colors.text }}>
           {title}
@@ -564,8 +688,8 @@ export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombr
     <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, ...TOKENS.shadow.md, marginBottom: TOKENS.spacing.base }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
-          <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: s.texto }}>{s.short}</Text>
+          <IconNivel nivel={s.i} size={18} color={s.texto} />
+          <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '800', color: s.texto }}>{s.label}</Text>
         </View>
         {esSobrePlaca && (
           <View style={{ backgroundColor: TOKENS.colors.accent100, paddingHorizontal: 8, paddingVertical: 2, borderRadius: TOKENS.radius.sm }}>

@@ -28,7 +28,7 @@ export default function ActivityScreen({
 
   const filtradas = useMemo(() => {
     if (filtro === 'all') return mediciones;
-    return mediciones.filter((m) => severidad(m).short === filtro);
+    return mediciones.filter((m) => severidad(m).i === filtro);
   }, [mediciones, filtro]);
 
   // Agrupación cronológica por día
@@ -61,10 +61,10 @@ export default function ActivityScreen({
         onChange={setFiltro}
         options={[
           { value: 'all', label: 'Todas' },
-          { value: 'NINGUNA', label: 'Sin corrosión' },
-          { value: 'LEVE', label: 'Leve' },
-          { value: 'MODERADA', label: 'Moderada' },
-          { value: 'SEVERA', label: 'Severa' },
+          { value: 0, label: 'Sin corrosión' },
+          { value: 1, label: 'Leve' },
+          { value: 2, label: 'Moderada' },
+          { value: 3, label: 'Severa' },
         ]}
       />
 

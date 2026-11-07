@@ -2,7 +2,7 @@
 // Base: _ds/organic-33a52a4e-dd64-41a7-8990-ae2bbb2371cc/styles.css (mockup PIXELRUST v2)
 
 import { StyleSheet } from 'react-native';
-import { num, nivelDePct } from './niveles';
+import { num, nivelDePct, nivelDeMedicion, NOMBRES_NIVEL } from './niveles';
 
 // ─────────────────────────────────────────────────────────────
 // Tokens
@@ -91,6 +91,20 @@ export const TOKENS = {
 
   lineHeights: { heading: 1.12, body: 1.5 },
 
+  // Escala tipográfica de Material 3 (sp = dp en RN; sigue el tamaño de fuente del sistema).
+  // Mínimo 14 salvo metadatos (labelSmall).
+  type: {
+    headlineMedium: { fontSize: 28, lineHeight: 34, fontWeight: '800' },
+    headlineSmall: { fontSize: 24, lineHeight: 30, fontWeight: '800' },
+    titleLarge: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
+    titleMedium: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
+    titleSmall: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
+    bodyLarge: { fontSize: 16, lineHeight: 24, fontWeight: '400' },
+    bodyMedium: { fontSize: 14, lineHeight: 20, fontWeight: '400' },
+    labelLarge: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
+    labelSmall: { fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  },
+
   // Objetivo mínimo táctil recomendado (accesibilidad).
   hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
   tapTarget: 48,
@@ -129,10 +143,10 @@ export const TOKENS = {
 // area_corroida_pct y confianza_promedio llegan como string en los GET y como number en el POST.
 // ─────────────────────────────────────────────────────────────
 export const NIVELES = [
-  { i: 0, label: 'Sin corrosión', short: 'NINGUNA', color: '#10b981', texto: '#126d34', tint: 'rgba(16, 185, 129, 0.12)' },
-  { i: 1, label: 'Leve', short: 'LEVE', color: '#0ea5e9', texto: '#994708', tint: 'rgba(14, 165, 233, 0.12)' },
-  { i: 2, label: 'Moderada', short: 'MODERADA', color: '#f59e0b', texto: '#af3a0b', tint: 'rgba(245, 158, 11, 0.12)' },
-  { i: 3, label: 'Severa', short: 'SEVERA', color: '#ef4444', texto: '#b91c1c', tint: 'rgba(239, 68, 68, 0.12)' },
+  { i: 0, label: NOMBRES_NIVEL[0], color: '#10b981', texto: '#126d34', tint: 'rgba(16, 185, 129, 0.12)' },
+  { i: 1, label: NOMBRES_NIVEL[1], color: '#0ea5e9', texto: '#994708', tint: 'rgba(14, 165, 233, 0.12)' },
+  { i: 2, label: NOMBRES_NIVEL[2], color: '#f59e0b', texto: '#af3a0b', tint: 'rgba(245, 158, 11, 0.12)' },
+  { i: 3, label: NOMBRES_NIVEL[3], color: '#ef4444', texto: '#b91c1c', tint: 'rgba(239, 68, 68, 0.12)' },
 ];
 
 export { num };
@@ -150,10 +164,7 @@ export function severidadDePct(pct) {
 
 // Severidad "efectiva": usa el nivel del backend, cae al % si el nivel no viene.
 export function severidad(medicion = {}) {
-  if (medicion.nivel_corrosion != null && medicion.nivel_corrosion !== '') {
-    return nivelMeta(medicion.nivel_corrosion);
-  }
-  return severidadDePct(medicion.area_corroida_pct);
+  return NIVELES[nivelDeMedicion(medicion)];
 }
 
 // Confianza del modelo: el backend la da en 0..1 -> % entero.

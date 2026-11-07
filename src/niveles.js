@@ -22,3 +22,21 @@ export function nivelDePct(pct) {
   if (p < UMBRAL_SEVERA) return 2;
   return 3;
 }
+
+// Nombres de los niveles: ÚNICA fuente del texto que ve el usuario (0..3).
+export const NOMBRES_NIVEL = ['Sin corrosión', 'Leve', 'Moderada', 'Severa'];
+
+// Nivel 0..3 entero (acota y redondea; no finito -> 0).
+export function nivelAcotado(n) {
+  return Math.max(0, Math.min(3, Math.round(num(n, 0))));
+}
+
+export function nombreNivel(n) {
+  return NOMBRES_NIVEL[nivelAcotado(n)];
+}
+
+// Nivel de una medición: el del backend si viene; si no, se deduce del %.
+export function nivelDeMedicion(m = {}) {
+  if (m.nivel_corrosion != null && m.nivel_corrosion !== '') return nivelAcotado(m.nivel_corrosion);
+  return nivelDePct(m.area_corroida_pct);
+}
