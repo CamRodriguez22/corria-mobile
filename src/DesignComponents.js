@@ -1023,8 +1023,8 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
       style={{ gap: 12 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: s.tint, alignItems: 'center', justifyContent: 'center' }}>
-          <IconNivel nivel={s.i} size={30} color={s.texto} />
+        <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+          <IconNivel nivel={s.i} size={32} color="#201e1d" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ ...TOKENS.type.titleLarge, color: s.texto }}>{s.label}</Text>

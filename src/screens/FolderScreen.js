@@ -126,6 +126,7 @@ export default function FolderScreen({
       <Header title={tituloPunto(bloque.nombre)} subtitle={empresaLinea || undefined} onBack={onBack} />
       <GaleriaFotos
         filas={filas}
+        mostrarDia
         nombrePunto={() => tituloPunto(bloque.nombre)}
         onAbrirFoto={onOpen}
         onAbrirLote={(f) => onAbrirLote?.(f.loteClave)}

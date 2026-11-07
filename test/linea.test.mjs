@@ -172,8 +172,8 @@ test('estadoFotoCola y avance de la cola', () => {
 test('ubicarRotulo evita tapar puntos: prueba arriba-derecha, luego arriba-izquierda, luego abajo', () => {
   const area = { ancho: 300, alto: 100 };
   const u = { etiqueta: 'Moderada desde 10 %', y: 60 };
-  assert.deepEqual(ubicarRotulo(u, [], area).x, 300 - (u.etiqueta.length * 7.2 + 10)); // libre: arriba-derecha
-  const w = u.etiqueta.length * 7.2 + 10;
+  assert.deepEqual(ubicarRotulo(u, [], area).x, 300 - (u.etiqueta.length * 7.8 + 10)); // libre: arriba-derecha
+  const w = u.etiqueta.length * 7.8 + 10;
   const punto = (x, y) => ({ x, y });
   // un punto justo donde iría el rótulo arriba-derecha -> se va a la izquierda
   const izq = ubicarRotulo(u, [punto(300 - w / 2, 50)], area);

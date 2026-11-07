@@ -2,7 +2,7 @@
 // por el peor nivel de ese día y marcada con su ícono (el color nunca va solo). Toca un día para filtrar.
 // Espejo móvil de la barra anual de la web (lineaTiempo.js), con datos de GET /mediciones/resumen-diario.
 import React, { useMemo, useRef } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-native';
 import { TOKENS, NIVELES } from './DesignTokens';
 import { Segmented, Button, Spinner, SwatchNivel } from './DesignComponents';
 import { IconNivel, IconClose } from './Icons';
@@ -69,7 +69,13 @@ export default function MapaCalor({ anio, setAnio, resumen, diaSel, onSelDia, on
   const dias = resumen?.dias || [];
   const mapa = useMemo(() => mapaCalor(dias, anio, hoy), [dias, anio, hoy]);
   const celdaSel = useMemo(() => mapa.semanas.flat().find((c) => c && c.fecha === diaSel) || null, [mapa, diaSel]);
-  const ancho = mapa.semanas.length * PASO;
+  const { width: anchoPantalla } = useWindowDimensions();
+  // Ancho visible = un número entero de columnas (sin medias celdas) y alineado con el margen de la página.
+  const disponible = anchoPantalla - TOKENS.spacing.lg * 2;
+  const columnasVisibles = Math.max(1, Math.floor((disponible + SEP) / PASO));
+  const anchoVisible = columnasVisibles * PASO - SEP;
+  const ancho = mapa.semanas.length * PASO - SEP;
+  const inicioX = Math.max(0, (mapa.semanas.length - columnasVisibles) * PASO);
 
   const alternar = (celda) => onSelDia?.(diaSel === celda.fecha ? null : celda.fecha);
 
@@ -101,10 +107,11 @@ export default function MapaCalor({ anio, setAnio, resumen, diaSel, onSelDia, on
             ref={scroll}
             horizontal
             showsHorizontalScrollIndicator={false}
-            onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}
+            snapToInterval={PASO}
+            decelerationRate="fast"
+            onContentSizeChange={() => scroll.current?.scrollTo({ x: inicioX, animated: false })}
             accessibilityLabel={`Mapa de calor del año ${anio}: ${plural(mapa.diasConFotos, 'día con fotos', 'días con fotos')}`}
-            style={{ marginHorizontal: -TOKENS.spacing.lg }}
-            contentContainerStyle={{ paddingHorizontal: TOKENS.spacing.lg }}
+            style={{ width: anchoVisible }}
           >
             <View style={{ width: ancho }}>
               <View style={{ height: 18, marginBottom: 4 }}>

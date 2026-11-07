@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { diaLocal, fechaLarga, fechaCorta, horaLocal, sumarDias, diaSemana, rotuloDia, formatoPct, pctCorto, fechaHoraLarga, fechaHoraCorta } from '../src/fechas.js';
 import {
-  construirMosaico, agruparPorDia, dividirEnFilas, filasDeGaleria, etiquetaFoto, etiquetaLote, tituloPunto, estadoPunto, claveLote, agruparLotes, indicadoresLocales,
+  construirMosaico, agruparPorDia, dividirEnFilas, filasDeGaleria, etiquetaFoto, etiquetaLote, tituloPunto, estadoPunto, claveLote, agruparLotes, indicadoresLocales, tituloMes, agruparPorMes,
 } from '../src/galeria.js';
 import { nombreNivel, nivelDeMedicion, NOMBRES_NIVEL } from '../src/niveles.js';
 import {
@@ -95,7 +95,7 @@ test('filasDeGaleria: encabezado por día y filas de 3 fichas (la última puede 
   const lista = [];
   for (let i = 0; i < 7; i++) lista.push(med(`h${i}`, `2026-11-07T1${i}:00:00Z`, i));
   lista.push(med('ayer', '2026-11-06T15:00:00Z', 1));
-  const filas = filasDeGaleria(lista, { hoy: '2026-11-07' });
+  const filas = filasDeGaleria(lista, { hoy: '2026-11-07', por: 'dia' });
   assert.deepEqual(filas.map((f) => f.tipo), ['dia', 'fila', 'fila', 'fila', 'dia', 'fila']);
   assert.equal(filas[0].titulo, 'Hoy · 7 de noviembre de 2026');
   assert.deepEqual(filas.filter((f) => f.tipo === 'fila').map((f) => f.fichas.length), [3, 3, 1, 1]);
@@ -104,6 +104,7 @@ test('filasDeGaleria: encabezado por día y filas de 3 fichas (la última puede 
   assert.deepEqual(dividirEnFilas([], 3), []);
   // sin días: solo filas
   assert.ok(filasDeGaleria(lista, { porDia: false }).every((f) => f.tipo === 'fila'));
+  assert.ok(filasDeGaleria(lista, { por: 'ninguno' }).every((f) => f.tipo === 'fila'));
 });
 
 test('etiquetas accesibles', () => {
@@ -222,4 +223,23 @@ test('indicadoresLocales: fotos de los últimos 30 días y puntos por nivel (no 
   assert.equal(r.fotos30, 4);
   assert.deepEqual(r.porNivel, [0, 2, 0, 1]);
   assert.equal(r.severos, 1); // un punto severo, aunque tenga 3 fotos severas
+});
+
+test('por mes: rejilla continua, un encabezado por mes y filas llenas', () => {
+  const lista = [];
+  for (let i = 0; i < 5; i++) lista.push(med(`n${i}`, `2026-11-0${i + 1}T15:00:00Z`, i));
+  for (let i = 0; i < 2; i++) lista.push(med(`o${i}`, `2026-10-1${i}T15:00:00Z`, i));
+  const filas = filasDeGaleria(lista, { hoy: '2026-11-07' });
+  assert.deepEqual(filas.map((f) => f.tipo), ['dia', 'fila', 'fila', 'dia', 'fila']);
+  assert.equal(filas[0].titulo, 'Noviembre de 2026');
+  assert.equal(filas[0].total, 5);
+  assert.deepEqual(filas.filter((f) => f.tipo === 'fila').map((f) => f.fichas.length), [3, 2, 2]);
+  assert.equal(filas[3].titulo, 'Octubre de 2026');
+});
+
+test('tituloMes y agruparPorMes usan el mes local UTC-5', () => {
+  assert.equal(tituloMes('2026-01'), 'Enero de 2026');
+  assert.equal(tituloMes('x'), 'Sin fecha');
+  const g = agruparPorMes([med('a', '2026-12-01T03:00:00Z', 1), med('b', '2026-12-01T06:00:00Z', 1)]); // a: 30 nov local
+  assert.deepEqual(g.map((x) => x.dia), ['2026-12', '2026-11']);
 });

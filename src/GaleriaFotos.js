@@ -7,7 +7,7 @@ import { TOKENS } from './DesignTokens';
 import { Foto, NivelChip } from './DesignComponents';
 import { IconLotes } from './Icons';
 import { miniaturaDe, etiquetaFoto, etiquetaLote, COLUMNAS_GALERIA } from './galeria';
-import { pctCorto, plural } from './fechas';
+import { pctCorto, plural, diaLocal, fechaCorta } from './fechas';
 
 export const SEPARACION = 3;
 
@@ -15,7 +15,21 @@ export function anchoFicha(ancho, columnas = COLUMNAS_GALERIA, margen = 0, separ
   return Math.floor((ancho - margen * 2 - separacion * (columnas - 1)) / columnas);
 }
 
-export const FichaFoto = React.memo(function FichaFoto({ medicion, lado, punto, onPress, radio = 0, seleccionada = false }) {
+// Día de la ficha ("7 nov") sobre la foto, arriba a la izquierda.
+function EtiquetaDia({ ts }) {
+  const d = diaLocal(ts);
+  if (!d) return null;
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', left: 6, top: 6, backgroundColor: 'rgba(32,30,29,0.84)', borderRadius: TOKENS.radius.pill, paddingHorizontal: 8, paddingVertical: 3 }}
+    >
+      <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color: '#fff' }}>{fechaCorta(d)}</Text>
+    </View>
+  );
+}
+
+export const FichaFoto = React.memo(function FichaFoto({ medicion, lado, punto, onPress, radio = 0, seleccionada = false, mostrarDia = false }) {
   return (
     <Pressable
       onPress={() => onPress?.(medicion)}
@@ -32,6 +46,7 @@ export const FichaFoto = React.memo(function FichaFoto({ medicion, lado, punto, 
           style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: radio, borderWidth: 3, borderColor: TOKENS.colors.accent }}
         />
       )}
+      {mostrarDia && <EtiquetaDia ts={medicion.timestamp} />}
       <NivelChip
         nivel={Math.max(0, Math.min(3, Math.round(Number(medicion.nivel_corrosion ?? 0))))}
         texto={medicion.area_corroida_pct == null ? '' : pctCorto(medicion.area_corroida_pct)}
@@ -41,7 +56,7 @@ export const FichaFoto = React.memo(function FichaFoto({ medicion, lado, punto, 
   );
 });
 
-export const FichaLote = React.memo(function FichaLote({ ficha, lado, punto, onPress, radio = 0 }) {
+export const FichaLote = React.memo(function FichaLote({ ficha, lado, punto, onPress, radio = 0, mostrarDia = false }) {
   return (
     <Pressable
       onPress={() => onPress?.(ficha)}
@@ -68,6 +83,7 @@ export const FichaLote = React.memo(function FichaLote({ ficha, lado, punto, onP
         <IconLotes size={13} color="#fff" />
         <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color: '#fff' }}>{ficha.total}</Text>
       </View>
+      {mostrarDia && <EtiquetaDia ts={ficha.items[0].timestamp} />}
       <NivelChip
         nivel={ficha.peorNivel}
         texto={ficha.maxPct == null ? '' : pctCorto(ficha.maxPct)}
@@ -77,14 +93,14 @@ export const FichaLote = React.memo(function FichaLote({ ficha, lado, punto, onP
   );
 });
 
-export function FilaGaleria({ fichas, lado, columnas = COLUMNAS_GALERIA, nombrePunto, onAbrirFoto, onAbrirLote, margen = 0, radio = 0, seleccionadaId = null }) {
+export function FilaGaleria({ fichas, lado, columnas = COLUMNAS_GALERIA, nombrePunto, onAbrirFoto, onAbrirLote, margen = 0, radio = 0, seleccionadaId = null, mostrarDia = false }) {
   return (
     <View style={{ flexDirection: 'row', gap: SEPARACION, marginBottom: SEPARACION, paddingHorizontal: margen }}>
       {fichas.map((f) =>
         f.tipo === 'lote' ? (
-          <FichaLote key={f.clave} ficha={f} lado={lado} radio={radio} punto={nombrePunto?.(f.items[0])} onPress={onAbrirLote} />
+          <FichaLote key={f.clave} ficha={f} lado={lado} radio={radio} mostrarDia={mostrarDia} punto={nombrePunto?.(f.items[0])} onPress={onAbrirLote} />
         ) : (
-          <FichaFoto key={f.clave} medicion={f.medicion} lado={lado} radio={radio} punto={nombrePunto?.(f.medicion)} onPress={onAbrirFoto} seleccionada={seleccionadaId === f.medicion.id_medicion} />
+          <FichaFoto key={f.clave} medicion={f.medicion} lado={lado} radio={radio} mostrarDia={mostrarDia} punto={nombrePunto?.(f.medicion)} onPress={onAbrirFoto} seleccionada={seleccionadaId === f.medicion.id_medicion} />
         )
       )}
     </View>
@@ -123,6 +139,7 @@ export default function GaleriaFotos({
   refreshControl,
   columnas = COLUMNAS_GALERIA,
   margen = 0,
+  mostrarDia = false,
   contentContainerStyle,
 }) {
   const { width } = useWindowDimensions();
@@ -140,6 +157,7 @@ export default function GaleriaFotos({
             lado={lado}
             columnas={columnas}
             margen={margen}
+            mostrarDia={mostrarDia}
             nombrePunto={nombrePunto}
             onAbrirFoto={onAbrirFoto}
             onAbrirLote={onAbrirLote}

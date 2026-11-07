@@ -1,7 +1,7 @@
 // src/galeria.js — Lógica pura de la galería de fotos (mosaico por día y por lote). Sin React Native.
 // Espejo de lib/mosaico.js de la web: fichas cuadradas, un lote se resume en una ficha con portada.
 import { nivelDeMedicion, nombreNivel } from './niveles.js';
-import { diaLocal, fechaLarga, rotuloDia, formatoPct, plural, hoyLocal, sumarDias } from './fechas.js';
+import { MESES, diaLocal, fechaLarga, rotuloDia, formatoPct, plural, hoyLocal, sumarDias } from './fechas.js';
 import { miniaturaDe } from './miniaturas.js';
 
 export { miniaturaDe };
@@ -85,18 +85,44 @@ export function dividirEnFilas(fichas = [], columnas = COLUMNAS_GALERIA) {
   return filas;
 }
 
-// Filas planas para una FlatList virtualizada: un encabezado por día y filas de `columnas` fichas.
+// Agrupa por mes local (UTC-5), del más reciente al más antiguo.
+export function agruparPorMes(mediciones = []) {
+  const mapa = new Map();
+  for (const m of mediciones) {
+    const dia = diaLocal(m.timestamp);
+    const k = dia ? dia.slice(0, 7) : 'sin-fecha';
+    if (!mapa.has(k)) mapa.set(k, []);
+    mapa.get(k).push(m);
+  }
+  return [...mapa.entries()]
+    .sort((a, z) => (a[0] < z[0] ? 1 : a[0] > z[0] ? -1 : 0))
+    .map(([mes, items]) => ({ dia: mes, items: items.sort((a, z) => ts(z) - ts(a)) }));
+}
+
+// "2026-11" -> "Noviembre de 2026" (mayúscula inicial, el resto en minúscula).
+export function tituloMes(ym) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym));
+  if (!m) return 'Sin fecha';
+  const nombre = MESES[Number(m[2]) - 1];
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} de ${m[1]}`;
+}
+
+// Filas planas para una FlatList virtualizada. `por`: 'mes' (por defecto: rejilla continua con un
+// encabezado por mes, el día va en cada ficha), 'dia' (un encabezado por día) o 'ninguno'.
 //   { tipo: 'dia', clave, dia, titulo, total }  ·  { tipo: 'fila', clave, fichas }
-export function filasDeGaleria(mediciones = [], { columnas = COLUMNAS_GALERIA, agrupar = true, porDia = true, hoy = hoyLocal() } = {}) {
-  const grupos = porDia ? agruparPorDia(mediciones) : [{ dia: null, items: mediciones }];
+export function filasDeGaleria(mediciones = [], { columnas = COLUMNAS_GALERIA, agrupar = true, por = 'mes', porDia, hoy = hoyLocal() } = {}) {
+  const modo = porDia === false ? 'ninguno' : por;
+  const grupos =
+    modo === 'dia' ? agruparPorDia(mediciones) : modo === 'mes' ? agruparPorMes(mediciones) : [{ dia: null, items: mediciones }];
   const filas = [];
   for (const g of grupos) {
-    if (porDia) {
+    if (modo !== 'ninguno') {
+      const sinFecha = g.dia === 'sin-fecha';
       filas.push({
         tipo: 'dia',
         clave: `d:${g.dia}`,
         dia: g.dia,
-        titulo: g.dia === 'sin-fecha' ? 'Sin fecha' : rotuloDia(g.dia, hoy),
+        titulo: sinFecha ? 'Sin fecha' : modo === 'mes' ? tituloMes(g.dia) : rotuloDia(g.dia, hoy),
         total: g.items.length,
       });
     }

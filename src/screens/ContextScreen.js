@@ -70,7 +70,7 @@ export default function ContextScreen({
   return (
     <Screen>
       <Header title="Nueva medición" subtitle={contexto || 'Elige dónde vas a medir'} onBack={onBack} />
-      <ScrollView contentContainerStyle={{ paddingHorizontal: PAD, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: PAD, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
         <SectionTitle title="Punto" />
         <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginBottom: 12 }}>
           Elige el punto de monitoreo donde estás tomando las fotos.
@@ -118,7 +118,7 @@ export default function ContextScreen({
         </View>
       </ScrollView>
 
-      <View style={{ padding: PAD, paddingTop: 12, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200, gap: 8 }}>
+      <View style={{ padding: PAD, paddingTop: 12, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral300, backgroundColor: TOKENS.colors.surfaceAlt, gap: 8 }}>
         <Button
           label="Capturar foto"
           onPress={onNext}

@@ -111,7 +111,7 @@ export function textoDia(p) {
 // Rótulo de una línea de referencia (p. ej. "Severa desde 25 %"): se prueba arriba-derecha, arriba-izquierda,
 // abajo-derecha y abajo-izquierda de la línea y se elige la primera posición que no tape ningún punto.
 // Coordenadas relativas al área de dibujo (sin márgenes). `radio` = radio del punto + aire.
-export function ubicarRotulo(umbral, puntos = [], { ancho, alto }, { anchoCaracter = 7.2, relleno = 10, altoRotulo = 18, radio = 9 } = {}) {
+export function ubicarRotulo(umbral, puntos = [], { ancho, alto }, { anchoCaracter = 7.8, relleno = 10, altoRotulo = 18, radio = 9 } = {}) {
   const w = umbral.etiqueta.length * anchoCaracter + relleno;
   const h = altoRotulo;
   const candidatos = [

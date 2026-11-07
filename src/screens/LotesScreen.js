@@ -73,6 +73,7 @@ export default function LotesScreen({
           title={lote.nombre}
           subtitle={`${lote.puntoTitulo} · ${plural(lote.items.length, 'foto', 'fotos')}`}
           onBack={() => setLoteSeleccionado(null)}
+          lines={2}
           right={
             puedeRenombrar ? (
               <IconButton onPress={() => setRenombrandoLote(lote)} label="Renombrar lote">

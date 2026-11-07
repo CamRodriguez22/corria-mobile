@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, RefreshControl, ScrollView, Pressable } from 'react-native';
 import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
@@ -104,10 +105,11 @@ export default function ActivityScreen({
       <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, paddingHorizontal: PAD, marginTop: 18 }}>
         Filtrar fotos
       </Text>
+      <View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: PAD, gap: 8, alignItems: 'center' }}
+        contentContainerStyle={{ paddingLeft: PAD, paddingRight: PAD + 32, gap: 8, alignItems: 'center' }}
       >
         {NIVELES.map((n) => {
           const activo = filtros.niveles.includes(n.i);
@@ -142,6 +144,15 @@ export default function ActivityScreen({
           />
         )}
       </ScrollView>
+      {/* Degradado a la derecha: indica que la fila sigue y no corta chips a media palabra. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(245,234,216,0)', TOKENS.colors.bg]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 36 }}
+      />
+      </View>
 
       <View style={{ paddingHorizontal: PAD, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text accessibilityLiveRegion="polite" style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, flex: 1 }}>
@@ -200,6 +211,7 @@ export default function ActivityScreen({
   return (
     <GaleriaFotos
       filas={filas}
+      mostrarDia
       nombrePunto={(m) => nombrePuntoDe(m, bloqueMap, bloquesMap)}
       onAbrirFoto={onOpen}
       onAbrirLote={(f) => onAbrirLote?.(f.loteClave)}

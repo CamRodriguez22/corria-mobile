@@ -12,8 +12,8 @@ import { IconTrend, IconNivel } from './Icons';
 import { escalaTendencia, resumenTendencia, lineasAccesibles, textoDia, ubicarRotulo, MIN_DIAS_TENDENCIA } from './tendencia';
 import { formatoPct, plural } from './fechas';
 
-const ALTO = 188;
-const M = { izq: 40, der: 10, arr: 14, abajo: 26 };
+const ALTO = 232;
+const M = { izq: 40, der: 10, arr: 56, abajo: 26 }; // banda superior de 56 para el tooltip
 const TINTA = TOKENS.colors.neutral700;
 const REJILLA = 'rgba(32,30,29,0.10)';
 const LINEA = TOKENS.colors.accent2_700; // un solo color de serie; el nivel va en los puntos
@@ -119,12 +119,13 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
             </React.Fragment>
           ))}
           {escala.umbrales.map((u) => {
-            const r = ubicarRotulo(u, escala.puntos, area);
+            // Rótulo a la derecha, dentro del área y sobre su línea, con fondo del color de la tarjeta.
+            const r = ubicarRotulo(u, [], area);
             return (
               <React.Fragment key={u.valor}>
                 <Line x1={M.izq} x2={M.izq + area.ancho} y1={M.arr + u.y} y2={M.arr + u.y} stroke={TINTA} strokeWidth={1.25} />
-                <Rect x={M.izq + r.x} y={M.arr + r.y} width={r.w} height={r.h} rx={4} fill={TOKENS.colors.surfaceAlt} fillOpacity={0.92} />
-                <SvgText x={M.izq + r.x + 5} y={M.arr + r.y + r.h - 5} fontSize={12} fontWeight="600" fill={TINTA}>
+                <Rect x={M.izq + r.x} y={M.arr + r.y} width={r.w} height={r.h} rx={4} fill={TOKENS.colors.surfaceAlt} fillOpacity={0.96} />
+                <SvgText x={M.izq + r.x + r.w - 5} y={M.arr + r.y + r.h - 5} fontSize={12} fontWeight="600" fill={TINTA} textAnchor="end">
                   {u.etiqueta}
                 </SvgText>
               </React.Fragment>
@@ -187,7 +188,7 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
             style={{
               position: 'absolute',
               left: tipLeft,
-              top: M.arr + actual.y - 56 >= 0 ? M.arr + actual.y - 56 : M.arr + actual.y + 12,
+              top: 0,
               width: tipW,
               backgroundColor: TOKENS.colors.text,
               borderRadius: 10,

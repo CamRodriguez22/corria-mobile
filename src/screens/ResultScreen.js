@@ -151,7 +151,7 @@ export default function ResultScreen({
           </ScrollView>
         </KeyboardAvoidingView>
 
-        <View style={{ padding: PAD, gap: 8, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200 }}>
+        <View style={{ padding: PAD, gap: 8, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral300, backgroundColor: TOKENS.colors.surfaceAlt }}>
           <Button label={loteNombre ? 'Siguiente foto en este lote' : 'Siguiente foto en este punto'} onPress={onNext} />
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {!!loteNombre && (

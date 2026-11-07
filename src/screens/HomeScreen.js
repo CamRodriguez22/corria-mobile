@@ -67,7 +67,7 @@ export default function HomeScreen({
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
-        contentContainerStyle={{ padding: PAD, paddingBottom: 112 }}
+        contentContainerStyle={{ padding: PAD, paddingBottom: 148 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
