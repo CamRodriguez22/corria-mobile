@@ -207,6 +207,11 @@ function Root() {
         cerrarConfirm();
         cerrarSesionLocal();
       },
+      // Cerrar el aviso por otra vía (botón atrás de Android) también cierra la sesión:
+      // si no, el candado quedaría puesto y los siguientes 401 se ignorarían.
+      onCancel: () => {
+        cerrarSesionLocal();
+      },
     });
   };
   // Error de una acción contra el backend: 401 → sesión vencida; si no, aviso con el mensaje.
@@ -576,6 +581,8 @@ function Root() {
   };
 
   const cerrarSesionLocal = async () => {
+    // Invalida la sesión ANTES de esperar: las respuestas tardías ya se descartan.
+    sesionRef.current += 1;
     try {
       await signOut();
     } catch {}
@@ -731,6 +738,8 @@ function Root() {
   const analizar = async () => {
     if (analizandoRef.current || !colaRef.current.length || !bloqueSel) return;
     analizandoRef.current = true;
+    const sesion = sesionRef.current;
+    const vigente = () => sesion === sesionRef.current;
     setScreen('analyzing');
     setResultado(null);
     setEtapaSubida('');
@@ -742,9 +751,11 @@ function Root() {
     try {
       const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), descripcion);
       const bloqueIdReal = await resolverBloqueId({ bloque: bloqueElegido });
+      if (!vigente()) return;
       if (!loteIdRef.current && loteNombreInput) fijarLoteId(`lote_${Date.now()}`);
 
       for (let i = 0; i < colaRef.current.length; i++) {
+        if (!vigente()) return;
         const itemFoto = colaRef.current[i];
         if (itemFoto.status === 'lista' || itemFoto.definitivo) continue;
         actualizarFoto(i, { status: 'subiendo', error: undefined });
@@ -758,9 +769,10 @@ function Root() {
             loteNombre: loteNombreInput || undefined,
             notas,
             imagenKey: itemFoto.imagenKey,
-            onImagenKey: (k) => actualizarFoto(i, { imagenKey: k }),
-            onEtapa: (e) => setEtapaSubida(e),
+            onImagenKey: (k) => vigente() && actualizarFoto(i, { imagenKey: k }),
+            onEtapa: (e) => vigente() && setEtapaSubida(e),
           });
+          if (!vigente()) return;
 
           actualizarFoto(i, { status: 'lista', medicion, error: undefined });
           bloquesNuevos[medicion.id_medicion] = bloqueIdReal;
@@ -783,6 +795,7 @@ function Root() {
           const medConFoto = { ...ligera, url_imagen: medicion.url_imagen || itemFoto.uri, _localUri: itemFoto.uri };
           setMediciones((prev) => [medConFoto, ...prev.filter((m) => m.id_medicion !== medicion.id_medicion)]);
         } catch (errFoto) {
+          if (!vigente()) return;
           const { mensaje, reintentable } = clasificarErrorSubida(errFoto);
           actualizarFoto(i, { status: 'error', error: mensaje, definitivo: !reintentable });
           if (esSesionVencida(errFoto)) avisarSesionVencida();
@@ -792,6 +805,7 @@ function Root() {
       // Se persiste una sola vez, mezclando con lo ya guardado (no con un estado capturado).
       if (Object.keys(bloquesNuevos).length) {
         const guardado = await loadLocal(APP_CONFIG.storageKeys.bloquePorMedicion, {});
+        if (!vigente()) return;
         await saveLocal(APP_CONFIG.storageKeys.bloquePorMedicion, { ...guardado, ...bloquesNuevos });
       }
 
@@ -811,6 +825,7 @@ function Root() {
       });
       setScreen('result');
     } catch (e) {
+      if (!vigente()) return;
       setConfirmModal({
         visible: true,
         title: 'Error en el análisis',
@@ -825,7 +840,8 @@ function Root() {
         onCancel: () => setScreen('preview'),
       });
     } finally {
-      analizandoRef.current = false;
+      // Si la sesión cambió, reiniciarEstadoSesion ya liberó el candado (y puede haber otro análisis).
+      if (vigente()) analizandoRef.current = false;
     }
   };
 
