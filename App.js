@@ -50,6 +50,7 @@ import {
   esSesionVencida,
   conAutor,
   navegarAtras,
+  pendientesAlSalir,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -307,7 +308,7 @@ function Root() {
         return true;
       }
       if (screen === 'result') {
-        irAInicioConservandoLote();
+        salirDelResultado(irAInicioConservandoLote);
         return true;
       }
       const atras = navegarAtras({ screen, tab, folderClave, loteSel });
@@ -320,7 +321,7 @@ function Root() {
 
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [screen, tab, folderClave, loteSel, confirmModal, promptModal]);
+  }, [screen, tab, folderClave, loteSel, confirmModal, promptModal, espesor, descripcion, obsMap, resultado, colaFotos]);
 
   const cargarTodo = useCallback(async (first = false) => {
     const sesion = sesionRef.current;
@@ -613,6 +614,46 @@ function Root() {
     setTab('home');
   };
 
+  // Salir del resultado descartaría las fotos fallidas y las observaciones sin guardar:
+  // se pregunta antes. "Quedarme aquí" es la opción segura (también la del botón atrás).
+  const salirDelResultado = (continuar) => {
+    const pend = pendientesAlSalir({
+      cola: colaRef.current,
+      espesor,
+      descripcion,
+      guardada: obsMap[resultado?.id_medicion],
+    });
+    if (!pend.hay) {
+      continuar();
+      return;
+    }
+    const partes = [];
+    if (pend.fallidas) partes.push(`${pend.fallidas} ${pend.fallidas === 1 ? 'foto no se analizó' : 'fotos no se analizaron'}`);
+    if (pend.obsSinGuardar) partes.push('tienes observaciones sin guardar');
+    const mensaje = `${partes.join(' y ')}. Si continúas, se perderán.`;
+    setConfirmModal({
+      visible: true,
+      title: 'Hay cambios sin resolver',
+      message: mensaje.charAt(0).toUpperCase() + mensaje.slice(1),
+      confirmLabel: pend.fallidas ? 'Reintentar las fallidas' : 'Guardar notas y continuar',
+      extraLabel: 'Descartar y continuar',
+      cancelLabel: 'Quedarme aquí',
+      onConfirm: async () => {
+        cerrarConfirm();
+        if (pend.fallidas) {
+          analizar();
+        } else {
+          await guardarObs();
+          continuar();
+        }
+      },
+      onExtra: () => {
+        cerrarConfirm();
+        continuar();
+      },
+    });
+  };
+
   const terminarLote = () => {
     setBloqueSel('');
     fijarLoteId('');
@@ -854,6 +895,8 @@ function Root() {
         message={confirmModal.message}
         confirmLabel={confirmModal.confirmLabel}
         cancelLabel={confirmModal.cancelLabel}
+        extraLabel={confirmModal.extraLabel}
+        onExtra={confirmModal.onExtra}
         variant={confirmModal.variant}
         onConfirm={confirmModal.onConfirm}
         onCancel={cancelarConfirm}
@@ -953,12 +996,12 @@ function Root() {
           setObsOpen={setObsOpen}
           obsSaved={obsSaved}
           onSaveObs={guardarObs}
-          onNext={() => irANuevaMedicion({ mantenerLote: true })}
-          onTerminarLote={terminarLote}
+          onNext={() => salirDelResultado(() => irANuevaMedicion({ mantenerLote: true }))}
+          onTerminarLote={() => salirDelResultado(terminarLote)}
           resumenLote={resumirCola(colaFotos)}
           onReintentar={analizar}
-          onBack={irAInicioConservandoLote}
-          onHome={terminarLote}
+          onBack={() => salirDelResultado(irAInicioConservandoLote)}
+          onHome={() => salirDelResultado(terminarLote)}
         />
       );
 

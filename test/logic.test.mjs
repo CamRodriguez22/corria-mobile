@@ -19,6 +19,7 @@ import {
   conAutor,
   parteArchivoForm,
   navegarAtras,
+  pendientesAlSalir,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -274,4 +275,23 @@ test('navegarAtras - limpia carpeta y lote al salir y nunca cae en uno viejo', (
   });
   // en inicio no hay a dónde volver (Android sale de la app)
   assert.equal(navegarAtras({ screen: 'home', tab: 'home' }), null);
+});
+
+test('pendientesAlSalir - avisa de fotos fallidas y observaciones sin guardar', () => {
+  const ok = [{ status: 'lista' }];
+  assert.equal(pendientesAlSalir({ cola: ok }).hay, false);
+  assert.deepEqual(pendientesAlSalir({ cola: [{ status: 'lista' }, { status: 'error' }] }), {
+    fallidas: 1,
+    obsSinGuardar: false,
+    hay: true,
+  });
+  // Observaciones escritas y no guardadas
+  assert.equal(pendientesAlSalir({ cola: ok, espesor: '2.4' }).obsSinGuardar, true);
+  // Ya guardadas e iguales -> nada pendiente
+  const guardada = { espesor: '2.4', descripcion: 'Cara norte' };
+  assert.equal(pendientesAlSalir({ cola: ok, espesor: '2.4', descripcion: 'Cara norte', guardada }).hay, false);
+  // Editadas después de guardar -> pendiente
+  assert.equal(pendientesAlSalir({ cola: ok, espesor: '2.5', descripcion: 'Cara norte', guardada }).obsSinGuardar, true);
+  // Vacías -> nada
+  assert.equal(pendientesAlSalir({ cola: ok, espesor: ' ', descripcion: '' }).hay, false);
 });

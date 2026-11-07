@@ -612,6 +612,8 @@ export const ConfirmModal = ({
   confirmLabel = 'Aceptar',
   cancelLabel = 'Cancelar',
   variant = 'primary', // primary | danger
+  extraLabel = '', // tercera acción opcional (p. ej. "Descartar y continuar")
+  onExtra,
   onConfirm,
   onCancel,
 }) => {
@@ -636,6 +638,7 @@ export const ConfirmModal = ({
               label={confirmLabel}
               onPress={onConfirm}
             />
+            {!!extraLabel && <Button variant="danger" label={extraLabel} onPress={onExtra} />}
             {!!cancelLabel && (
               <Button
                 variant="ghost"

@@ -206,6 +206,17 @@ export function resumirCola(cola = []) {
   };
 }
 
+// ¿Qué se perdería al salir de la pantalla de resultado? Fotos fallidas de la cola y
+// observaciones escritas que no coinciden con lo ya guardado en el teléfono.
+export function pendientesAlSalir({ cola = [], espesor = '', descripcion = '', guardada = null } = {}) {
+  const fallidas = cola.filter((f) => f.status === 'error').length;
+  const e = String(espesor || '').trim();
+  const d = String(descripcion || '').trim();
+  const obsSinGuardar =
+    Boolean(e || d) && (String(guardada?.espesor || '').trim() !== e || String(guardada?.descripcion || '').trim() !== d);
+  return { fallidas, obsSinGuardar, hay: fallidas > 0 || obsSinGuardar };
+}
+
 // Texto de resumen para un lote con varias fotos ("3 de 5 fotos analizadas; 2 fallaron").
 export function textoResumenCola({ total, listas, fallidas }) {
   if (total <= 1 && !fallidas) return '';
