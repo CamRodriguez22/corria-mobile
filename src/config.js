@@ -34,6 +34,9 @@ export const APP_CONFIG = {
     bloquePorMedicion: 'pixelrust_bloque_por_medicion',
     obsPorMedicion: 'pixelrust_obs_por_medicion',
     borradorPendiente: 'pixelrust_borrador_pendiente',
+    // Perfil y puntos para el modo sin conexión (con el sub del usuario; se borran al cerrar sesión).
+    perfilCache: 'pixelrust_perfil_cache',
+    bloquesCache: 'pixelrust_bloques_cache',
   },
   carpetaFotos: 'PIXELRUST_Mediciones',
 };

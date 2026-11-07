@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Image } from 'react-native';
 import { Screen, Header, SeverityBadge, KeyValueCard, Button } from '../DesignComponents';
 import { TOKENS, num, severidad, confianzaPct } from '../DesignTokens';
 import { formatDateTime } from '../utils';
+import { imagenDe } from '../miniaturas';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -18,7 +19,7 @@ export default function DetailScreen({
   onDelete,
 }) {
   const s = severidad(medicion);
-  const uri = medicion._localUri || medicion.url_imagen || medicion.url_thumbnail;
+  const uri = imagenDe(medicion);
   const lat = medicion.latitud_real ?? medicion.punto_info?.coordenadas?.lat;
   const lng = medicion.longitud_real ?? medicion.punto_info?.coordenadas?.lng;
   const clima = medicion.clima || {};

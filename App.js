@@ -4,6 +4,7 @@ import {
   StatusBar,
   Share,
   BackHandler,
+  AppState,
 } from 'react-native';
 
 // Polyfills antes de Amplify
@@ -54,6 +55,7 @@ import {
   datosEmpresa,
   clasificarErrorSubida,
 } from './src/helpers';
+import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
 import {
   AWS_CONFIG,
   APP_CONFIG,
@@ -149,6 +151,7 @@ function Root() {
   const [errorBloques, setErrorBloques] = useState(false); // GET /bloques falló (distinto de "sin puntos")
   const [cargandoBloques, setCargandoBloques] = useState(false);
   const sesionVencidaAvisada = useRef(false);
+  const medicionesRef = useRef([]); // copia de `mediciones` para el reloj de URL vencidas
 
   // navegación
   const [tab, setTab] = useState('home');
@@ -236,6 +239,8 @@ function Root() {
     setLoteIdActual(id);
   };
 
+  medicionesRef.current = mediciones;
+
   const nombre = perfil?.nombre || (perfil?.email || email).split('@')[0] || 'Usuario';
   const iniciales = nombre
     .split(' ')
@@ -283,6 +288,24 @@ function Root() {
 
   useEffect(() => {
     if (logged) cargarTodo(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logged]);
+
+  // Las URL de las fotos vencen a la hora: al volver a la app (o cada 5 min con la app abierta) se
+  // recarga la lista si ya pasó el umbral, para que las miniaturas no se queden en blanco.
+  useEffect(() => {
+    if (!logged) return undefined;
+    const revisar = () => {
+      if (necesitaRefresco(medicionesRef.current)) cargarTodo(false);
+    };
+    const sub = AppState.addEventListener('change', (estado) => {
+      if (estado === 'active') revisar();
+    });
+    const reloj = setInterval(revisar, 5 * 60 * 1000);
+    return () => {
+      sub.remove();
+      clearInterval(reloj);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged]);
 
@@ -346,15 +369,23 @@ function Root() {
     const sesion = sesionRef.current;
     if (first) setLoadingData(true);
     // cache local primero (para pintar algo sin red)
-    const [cache, bmap, omap] = await Promise.all([
+    const [cache, bmap, omap, perfilCache, bloquesCache] = await Promise.all([
       loadLocal(APP_CONFIG.storageKeys.historialCache, []),
       loadLocal(APP_CONFIG.storageKeys.bloquePorMedicion, {}),
       loadLocal(APP_CONFIG.storageKeys.obsPorMedicion, {}),
+      loadLocal(APP_CONFIG.storageKeys.perfilCache, null),
+      loadLocal(APP_CONFIG.storageKeys.bloquesCache, null),
     ]);
     if (sesion !== sesionRef.current) return;
     setBloqueMap(bmap || {});
     setObsMap(omap || {});
-    if (Array.isArray(cache) && cache.length) setMediciones(cache);
+    // Perfil y puntos guardados: sin red el nombre y el punto de cada foto siguen visibles.
+    const perfilGuardado = leerCache(perfilCache);
+    if (perfilGuardado) setPerfil((prev) => prev || perfilGuardado);
+    const bloquesGuardados = leerCache(bloquesCache, perfilGuardado?.cognito_sub);
+    if (Array.isArray(bloquesGuardados) && bloquesGuardados.length) setBloques((prev) => (prev.length ? prev : bloquesGuardados));
+    // Las URL firmadas de la caché pueden haber vencido (1 h): no se pintan.
+    if (Array.isArray(cache) && cache.length) setMediciones(limpiarVencidas(cache));
 
     try {
       // allSettled: un fallo de red NO es una lista vacía. Si /mediciones/recientes
@@ -372,11 +403,17 @@ function Root() {
         setOffline(true);
         return;
       }
-      if (rPerfil.status === 'fulfilled' && rPerfil.value) setPerfil(rPerfil.value);
+      if (rPerfil.status === 'fulfilled' && rPerfil.value) {
+        setPerfil(rPerfil.value);
+        saveLocal(APP_CONFIG.storageKeys.perfilCache, envolverCache(rPerfil.value.cognito_sub, rPerfil.value));
+      }
       if (rInds.status === 'fulfilled' && rInds.value) setIndicadoresServidor(rInds.value);
       if (rBloques.status === 'fulfilled' && Array.isArray(rBloques.value)) {
-        setBloques(rBloques.value.map(adaptarBloque));
+        const adaptados = rBloques.value.map(adaptarBloque);
+        setBloques(adaptados);
         setErrorBloques(false);
+        const subPerfil = rPerfil.status === 'fulfilled' ? rPerfil.value?.cognito_sub : perfilGuardado?.cognito_sub;
+        saveLocal(APP_CONFIG.storageKeys.bloquesCache, envolverCache(subPerfil, adaptados));
       } else {
         setErrorBloques(true);
       }
@@ -390,10 +427,15 @@ function Root() {
       const lista = listaDeRespuesta(respMeds);
       setHayMasMediciones(calcularHayMas(respMeds, PAGINA_MEDICIONES));
 
-      const limpio = lista
-        .map(({ mascaras, ...rest }) => rest)
-        .sort((a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0));
+      const limpio = marcarCarga(lista.map(({ mascaras, ...rest }) => rest)).sort(
+        (a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0)
+      );
       setMediciones(limpio);
+      // El detalle abierto recibe las URL nuevas (las que tenía pueden estar por vencer).
+      setDetalle((prev) => {
+        const fresca = prev && limpio.find((m) => m.id_medicion === prev.id_medicion);
+        return fresca ? { ...prev, url_thumbnail: fresca.url_thumbnail, url_imagen: fresca.url_imagen, _urlTs: fresca._urlTs } : prev;
+      });
       setOffline(false);
       saveLocal(
         APP_CONFIG.storageKeys.historialCache,
@@ -420,7 +462,7 @@ function Root() {
       const resp = await getMedicionesRecientes(undefined, pagina.limit, { hasta: pagina.hasta });
       if (sesion !== sesionRef.current) return;
       const lista = listaDeRespuesta(resp);
-      const nuevas = lista.map(({ mascaras, ...rest }) => rest);
+      const nuevas = marcarCarga(lista.map(({ mascaras, ...rest }) => rest));
       const { agregadas } = mezclarMediciones(mediciones, nuevas);
       // Actualización funcional: no pisa una medición subida mientras se esperaba.
       setMediciones((prev) => mezclarMediciones(prev, nuevas).lista);
