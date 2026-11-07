@@ -74,3 +74,42 @@ export function IconCheckCircle({ size = 20, color = '#10b981', strokeWidth = 2,
     </Svg>
   );
 }
+
+export function IconBuilding({ size = 20, color = '#2563eb', strokeWidth = 2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+      <Path d="M9 22v-4h6v4" />
+      <Line x1="8" y1="6" x2="8.01" y2="6" />
+      <Line x1="16" y1="6" x2="16.01" y2="6" />
+      <Line x1="12" y1="6" x2="12.01" y2="6" />
+      <Line x1="8" y1="10" x2="8.01" y2="10" />
+      <Line x1="16" y1="10" x2="16.01" y2="10" />
+      <Line x1="12" y1="10" x2="12.01" y2="10" />
+      <Line x1="8" y1="14" x2="8.01" y2="14" />
+      <Line x1="16" y1="14" x2="16.01" y2="14" />
+      <Line x1="12" y1="14" x2="12.01" y2="14" />
+    </Svg>
+  );
+}
+
+export function IconGps({ size = 20, color = '#2563eb', strokeWidth = 2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Circle cx="12" cy="12" r="10" />
+      <Line x1="22" y1="12" x2="18" y2="12" />
+      <Line x1="6" y1="12" x2="2" y2="12" />
+      <Line x1="12" y1="6" x2="12" y2="2" />
+      <Line x1="12" y1="22" x2="12" y2="18" />
+    </Svg>
+  );
+}
+
+export function IconCheck({ size = 20, color = '#10b981', strokeWidth = 2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Polyline points="20 6 9 17 4 12" />
+    </Svg>
+  );
+}
+

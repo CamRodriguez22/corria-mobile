@@ -1,0 +1,13 @@
+export { default as LoginScreen } from './LoginScreen';
+export { default as HomeScreen } from './HomeScreen';
+export { default as LotesScreen } from './LotesScreen';
+export { default as FoldersScreen } from './FoldersScreen';
+export { default as FolderScreen } from './FolderScreen';
+export { default as ActivityScreen } from './ActivityScreen';
+export { default as SettingsScreen } from './SettingsScreen';
+export { default as ContextScreen } from './ContextScreen';
+export { default as CameraScreen } from './CameraScreen';
+export { default as PreviewScreen } from './PreviewScreen';
+export { default as AnalyzingScreen } from './AnalyzingScreen';
+export { default as ResultScreen } from './ResultScreen';
+export { default as DetailScreen } from './DetailScreen';
