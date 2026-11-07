@@ -80,7 +80,7 @@ export async function pickPhotos({ fromCamera = false, allowsMultiple = true } =
   const opts = {
     mediaTypes: ['images'],
     quality: 0.6,
-    base64: true,
+    base64: false, // la subida usa la URI (upload-url + S3); base64 solo gastaba memoria
     allowsMultipleSelection: !fromCamera && allowsMultiple,
   };
   const res = fromCamera

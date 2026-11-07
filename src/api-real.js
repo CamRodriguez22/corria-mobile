@@ -25,7 +25,6 @@
 //   s3_key_imagen / _thumbnail / _resultado : claves (no accesibles directo)
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
-import * as FileSystem from 'expo-file-system/legacy';
 import { AWS_CONFIG, APP_CONFIG } from './config';
 import { getIdToken } from './utils';
 
@@ -204,9 +203,14 @@ export async function subirFotoAS3({ url, fields }, uri) {
 }
 
 // ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
+// DECISIÓN (idempotencia): la foto SIEMPRE viaja por POST /medicion/upload-url + POST
+// prefirmado a S3 y luego POST /medicion con `imagen_key` (igual que la web). La clave
+// es la llave de idempotencia del backend: un reintento con la misma imagen_key devuelve
+// el resultado previo (200) o 409/410, nunca duplica. No hay respaldo en base64: no tiene
+// clave y un reintento tras un timeout duplicaría la medición. Si upload-url falla, aún no
+// se creó nada, así que reintentar es seguro.
 export async function subirMedicionReal({
   uri,
-  base64,
   token,
   bloqueId,
   lat,
@@ -220,26 +224,16 @@ export async function subirMedicionReal({
 }) {
   if (!bloqueId) throw new Error('bloque_id es requerido para subir la medición.');
 
-  let imgB64 = base64;
-  // Si la foto ya está en S3 (reintento), se reutiliza su imagen_key: POST /medicion es
-  // idempotente por imagen_key y devuelve el resultado previo en vez de duplicar.
+  // Si la foto ya está en S3 (reintento), se reutiliza su imagen_key.
   let imagenKey = imagenKeyPrevia;
-
-  // Si la foto es grande o no viene en base64, usa upload-url a S3
-  const debeUsarS3 = !imgB64 || (imgB64.length > 3.5 * 1024 * 1024);
-
-  if (imagenKey) {
-    imgB64 = null;
-  } else if (debeUsarS3 && uri) {
+  if (!imagenKey) {
+    if (!uri) throw new Error('No se pudo preparar la imagen para el análisis.');
     if (onEtapa) onEtapa('preparando_subida');
     const presigned = await pedirUploadUrl('image/jpeg', token);
     if (onEtapa) onEtapa('subiendo_s3');
     await subirFotoAS3(presigned, uri);
     imagenKey = presigned.imagen_key;
     if (onImagenKey) onImagenKey(imagenKey); // solo tras subir con éxito
-    imgB64 = null; // no viaja en el body si se subió a S3
-  } else if (!imgB64 && uri) {
-    imgB64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
   }
 
   if (onEtapa) onEtapa('analizando_ia');
@@ -248,14 +242,8 @@ export async function subirMedicionReal({
     fuente: 'movil',
     bloque_id: bloqueId,
     notas: notas || `movil-bloque-${bloqueId}`,
+    imagen_key: imagenKey,
   };
-  if (imagenKey) {
-    body.imagen_key = imagenKey;
-  } else if (imgB64) {
-    body.imagen_base64 = imgB64;
-  } else {
-    throw new Error('No se pudo preparar la imagen para el análisis.');
-  }
 
   if (lat != null && lng != null) {
     body.latitud_real = lat;
@@ -268,12 +256,11 @@ export async function subirMedicionReal({
 }
 
 // ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
-// foto: { uri, base64 }  ·  gps: { lat, lng } (opcional) ·  bloqueId: id_bloque real
+// foto: { uri }  ·  gps: { lat, lng } (opcional) ·  bloqueId: id_bloque real
 export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, notas = '', onEtapa, imagenKey, onImagenKey }) {
   if (!bloqueId) throw new Error('No se pudo determinar el punto de la medición.');
   const medicion = await subirMedicionReal({
     uri: foto?.uri,
-    base64: foto?.base64,
     lat: gps?.lat,
     lng: gps?.lng,
     bloqueId,
