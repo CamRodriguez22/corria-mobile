@@ -47,6 +47,7 @@ import {
 import {
   tituloBloque,
   nombreCortoBloque,
+  puedeGestionarMedicion,
   traducirAuthError,
 } from './src/helpers';
 import {
@@ -789,10 +790,7 @@ function Root() {
 
   if (screen === 'detail' && detalle) {
     const detalleClaveBloque = bloqueDeMedicion(detalle, bloqueMap, listaBloques);
-    const rol = (perfil?.rol || '').toLowerCase();
-    const esAdminOSuper = rol === 'admin' || rol === 'super_admin';
-    const esPropia = Boolean(perfil?.sub) && (detalle?.tomado_por_id === perfil?.sub || detalle?.usuario_id === perfil?.sub);
-    const puedeGestionar = esAdminOSuper || (rol === 'tecnico' && esPropia);
+    const puedeGestionar = puedeGestionarMedicion(perfil, detalle);
 
     return (
       <DetailScreen
