@@ -168,6 +168,16 @@ export function esSesionVencida(e) {
   return e?.status === 401;
 }
 
+// Parte `file` del FormData del POST prefirmado a S3. En React Native nativo basta
+// {uri,name,type}; en web FormData exige un Blob/File, así que se descarga la URI
+// (blob: / data:) a un Blob. `fetchFn` se inyecta para poder probarlo sin red.
+export async function parteArchivoForm({ uri, type = 'image/jpeg', nombre = 'foto.jpg', esWeb = false, fetchFn }) {
+  if (!esWeb) return { valor: { uri, name: nombre, type }, nombre: undefined };
+  const resp = await fetchFn(uri);
+  const blob = await resp.blob();
+  return { valor: blob, nombre };
+}
+
 // ───────────────────────── Cola de fotos (lote en análisis) ─────────────────────────
 // Cada ítem: { uri, base64, status: 'esperando'|'subiendo'|'lista'|'error', error?, imagenKey?, medicion? }
 export function resumirCola(cola = []) {

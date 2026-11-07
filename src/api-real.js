@@ -25,6 +25,8 @@
 //   s3_key_imagen / _thumbnail / _resultado : claves (no accesibles directo)
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
+import { Platform } from 'react-native';
+import { parteArchivoForm } from './logic';
 import { AWS_CONFIG, APP_CONFIG } from './config';
 import { getIdToken } from './utils';
 
@@ -187,11 +189,15 @@ export async function pedirUploadUrl(contentType = 'image/jpeg', token) {
 export async function subirFotoAS3({ url, fields }, uri) {
   const form = new FormData();
   Object.entries(fields).forEach(([k, v]) => form.append(k, v));
-  form.append('file', {
+  // S3 exige que `file` sea el ÚLTIMO campo. En web debe ser un Blob con nombre.
+  const parte = await parteArchivoForm({
     uri,
-    name: 'foto.jpg',
     type: fields['Content-Type'] || 'image/jpeg',
+    esWeb: Platform.OS === 'web',
+    fetchFn: fetch,
   });
+  if (parte.nombre) form.append('file', parte.valor, parte.nombre);
+  else form.append('file', parte.valor);
 
   const res = await fetch(url, {
     method: 'POST',

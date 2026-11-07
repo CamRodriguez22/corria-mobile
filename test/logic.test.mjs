@@ -17,6 +17,7 @@ import {
   listaDeRespuesta,
   esSesionVencida,
   conAutor,
+  parteArchivoForm,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -229,4 +230,24 @@ test('conAutor - completa tomado_por_id/usuario_id para que el técnico gestione
   assert.equal(original.usuario_id, undefined);
   // Sin perfil/sub no inventa autor
   assert.deepEqual(conAutor({ id_medicion: 'm3' }, null), { id_medicion: 'm3' });
+});
+
+test('parteArchivoForm - nativo usa {uri,name,type}; web descarga un Blob con nombre', async () => {
+  const nativo = await parteArchivoForm({ uri: 'file:///a.jpg', type: 'image/jpeg', esWeb: false });
+  assert.deepEqual(nativo.valor, { uri: 'file:///a.jpg', name: 'foto.jpg', type: 'image/jpeg' });
+  assert.equal(nativo.nombre, undefined);
+
+  const blobFalso = { size: 3 };
+  let pedida = null;
+  const web = await parteArchivoForm({
+    uri: 'blob:http://x/1',
+    esWeb: true,
+    fetchFn: async (u) => {
+      pedida = u;
+      return { blob: async () => blobFalso };
+    },
+  });
+  assert.equal(pedida, 'blob:http://x/1');
+  assert.equal(web.valor, blobFalso);
+  assert.equal(web.nombre, 'foto.jpg');
 });
