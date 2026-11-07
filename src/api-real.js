@@ -103,13 +103,20 @@ export async function getIndicadores(token) {
 
 // ─────────────────────────── Mediciones ───────────────────────────
 // Sin cursor: la paginación se hace con `hasta`/`desde` (YYYY-MM-DD), ver paginaAnterior en logic.js.
+//
+// DECISIÓN (payload): las listas SIEMPRE piden `resumen=1`. El backend entonces solo lee
+// CAMPOS_LIVIANOS y omite mascaras, detecciones, clima, inferencia_local y contorno_placa
+// (CAMPOS_PESADOS): con eso 1000 mediciones caben en los 6 MB de respuesta de Lambda
+// (sin resumen, cada máscara pesa cientos de KB y "cargar más" podía pasar el límite).
+// La pantalla de detalle sí usa detecciones/clima: los pide al abrir con
+// getMedicionCompleta (GET /mediciones/{id_punto}?id_medicion=...).
 export async function getMedicionesRecientes(
   token,
   limit = APP_CONFIG.limiteHistorialMovil,
   { hasta, desde } = {}
 ) {
   const lim = Math.max(1, Math.min(limit, APP_CONFIG.limiteHistorialMax));
-  let path = `/mediciones/recientes?limit=${lim}`;
+  let path = `/mediciones/recientes?limit=${lim}&resumen=1`;
   if (desde) path += `&desde=${encodeURIComponent(desde)}`;
   if (hasta) path += `&hasta=${encodeURIComponent(hasta)}`;
   return req('GET', path, { token });
@@ -118,9 +125,21 @@ export async function getMedicionesRecientes(
 export const listarMediciones = (limit) => getMedicionesRecientes(undefined, limit);
 export const fetchUserMeasurements = (limit) => getMedicionesRecientes(undefined, limit);
 
-export async function getMedicionesDelPunto(token, id_punto) {
-  const data = await req('GET', `/mediciones/${id_punto}`, { token });
-  return Array.isArray(data) ? data : data.mediciones || data.items || [];
+// Una medición con TODOS sus campos (detecciones, clima, ...), aunque sea antigua: el
+// backend filtra por id_medicion y pagina hasta hallarla. Devuelve null si no existe.
+// Las máscaras se descartan: la app móvil no las usa y pesan cientos de KB.
+export async function getMedicionCompleta(id_punto, id_medicion, token) {
+  if (!id_punto || !id_medicion) return null;
+  const data = await req(
+    'GET',
+    `/mediciones/${encodeURIComponent(id_punto)}?id_medicion=${encodeURIComponent(id_medicion)}`,
+    { token }
+  );
+  const lista = Array.isArray(data) ? data : data?.mediciones || data?.items || [];
+  const encontrada = lista.find((m) => m.id_medicion === id_medicion);
+  if (!encontrada) return null;
+  const { mascaras, ...resto } = encontrada;
+  return resto;
 }
 
 // PATCH /mediciones/{id_punto}?id_medicion={id_medicion} (renombrar foto)

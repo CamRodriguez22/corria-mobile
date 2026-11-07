@@ -96,6 +96,10 @@ export function calcularMetricasLote(items = []) {
 // `truncado: true` si había más resultados que el límite. Para "cargar anteriores"
 // se pide `hasta` = día de la medición más antigua cargada: el resultado repite las
 // mediciones de ese día (se deduplican por id_medicion) y trae las anteriores.
+// DECISIÓN: `hasta` tiene granularidad de DÍA (no de timestamp) y no hay offset, así que el
+// backend no puede "saltar" lo ya cargado: el `limit` debe cubrir lo ya cargado de ese día y
+// de los anteriores + una página nueva (límite acumulado, tope 1000). Es seguro porque las
+// listas usan `resumen=1` (sin máscaras): ~1 KB por medición, 1000 caben en 6 MB.
 export const PAGINA_MEDICIONES = 30;
 export const LIMITE_MEDICIONES_MAX = 1000;
 

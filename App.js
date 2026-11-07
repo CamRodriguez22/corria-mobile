@@ -58,6 +58,7 @@ import {
   getMiPerfil,
   getIndicadores,
   getMedicionesRecientes,
+  getMedicionCompleta,
   getBloques,
   resolverBloqueId,
   subirMedicion,
@@ -747,9 +748,23 @@ function Root() {
     setObsSaved(true);
   };
 
+  // La lista viene en modo resumen (sin detecciones ni clima): se muestra el detalle de
+  // inmediato y se completa con GET /mediciones/{id_punto}?id_medicion=... en segundo plano.
+  // Si falla, el detalle sigue con lo que ya hay (esos campos muestran "—").
   const abrirDetalle = (m) => {
     setDetalle(m);
     setScreen('detail');
+    if (m.detecciones || !m.id_punto) return;
+    const sesion = sesionRef.current;
+    getMedicionCompleta(m.id_punto, m.id_medicion)
+      .then((completa) => {
+        if (!completa || sesion !== sesionRef.current) return;
+        // Conserva lo local (_localUri, nombre renombrado, etc.) y evita pisar otra pantalla.
+        setDetalle((prev) => (prev && prev.id_medicion === m.id_medicion ? { ...completa, ...prev, detecciones: completa.detecciones, clima: completa.clima } : prev));
+      })
+      .catch((e) => {
+        if (esSesionVencida(e)) avisarSesionVencida();
+      });
   };
 
   const compartir = async (m) => {
