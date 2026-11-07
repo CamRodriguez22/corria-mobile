@@ -166,6 +166,7 @@ function Root() {
   const colaRef = useRef([]); // copia síncrona de colaFotos para el bucle de subida
   const loteIdRef = useRef('');
   const analizandoRef = useRef(false);
+  const sesionRef = useRef(0); // sube al cerrar sesión: descarta respuestas tardías de la sesión anterior
   const [lugar, setLugar] = useState(null); // { ciudad, barrio, direccion } del reverse-geocode
   const [etapaSubida, setEtapaSubida] = useState(''); // preparando_subida | subiendo_s3 | analizando_ia | completado
   const [resultado, setResultado] = useState(null);
@@ -306,6 +307,7 @@ function Root() {
   }, [screen, tab, folderClave, confirmModal, promptModal]);
 
   const cargarTodo = useCallback(async (first = false) => {
+    const sesion = sesionRef.current;
     if (first) setLoadingData(true);
     // cache local primero (para pintar algo sin red)
     const [cache, bmap, omap] = await Promise.all([
@@ -313,6 +315,7 @@ function Root() {
       loadLocal(APP_CONFIG.storageKeys.bloquePorMedicion, {}),
       loadLocal(APP_CONFIG.storageKeys.obsPorMedicion, {}),
     ]);
+    if (sesion !== sesionRef.current) return;
     setBloqueMap(bmap || {});
     setObsMap(omap || {});
     if (Array.isArray(cache) && cache.length) setMediciones(cache);
@@ -324,6 +327,7 @@ function Root() {
         getBloques().catch(() => null),
         getIndicadores().catch(() => null),
       ]);
+      if (sesion !== sesionRef.current) return;
       if (p) setPerfil(p);
       if (inds) setIndicadoresServidor(inds);
       if (Array.isArray(blqs)) setBloques(blqs.map(adaptarBloque));
@@ -355,9 +359,11 @@ function Root() {
     if (cargandoMas) return;
     const pagina = paginaAnterior(mediciones);
     if (!pagina) return;
+    const sesion = sesionRef.current;
     setCargandoMas(true);
     try {
       const resp = await getMedicionesRecientes(undefined, pagina.limit, { hasta: pagina.hasta });
+      if (sesion !== sesionRef.current) return;
       const lista = Array.isArray(resp) ? resp : resp?.mediciones || resp?.items || [];
       const nuevas = lista.map(({ mascaras, ...rest }) => rest);
       const { agregadas } = mezclarMediciones(mediciones, nuevas);
@@ -447,6 +453,55 @@ function Root() {
     }
   };
 
+  // Deja la app como recién abierta: nada de la sesión anterior debe verse ni
+  // filtrarse al siguiente usuario que inicie sesión en este dispositivo.
+  const reiniciarEstadoSesion = () => {
+    sesionRef.current += 1;
+    setLogged(false);
+    setPerfil(null);
+    setIndicadoresServidor(null);
+    setMediciones([]);
+    setHayMasMediciones(false);
+    setCargandoMas(false);
+    setBloques([]);
+    setBloqueMap({});
+    setObsMap({});
+    setLoadingData(false);
+    setRefreshing(false);
+    setOffline(false);
+    // login
+    setEmail('');
+    setPass('');
+    setNewPass('');
+    setNeedsNewPass(false);
+    setAuthBusy(false);
+    setAuthError('');
+    // navegación
+    setTab('home');
+    setScreen('home');
+    setFolderClave(null);
+    setDetalle(null);
+    // flujo de medición
+    setBloqueSel('');
+    fijarLoteId('');
+    setLoteNombreInput('');
+    setGps(null);
+    setGpsError('');
+    setFoto(null);
+    fijarCola([]);
+    analizandoRef.current = false;
+    setLugar(null);
+    setEtapaSubida('');
+    setResultado(null);
+    setEspesor('');
+    setDescripcion('');
+    setObsOpen(false);
+    setObsSaved(false);
+    // modales
+    setConfirmModal({ visible: false, title: '', message: '', variant: 'primary', onConfirm: null, onCancel: null });
+    setPromptModal({ visible: false, title: '', message: '', initialValue: '', onConfirm: null });
+  };
+
   const handleLogout = async () => {
     setConfirmModal({
       visible: true,
@@ -459,17 +514,7 @@ function Root() {
           await signOut();
         } catch {}
         await clearLocalData();
-        setLogged(false);
-        setPerfil(null);
-        setMediciones([]);
-        setBloques([]);
-        setBloqueMap({});
-        setObsMap({});
-        setPass('');
-        setNewPass('');
-        setNeedsNewPass(false);
-        setTab('home');
-        setScreen('home');
+        reiniciarEstadoSesion();
       },
     });
   };

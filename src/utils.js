@@ -1,5 +1,6 @@
 // src/utils.js — Helpers compartidos. No duplicar en App.js.
 
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -184,15 +185,32 @@ export async function loadLocal(key, fallback = null) {
   }
 }
 
+// Borra TODO lo que la app guarda del usuario: las claves de AsyncStorage (las
+// declaradas en APP_CONFIG.storageKeys más cualquier otra con prefijo `pixelrust_`)
+// y las fotos locales de guardarFotoLocal. Las claves de Amplify las limpia signOut().
 export async function clearLocalData() {
+  let ok = true;
   try {
-    const keys = Object.values(APP_CONFIG.storageKeys);
-    await AsyncStorage.multiRemove(keys);
-    return true;
+    const keys = new Set(Object.values(APP_CONFIG.storageKeys));
+    const todas = await AsyncStorage.getAllKeys();
+    todas.filter((k) => k.startsWith('pixelrust_')).forEach((k) => keys.add(k));
+    await AsyncStorage.multiRemove([...keys]);
   } catch (e) {
     console.log('clearLocalData', e?.message);
-    return false;
+    ok = false;
   }
+  try {
+    // Sin sistema de archivos en web (documentDirectory es null/undefined).
+    if (Platform.OS !== 'web' && FileSystem.documentDirectory) {
+      await FileSystem.deleteAsync(FileSystem.documentDirectory + APP_CONFIG.carpetaFotos + '/', {
+        idempotent: true,
+      });
+    }
+  } catch (e) {
+    console.log('clearLocalData fotos', e?.message);
+    ok = false;
+  }
+  return ok;
 }
 
 // ───────────────────────────── Fotos locales ─────────────────────────────
