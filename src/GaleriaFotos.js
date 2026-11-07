@@ -15,16 +15,23 @@ export function anchoFicha(ancho, columnas = COLUMNAS_GALERIA, margen = 0, separ
   return Math.floor((ancho - margen * 2 - separacion * (columnas - 1)) / columnas);
 }
 
-export const FichaFoto = React.memo(function FichaFoto({ medicion, lado, punto, onPress, radio = 0 }) {
+export const FichaFoto = React.memo(function FichaFoto({ medicion, lado, punto, onPress, radio = 0, seleccionada = false }) {
   return (
     <Pressable
       onPress={() => onPress?.(medicion)}
       accessibilityRole="button"
       accessibilityLabel={etiquetaFoto(medicion, { punto })}
+      accessibilityState={{ selected: seleccionada }}
       accessibilityHint="Abre el detalle de la foto"
       style={({ pressed }) => ({ width: lado, height: lado, opacity: pressed ? 0.82 : 1 })}
     >
       <Foto uri={miniaturaDe(medicion)} style={{ width: lado, height: lado, borderRadius: radio }} />
+      {seleccionada && (
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: radio, borderWidth: 3, borderColor: TOKENS.colors.accent }}
+        />
+      )}
       <NivelChip
         nivel={Math.max(0, Math.min(3, Math.round(Number(medicion.nivel_corrosion ?? 0))))}
         texto={medicion.area_corroida_pct == null ? '' : pctCorto(medicion.area_corroida_pct)}
@@ -70,14 +77,14 @@ export const FichaLote = React.memo(function FichaLote({ ficha, lado, punto, onP
   );
 });
 
-export function FilaGaleria({ fichas, lado, columnas = COLUMNAS_GALERIA, nombrePunto, onAbrirFoto, onAbrirLote, margen = 0, radio = 0 }) {
+export function FilaGaleria({ fichas, lado, columnas = COLUMNAS_GALERIA, nombrePunto, onAbrirFoto, onAbrirLote, margen = 0, radio = 0, seleccionadaId = null }) {
   return (
     <View style={{ flexDirection: 'row', gap: SEPARACION, marginBottom: SEPARACION, paddingHorizontal: margen }}>
       {fichas.map((f) =>
         f.tipo === 'lote' ? (
           <FichaLote key={f.clave} ficha={f} lado={lado} radio={radio} punto={nombrePunto?.(f.items[0])} onPress={onAbrirLote} />
         ) : (
-          <FichaFoto key={f.clave} medicion={f.medicion} lado={lado} radio={radio} punto={nombrePunto?.(f.medicion)} onPress={onAbrirFoto} />
+          <FichaFoto key={f.clave} medicion={f.medicion} lado={lado} radio={radio} punto={nombrePunto?.(f.medicion)} onPress={onAbrirFoto} seleccionada={seleccionadaId === f.medicion.id_medicion} />
         )
       )}
     </View>

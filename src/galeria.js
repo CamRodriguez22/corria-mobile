@@ -1,7 +1,7 @@
 // src/galeria.js — Lógica pura de la galería de fotos (mosaico por día y por lote). Sin React Native.
 // Espejo de lib/mosaico.js de la web: fichas cuadradas, un lote se resume en una ficha con portada.
 import { nivelDeMedicion, nombreNivel } from './niveles.js';
-import { diaLocal, fechaLarga, rotuloDia, formatoPct, plural, hoyLocal } from './fechas.js';
+import { diaLocal, fechaLarga, rotuloDia, formatoPct, plural, hoyLocal, sumarDias } from './fechas.js';
 import { miniaturaDe } from './miniaturas.js';
 
 export { miniaturaDe };
@@ -140,4 +140,53 @@ export function estadoPunto(items = []) {
   const promedio = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
   const nivel = promedio === null ? peorNivel(delDia) : nivelDeMedicion({ area_corroida_pct: promedio });
   return { dia: ultimo, nivel, promedio, fotos: delDia.length };
+}
+
+// Lotes a partir de una lista de mediciones (misma clave que `claveLote`). Las fotos sin lote NO
+// forman un lote: se cuentan aparte en `sueltas`. Más reciente primero.
+export function agruparLotes(mediciones = []) {
+  const mapa = new Map();
+  let sueltas = 0;
+  for (const m of mediciones) {
+    const k = claveLote(m);
+    if (!k) {
+      sueltas += 1;
+      continue;
+    }
+    if (!mapa.has(k)) mapa.set(k, { id: k, nombre: m.lote_nombre || `Lote ${String(m.lote_id || k).slice(-6)}`, items: [] });
+    mapa.get(k).items.push(m);
+  }
+  const lotes = [...mapa.values()].map((l) => {
+    const items = [...l.items].sort((a, z) => ts(z) - ts(a));
+    const pcts = items.map((m) => parseFloat(m.area_corroida_pct)).filter(Number.isFinite);
+    const peor = peorNivel(items);
+    return {
+      ...l,
+      items,
+      fechaReciente: items[0]?.timestamp || null,
+      peorNivel: peor,
+      maxPct: pcts.length ? Math.max(...pcts) : null,
+      avgPct: pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null,
+      portada: items.find((m) => nivelDeMedicion(m) === peor) || items[0],
+    };
+  });
+  lotes.sort((a, z) => ts({ timestamp: z.fechaReciente }) - ts({ timestamp: a.fechaReciente }));
+  return { lotes, sueltas };
+}
+
+// Respaldo de los indicadores de Inicio cuando no hay respuesta del servidor (sin conexión y sin
+// caché): mismo criterio que /indicadores pero SOLO sobre las fotos cargadas en el teléfono.
+// `puntosItems` = una lista de fotos por punto. Estado de un punto = promedio de su día más reciente.
+export function indicadoresLocales(mediciones = [], puntosItems = [], hoy = hoyLocal()) {
+  const desde = sumarDias(hoy, -29);
+  const fotos30 = mediciones.filter((m) => {
+    const d = diaLocal(m.timestamp);
+    return d && d >= desde && d <= hoy;
+  }).length;
+  const porNivel = [0, 0, 0, 0];
+  for (const items of puntosItems) {
+    const e = estadoPunto(items);
+    if (e) porNivel[e.nivel] += 1;
+  }
+  return { fotos30, porNivel, severos: porNivel[3] };
 }

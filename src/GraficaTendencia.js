@@ -9,7 +9,7 @@ import { View, Text, Pressable, useWindowDimensions } from 'react-native';
 import Svg, { Line, Polyline, Circle, Text as SvgText, Rect } from 'react-native-svg';
 import { TOKENS, NIVELES } from './DesignTokens';
 import { IconTrend, IconNivel } from './Icons';
-import { escalaTendencia, resumenTendencia, lineasAccesibles, textoDia, MIN_DIAS_TENDENCIA } from './tendencia';
+import { escalaTendencia, resumenTendencia, lineasAccesibles, textoDia, ubicarRotulo, MIN_DIAS_TENDENCIA } from './tendencia';
 import { formatoPct, plural } from './fechas';
 
 const ALTO = 188;
@@ -96,7 +96,7 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
   if (medio && medio.x > 70 && area.ancho - medio.x > 70) etiquetasX.splice(1, 0, medio);
 
   const tipW = 188;
-  const tipLeft = actual ? Math.min(Math.max(M.izq + actual.x - tipW / 2, 0), anchoTotal - tipW) : 0;
+  const tipLeft = actual ? Math.min(Math.max(M.izq + actual.x - tipW / 2, M.izq - 4), anchoTotal - tipW) : 0;
 
   return tarjeta(
     <>
@@ -109,7 +109,7 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
         accessibilityLabel={`Gráfica. ${resumenTendencia(puntos)}`}
         style={{ width: anchoTotal, height: ALTO }}
       >
-        <Svg width={anchoTotal} height={ALTO} importantForAccessibility="no-hide-descendants">
+        <Svg width={anchoTotal} height={ALTO} aria-hidden>
           {escala.marcas.map((m) => (
             <React.Fragment key={m.valor}>
               <Line x1={M.izq} x2={M.izq + area.ancho} y1={M.arr + m.y} y2={M.arr + m.y} stroke={REJILLA} strokeWidth={1} />
@@ -118,23 +118,18 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
               </SvgText>
             </React.Fragment>
           ))}
-          {escala.umbrales.map((u) => (
-            <React.Fragment key={u.valor}>
-              <Line x1={M.izq} x2={M.izq + area.ancho} y1={M.arr + u.y} y2={M.arr + u.y} stroke={TINTA} strokeWidth={1.25} />
-              <Rect
-                x={M.izq + area.ancho - (u.etiqueta.length * 6.4 + 10)}
-                y={M.arr + u.y - 20}
-                width={u.etiqueta.length * 6.4 + 10}
-                height={18}
-                rx={4}
-                fill={TOKENS.colors.surfaceAlt}
-                fillOpacity={0.9}
-              />
-              <SvgText x={M.izq + area.ancho - 5} y={M.arr + u.y - 7} fontSize={12} fontWeight="600" fill={TINTA} textAnchor="end">
-                {u.etiqueta}
-              </SvgText>
-            </React.Fragment>
-          ))}
+          {escala.umbrales.map((u) => {
+            const r = ubicarRotulo(u, escala.puntos, area);
+            return (
+              <React.Fragment key={u.valor}>
+                <Line x1={M.izq} x2={M.izq + area.ancho} y1={M.arr + u.y} y2={M.arr + u.y} stroke={TINTA} strokeWidth={1.25} />
+                <Rect x={M.izq + r.x} y={M.arr + r.y} width={r.w} height={r.h} rx={4} fill={TOKENS.colors.surfaceAlt} fillOpacity={0.92} />
+                <SvgText x={M.izq + r.x + 5} y={M.arr + r.y + r.h - 5} fontSize={12} fontWeight="600" fill={TINTA}>
+                  {u.etiqueta}
+                </SvgText>
+              </React.Fragment>
+            );
+          })}
           {actual && (
             <Line x1={M.izq + actual.x} x2={M.izq + actual.x} y1={M.arr} y2={M.arr + area.alto} stroke={TOKENS.colors.neutral500} strokeWidth={1} />
           )}
@@ -179,8 +174,9 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
           <Pressable
             key={t.i}
             onPress={() => setSel(t.i)}
-            importantForAccessibility="no"
             accessible={false}
+            focusable={false}
+            aria-hidden
             style={{ position: 'absolute', left: t.left, width: t.width, top: 0, height: ALTO - M.abajo }}
           />
         ))}

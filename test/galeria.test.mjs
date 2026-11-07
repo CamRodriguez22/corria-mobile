@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { diaLocal, fechaLarga, fechaCorta, horaLocal, sumarDias, diaSemana, rotuloDia, formatoPct, pctCorto, fechaHoraLarga } from '../src/fechas.js';
+import { diaLocal, fechaLarga, fechaCorta, horaLocal, sumarDias, diaSemana, rotuloDia, formatoPct, pctCorto, fechaHoraLarga, fechaHoraCorta } from '../src/fechas.js';
 import {
-  construirMosaico, agruparPorDia, dividirEnFilas, filasDeGaleria, etiquetaFoto, etiquetaLote, tituloPunto, estadoPunto, claveLote,
+  construirMosaico, agruparPorDia, dividirEnFilas, filasDeGaleria, etiquetaFoto, etiquetaLote, tituloPunto, estadoPunto, claveLote, agruparLotes, indicadoresLocales,
 } from '../src/galeria.js';
 import { nombreNivel, nivelDeMedicion, NOMBRES_NIVEL } from '../src/niveles.js';
 import {
@@ -185,4 +185,41 @@ test('nombreRol nunca muestra el identificador crudo', () => {
   assert.equal(nombreRol('super_admin'), 'Superadministrador');
   assert.equal(nombreRol('otro_rol'), 'Otro rol');
   assert.equal(nombreRol(undefined), '');
+});
+
+test('agruparLotes: las fotos sin lote no son un lote y el resumen sale del lote', () => {
+  const { lotes, sueltas } = agruparLotes([
+    med('1', '2026-11-05T15:00:00Z', 4, { lote_id: 'L1', lote_nombre: 'Semana 1' }),
+    med('2', '2026-11-05T15:05:00Z', 30, { lote_id: 'L1', lote_nombre: 'Semana 1' }),
+    med('3', '2026-11-07T15:00:00Z', 12, { lote_id: 'L2' }),
+    med('4', '2026-11-07T16:00:00Z', 1),
+    med('5', '2026-11-07T17:00:00Z', 2),
+  ]);
+  assert.equal(sueltas, 2);
+  assert.deepEqual(lotes.map((l) => l.id), ['L2', 'L1']);
+  assert.equal(lotes[0].nombre, 'Lote L2'); // sin nombre: nunca "Sin lote"
+  const l1 = lotes[1];
+  assert.equal(l1.items.length, 2);
+  assert.equal(l1.maxPct, 30);
+  assert.equal(l1.avgPct, 17);
+  assert.equal(l1.peorNivel, 3);
+  assert.equal(l1.portada.id_medicion, '2');
+  assert.equal(l1.items[0].id_medicion, '2'); // más reciente primero
+});
+
+test('fechaHoraCorta omite el año si es el actual', () => {
+  assert.equal(fechaHoraCorta('2026-11-01T19:54:00Z', '2026-11-07'), '1 de noviembre, 2:54\u00A0p.\u00A0m.');
+  assert.equal(fechaHoraCorta('2025-12-31T19:54:00Z', '2026-11-07'), '31 de diciembre de 2025, 2:54\u00A0p.\u00A0m.');
+  assert.equal(fechaHoraCorta('x', '2026-11-07'), '');
+});
+
+test('indicadoresLocales: fotos de los últimos 30 días y puntos por nivel (no cuenta fotos como puntos)', () => {
+  const grave = [med('a', '2026-11-06T15:00:00Z', 30), med('b', '2026-11-06T16:00:00Z', 40), med('c', '2026-11-05T16:00:00Z', 50)];
+  const leve = [med('d', '2026-11-01T15:00:00Z', 3)];
+  const viejo = [med('e', '2026-08-01T15:00:00Z', 1)];
+  const todas = [...grave, ...leve, ...viejo];
+  const r = indicadoresLocales(todas, [grave, leve, viejo, []], '2026-11-07');
+  assert.equal(r.fotos30, 4);
+  assert.deepEqual(r.porNivel, [0, 2, 0, 1]);
+  assert.equal(r.severos, 1); // un punto severo, aunque tenga 3 fotos severas
 });

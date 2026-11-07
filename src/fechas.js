@@ -116,3 +116,11 @@ export function pctCorto(v) {
 export function plural(n, uno, varios) {
   return `${n} ${n === 1 ? uno : varios}`;
 }
+
+// "1 de noviembre, 2:54 p. m." (con año solo si no es el del día de hoy): para barras de título.
+export function fechaHoraCorta(ts, hoy = hoyLocal()) {
+  const dia = diaLocal(ts);
+  if (!dia) return '';
+  const mismoAnio = dia.slice(0, 4) === String(hoy).slice(0, 4);
+  return `${mismoAnio ? fechaMedia(dia) : fechaLarga(dia)}, ${horaLocal(ts)}`;
+}

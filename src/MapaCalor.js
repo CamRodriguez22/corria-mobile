@@ -4,7 +4,7 @@
 import React, { useMemo, useRef } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { TOKENS, NIVELES } from './DesignTokens';
-import { Segmented, Button, Spinner } from './DesignComponents';
+import { Segmented, Button, Spinner, SwatchNivel } from './DesignComponents';
 import { IconNivel, IconClose } from './Icons';
 import { mapaCalor, etiquetaCelda, aniosDisponibles } from './linea';
 import { fechaLarga, plural, hoyLocal } from './fechas';
@@ -51,9 +51,7 @@ function Leyenda() {
     >
       {NIVELES.map((n) => (
         <View key={n.i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <View style={{ width: 18, height: 18, borderRadius: 4, backgroundColor: n.color, alignItems: 'center', justifyContent: 'center' }}>
-            <IconNivel nivel={n.i} size={12} color={TINTA} />
-          </View>
+          <SwatchNivel nivel={n.i} />
           <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>{n.label}</Text>
         </View>
       ))}

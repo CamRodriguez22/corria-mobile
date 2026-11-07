@@ -173,10 +173,17 @@ export function IconDot({ size = 20, color = '#201e1d', strokeWidth = 2.2, style
   );
 }
 
-// Nivel de corrosión: 0 = marca de verificación; 1..3 = una, dos o tres barras de severidad.
+// Nivel de corrosión: 0 = círculo con verificación; 1..3 = una, dos o tres barras de severidad.
 // Nunca depende solo del color: la forma dice el nivel.
 export function IconNivel({ nivel = 0, size = 16, color = '#201e1d', strokeWidth = 2.2, style }) {
-  if (nivel <= 0) return <IconCheck size={size} color={color} strokeWidth={strokeWidth} style={style} />;
+  if (nivel <= 0) {
+    return (
+      <Base size={size} color={color} strokeWidth={strokeWidth} style={style}>
+        <Circle cx="12" cy="12" r="9" />
+        <Polyline points="8 12.5 11 15.5 16 9" />
+      </Base>
+    );
+  }
   const barras = [
     { x: 5, y2: 15 },
     { x: 12, y2: 10 },

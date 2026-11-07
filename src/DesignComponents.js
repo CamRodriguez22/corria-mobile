@@ -21,9 +21,10 @@ import {
 import { TOKENS, NIVELES, severidad, confianzaPct, num } from './DesignTokens';
 import { nivelDeMedicion } from './niveles';
 import { miniaturaDe } from './miniaturas';
+import { formatoPct } from './fechas';
 import {
   IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot, IconNivel, IconImageOff,
-  IconChevronDown, IconClose, IconCheck,
+  IconChevronDown, IconClose, IconCheck, IconArrowLeft, IconAlertTriangle, IconWifiOff,
 } from './Icons';
 
 // ─────────────────────────────────────────────────────────────
@@ -112,6 +113,7 @@ export const Button = ({
   loading = false,
   fullWidth = true,
   left = null,
+  compact = false,
   style = {},
   accessibilityHint,
 }) => {
@@ -133,7 +135,7 @@ export const Button = ({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 9,
-          paddingHorizontal: TOKENS.spacing.lg,
+          paddingHorizontal: compact ? 14 : TOKENS.spacing.lg,
           paddingVertical: 15,
           borderRadius: TOKENS.radius.pill,
           borderWidth: v.border === 'transparent' ? 0 : 1.5,
@@ -149,7 +151,7 @@ export const Button = ({
       ) : (
         <>
           {left}
-          <Text style={{ color: v.fg, fontWeight: '700', fontSize: TOKENS.fontSizes.h5 }}>{label}</Text>
+          <Text style={{ color: v.fg, fontWeight: '700', fontSize: compact ? TOKENS.fontSizes.small + 1 : TOKENS.fontSizes.h5 }} numberOfLines={compact ? 1 : undefined}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -222,6 +224,7 @@ export const Field = ({
   error = '',
   editable = true,
   autoFocus = false,
+  accessibilityLabel: etiquetaA11y,
   style = {},
 }) => {
   const [focused, setFocused] = useState(false);
@@ -239,7 +242,7 @@ export const Field = ({
         multiline={multiline}
         editable={editable}
         autoFocus={autoFocus}
-        accessibilityLabel={label || placeholder}
+        accessibilityLabel={etiquetaA11y || label || placeholder}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={{
@@ -302,6 +305,16 @@ export const NivelBadge = ({ nivel = 0, style, compacto = false }) => {
 export const SeverityBadge = ({ medicion, style, compacto }) => (
   <NivelBadge nivel={nivelDeMedicion(medicion || {})} style={style} compacto={compacto} />
 );
+
+// Muestra de color de un nivel con su ícono dentro (leyendas): el color nunca va solo.
+export const SwatchNivel = ({ nivel = 0, size = 18 }) => {
+  const s = NIVELES[Math.max(0, Math.min(3, nivel))];
+  return (
+    <View style={{ width: size, height: size, borderRadius: 4, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+      <IconNivel nivel={s.i} size={size - 6} color="#201e1d" />
+    </View>
+  );
+};
 
 // Ficha sobre una foto: fondo oscuro translúcido (texto blanco >= 9:1 sobre cualquier foto),
 // ícono del nivel en su color de estado y el valor.
@@ -460,16 +473,20 @@ export const ProgressBar = ({ value = 0, color = TOKENS.colors.accent }) => {
 // ─────────────────────────────────────────────────────────────
 export const Spinner = ({ size = 60, thickness = 4 }) => {
   const spin = useRef(new Animated.Value(0)).current;
+  const reducido = useReducedMotion();
   useEffect(() => {
+    if (reducido) return undefined;
     const loop = Animated.loop(
       Animated.timing(spin, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true })
     );
     loop.start();
     return () => loop.stop();
-  }, [spin]);
+  }, [spin, reducido]);
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   return (
     <Animated.View
+      accessibilityRole="progressbar"
+      accessibilityLabel="Cargando"
       style={{
         width: size,
         height: size,
@@ -477,7 +494,8 @@ export const Spinner = ({ size = 60, thickness = 4 }) => {
         borderWidth: thickness,
         borderColor: TOKENS.colors.neutral300,
         borderTopColor: TOKENS.colors.accent,
-        transform: [{ rotate }],
+        // Con movimiento reducido el anillo queda quieto (sigue indicando "cargando").
+        transform: reducido ? [] : [{ rotate }],
       }}
     />
   );
@@ -702,40 +720,227 @@ export const KeyValueCard = ({ rows }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// Encabezado de pantalla
+// Botón de ícono (Material 3): 48x48 de área táctil, ícono de 24.
 // ─────────────────────────────────────────────────────────────
-export const Header = ({ title, subtitle, onBack = null, right = null }) => (
+export const IconButton = ({ children, onPress, label, style, disabled = false }) => (
+  <Pressable
+    onPress={onPress}
+    disabled={disabled}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    style={({ pressed }) => [
+      {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: pressed ? TOKENS.colors.neutral200 : 'transparent',
+        opacity: disabled ? 0.4 : 1,
+      },
+      style,
+    ]}
+  >
+    {children}
+  </Pressable>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Barra superior (Material 3, pequeña): atrás, título de una línea, acciones a la derecha.
+// ─────────────────────────────────────────────────────────────
+export const Header = ({ title, subtitle, onBack = null, right = null, lines = 1 }) => (
   <View
     style={{
-      backgroundColor: TOKENS.colors.surface,
-      paddingHorizontal: TOKENS.spacing.lg,
-      paddingTop: TOKENS.spacing.base,
-      paddingBottom: TOKENS.spacing.base,
-      borderBottomWidth: 1,
-      borderBottomColor: TOKENS.colors.divider,
+      backgroundColor: TOKENS.colors.bg,
+      minHeight: 64,
+      paddingLeft: onBack ? 4 : TOKENS.spacing.lg,
+      paddingRight: 4,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: TOKENS.spacing.md,
+      gap: 4,
     }}
   >
     {onBack && (
-      <Pressable
-        onPress={onBack}
-        accessibilityRole="button"
-        accessibilityLabel="Volver a la pantalla anterior"
-        hitSlop={TOKENS.hitSlop}
-        style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: TOKENS.colors.neutral300, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <IconChevronLeft size={22} color={TOKENS.colors.text} />
-      </Pressable>
+      <IconButton onPress={onBack} label="Volver a la pantalla anterior">
+        <IconArrowLeft size={24} color={TOKENS.colors.text} />
+      </IconButton>
     )}
-    <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text }}>{title}</Text>
-      {!!subtitle && <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>{subtitle}</Text>}
+    <View style={{ flex: 1, minWidth: 0, paddingVertical: 8, paddingLeft: onBack ? 4 : 0 }}>
+      <Text accessibilityRole="header" numberOfLines={lines} style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text }}>
+        {title}
+      </Text>
+      {!!subtitle && (
+        <Text numberOfLines={lines} style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 1 }}>
+          {subtitle}
+        </Text>
+      )}
     </View>
     {right}
   </View>
 );
+
+// Título de pantalla de las pestañas (sin etiquetas superiores): titular y bajada opcional.
+export const ScreenTitle = ({ title, subtitle, right }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+    <View style={{ flex: 1 }}>
+      <Text accessibilityRole="header" style={{ ...TOKENS.type.headlineMedium, color: TOKENS.colors.text }}>
+        {title}
+      </Text>
+      {!!subtitle && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4 }}>{subtitle}</Text>}
+    </View>
+    {right}
+  </View>
+);
+
+// Encabezado de sección: el título habla por sí solo; acción opcional a la derecha.
+export const SectionTitle = ({ title, actionLabel, onAction, style }) => (
+  <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48 }, style]}>
+    <Text accessibilityRole="header" style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text }}>
+      {title}
+    </Text>
+    {!!actionLabel && (
+      <Pressable
+        onPress={onAction}
+        accessibilityRole="button"
+        style={{ minHeight: 48, justifyContent: 'center', paddingLeft: 12 }}
+      >
+        <Text style={{ ...TOKENS.type.labelLarge, color: TOKENS.colors.accentText }}>{actionLabel}</Text>
+      </Pressable>
+    )}
+  </View>
+);
+
+// Aviso en banda (sin conexión, errores recuperables).
+export const Banner = ({ text, tone = 'warning', icon, action, onAction }) => {
+  const tonos = {
+    warning: { bg: TOKENS.colors.warningTint, fg: TOKENS.colors.warningText, icon: TOKENS.colors.warning },
+    danger: { bg: TOKENS.colors.dangerTint, fg: TOKENS.colors.danger, icon: TOKENS.colors.danger },
+  };
+  const t = tonos[tone] || tonos.warning;
+  return (
+    <View accessibilityRole="alert" style={{ backgroundColor: t.bg, borderRadius: TOKENS.radius.md, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      {icon || <IconAlertTriangle size={22} color={t.icon} />}
+      <Text style={{ ...TOKENS.type.bodyMedium, color: t.fg, flex: 1, fontWeight: '600' }}>{text}</Text>
+      {!!action && (
+        <Pressable onPress={onAction} accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }}>
+          <Text style={{ ...TOKENS.type.labelLarge, color: t.fg }}>{action}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+};
+
+// Botón de acción flotante extendido (Material 3): una sola acción principal por pantalla.
+export const Fab = ({ label, icon, onPress, style }) => (
+  <Pressable
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    style={({ pressed }) => [
+      {
+        position: 'absolute',
+        right: 16,
+        bottom: 16,
+        minHeight: 56,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 20,
+        borderRadius: 16,
+        backgroundColor: pressed ? TOKENS.colors.accent700 : TOKENS.colors.accent,
+        ...TOKENS.shadow.md,
+      },
+      style,
+    ]}
+  >
+    {icon}
+    <Text style={{ ...TOKENS.type.labelLarge, fontSize: 16, color: '#fff' }}>{label}</Text>
+  </Pressable>
+);
+
+// Snackbar: aviso breve y pasajero (se oculta solo). Quien lo usa controla `visible`.
+export const Snackbar = ({ visible, message, actionLabel, onAction, onDismiss }) => {
+  useEffect(() => {
+    if (!visible) return undefined;
+    const t = setTimeout(() => onDismiss?.(), 4500);
+    return () => clearTimeout(t);
+  }, [visible, message, onDismiss]);
+  if (!visible) return null;
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      accessibilityRole="alert"
+      style={{
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        bottom: 96,
+        minHeight: 48,
+        backgroundColor: TOKENS.colors.text,
+        borderRadius: 8,
+        paddingLeft: 16,
+        paddingRight: actionLabel ? 4 : 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        ...TOKENS.shadow.md,
+      }}
+    >
+      <Text style={{ ...TOKENS.type.bodyMedium, color: '#f5ead8', flex: 1, paddingVertical: 12 }}>{message}</Text>
+      {!!actionLabel && (
+        <Pressable onPress={onAction} accessibilityRole="button" style={{ minHeight: 48, paddingHorizontal: 12, justifyContent: 'center' }}>
+          <Text style={{ ...TOKENS.type.labelLarge, color: TOKENS.colors.accent400 }}>{actionLabel}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+};
+
+// Menú de acciones de la barra superior (Material 3): lista corta bajo el botón de tres puntos.
+export const MenuAcciones = ({ visible, onCerrar, items }) => {
+  if (!visible) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCerrar}>
+      <Pressable onPress={onCerrar} accessibilityLabel="Cerrar menú" style={{ flex: 1 }}>
+        <View
+          accessibilityRole="menu"
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: TOP_INSET + 52,
+            minWidth: 220,
+            backgroundColor: TOKENS.colors.surfaceAlt,
+            borderRadius: 12,
+            paddingVertical: 8,
+            ...TOKENS.shadow.lg,
+          }}
+        >
+          {items.map((it) => (
+            <Pressable
+              key={it.label}
+              onPress={() => {
+                onCerrar();
+                it.onPress?.();
+              }}
+              accessibilityRole="menuitem"
+              style={({ pressed }) => ({
+                minHeight: 48,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 14,
+                paddingHorizontal: 16,
+                backgroundColor: pressed ? TOKENS.colors.neutral200 : 'transparent',
+              })}
+            >
+              {it.icon}
+              <Text style={{ ...TOKENS.type.bodyLarge, color: it.destructive ? TOKENS.colors.danger : TOKENS.colors.text }}>{it.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Pressable>
+    </Modal>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────
 // Barra de pestañas inferior
@@ -743,35 +948,36 @@ export const Header = ({ title, subtitle, onBack = null, right = null }) => (
 const renderTabIcon = (key, color) => {
   switch (key) {
     case 'home':
-      return <IconHome size={20} color={color} />;
+      return <IconHome size={24} color={color} />;
     case 'lotes':
-      return <IconLotes size={20} color={color} />;
+      return <IconLotes size={24} color={color} />;
     case 'folders':
-      return <IconPuntos size={20} color={color} />;
+      return <IconPuntos size={24} color={color} />;
     case 'activity':
-      return <IconActivity size={20} color={color} />;
+      return <IconActivity size={24} color={color} />;
     case 'settings':
-      return <IconSettings size={20} color={color} />;
+      return <IconSettings size={24} color={color} />;
     default:
-      return <IconDot size={20} color={color} />;
+      return <IconDot size={24} color={color} />;
   }
 };
 
 export const TabBar = ({ current, onChange, items }) => (
   <View
+    accessibilityRole="tablist"
     style={{
       flexDirection: 'row',
+      backgroundColor: TOKENS.colors.surfaceAlt,
       borderTopWidth: 1,
       borderTopColor: TOKENS.colors.neutral200,
-      backgroundColor: TOKENS.colors.surfaceAlt,
-      paddingTop: 8,
-      paddingBottom: 22,
-      paddingHorizontal: 8,
+      paddingTop: 12,
+      paddingBottom: 16,
+      paddingHorizontal: 4,
     }}
   >
     {items.map((it) => {
       const active = it.key === current;
-      const color = active ? TOKENS.colors.accent700 : TOKENS.colors.neutral500;
+      const color = active ? TOKENS.colors.accent900 : TOKENS.colors.neutral600;
       return (
         <Pressable
           key={it.key}
@@ -779,70 +985,139 @@ export const TabBar = ({ current, onChange, items }) => (
           accessibilityRole="tab"
           accessibilityState={{ selected: active }}
           accessibilityLabel={it.label}
-          style={{ flex: 1, alignItems: 'center', gap: 4, paddingVertical: 6, minHeight: TOKENS.tapTarget, justifyContent: 'center' }}
+          style={{ flex: 1, alignItems: 'center', gap: 4, minHeight: 56 }}
         >
-          {renderTabIcon(it.key, color)}
-          <Text numberOfLines={1} style={{ fontSize: TOKENS.fontSizes.small, fontWeight: active ? '800' : '600', color }}>{it.label}</Text>
+          {/* Indicador activo (píldora) de Material 3 */}
+          <View
+            style={{
+              width: 64,
+              height: 32,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: active ? TOKENS.colors.accent200 : 'transparent',
+            }}
+          >
+            {renderTabIcon(it.key, color)}
+          </View>
+          <Text numberOfLines={1} style={{ fontSize: TOKENS.fontSizes.small, fontWeight: active ? '800' : '600', color }}>
+            {it.label}
+          </Text>
         </Pressable>
       );
     })}
   </View>
 );
 
-// ResultCard — muestra resultado real del backend con soporte de placa y lote.
-export const ResultCard = ({ nivel, percentage, confidence, ubicacion, loteNombre, medicion }) => {
-  const m = medicion || { nivel_corrosion: nivel, area_corroida_pct: percentage, confianza_promedio: confidence };
-  const s = severidad(m);
-  const porcentaje = num(m.area_corroida_pct, 0).toFixed(1);
-  const esSobrePlaca = m.area_base === 'placa' || m.area_corroida_pct_foto != null;
-
+// LecturaNivel — la lectura de una medición: nivel (ícono + nombre), % y su aclaración honesta.
+//   El % es aproximado y se mide sobre la placa cuando el backend lo indica (area_base = 'placa').
+// ─────────────────────────────────────────────────────────────
+export const LecturaNivel = ({ medicion, compacta = false }) => {
+  const s = severidad(medicion || {});
+  const sobrePlaca = medicion?.area_base === 'placa' || medicion?.area_corroida_pct_foto != null;
+  const conf = medicion?.confianza_promedio;
   return (
-    <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, ...TOKENS.shadow.md, marginBottom: TOKENS.spacing.base }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-          <IconNivel nivel={s.i} size={18} color={s.texto} />
-          <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '800', color: s.texto }}>{s.label}</Text>
+    <View
+      accessible
+      accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado${conf != null ? `, confianza del modelo ${confianzaPct(conf)} %` : ''}`}
+      style={{ gap: 12 }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: s.tint, alignItems: 'center', justifyContent: 'center' }}>
+          <IconNivel nivel={s.i} size={30} color={s.texto} />
         </View>
-        {esSobrePlaca && (
-          <View style={{ backgroundColor: TOKENS.colors.accent100, paddingHorizontal: 8, paddingVertical: 2, borderRadius: TOKENS.radius.sm }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: TOKENS.colors.accent800 }}>Sobre placa</Text>
-          </View>
-        )}
-      </View>
-      <Text style={{ fontSize: 42, fontWeight: '800', color: TOKENS.colors.text }}>{porcentaje}%</Text>
-      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
-        {esSobrePlaca ? 'Corrosión sobre la placa' : 'Corrosión detectada'}
-      </Text>
-      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 4, fontStyle: 'italic' }}>
-        * Valor aproximado: depende del encuadre y no reemplaza una inspección en sitio.
-      </Text>
-      <Divider />
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.body }}>Confianza</Text>
-          <Text style={{ fontWeight: '700', fontSize: TOKENS.fontSizes.body }}>{confianzaPct(m.confianza_promedio)}%</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...TOKENS.type.titleLarge, color: s.texto }}>{s.label}</Text>
+          <Text style={{ fontSize: compacta ? 32 : 40, lineHeight: compacta ? 38 : 46, fontWeight: '800', color: TOKENS.colors.text }}>
+            {formatoPct(medicion?.area_corroida_pct)}
+          </Text>
         </View>
-        <ProgressBar value={confianzaPct(m.confianza_promedio)} color={TOKENS.colors.accent2} />
-        {!!ubicacion && (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-            <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.body }}>Ubicación</Text>
-            <Text style={{ fontWeight: '700', fontSize: TOKENS.fontSizes.body }}>{ubicacion}</Text>
-          </View>
-        )}
-        {!!(loteNombre || m.lote_nombre) && (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-            <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.body }}>Lote</Text>
-            <Text style={{ fontWeight: '700', fontSize: TOKENS.fontSizes.body }}>{loteNombre || m.lote_nombre}</Text>
-          </View>
-        )}
       </View>
+      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+        {sobrePlaca ? 'Aproximado sobre la placa' : 'Aproximado sobre la foto'}. Depende del encuadre y no reemplaza una inspección en sitio.
+      </Text>
+      {conf != null && (
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Confianza del modelo</Text>
+            <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text }}>{confianzaPct(conf)} %</Text>
+          </View>
+          <ProgressBar value={confianzaPct(conf)} color={TOKENS.colors.accent2_600} />
+        </View>
+      )}
     </View>
   );
 };
 
+// Tarjeta con la lectura (resultado de un análisis).
+export const ResultCard = ({ medicion, ubicacion, loteNombre, nivel, percentage, confidence }) => {
+  const m = medicion || { nivel_corrosion: nivel, area_corroida_pct: percentage, confianza_promedio: confidence };
+  return (
+    <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, borderWidth: 1, borderColor: TOKENS.colors.border, marginBottom: TOKENS.spacing.base }}>
+      <LecturaNivel medicion={m} />
+      {!!(ubicacion || loteNombre || m.lote_nombre) && (
+        <View style={{ marginTop: 14, gap: 8, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200, paddingTop: 14 }}>
+          {!!ubicacion && <FilaDato label="Punto" value={ubicacion} />}
+          {!!(loteNombre || m.lote_nombre) && <FilaDato label="Lote" value={loteNombre || m.lote_nombre} />}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Fila etiqueta / valor, el valor se parte en varias líneas en vez de truncarse.
+export const FilaDato = ({ label, value }) => (
+  <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+    <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, width: 104 }}>{label}</Text>
+    <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text, flex: 1 }}>{value}</Text>
+  </View>
+);
+
 // ─────────────────────────────────────────────────────────────
-// ConfirmModal — Reemplazo accesible y multiplataforma de Alert.alert
+// ConfirmModal — Diálogo de Material 3 (reemplazo accesible de Alert.alert).
+//   Título, mensaje y acciones de texto alineadas a la derecha; la acción destructiva usa el color de
+//   peligro y siempre nombra lo que hace ("Eliminar", "Cerrar sesión"), nunca "Aceptar".
 // ─────────────────────────────────────────────────────────────
+const AccionTexto = ({ label, onPress, danger = false, primary = false }) => (
+  <Pressable
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    style={({ pressed }) => ({
+      minHeight: 48,
+      minWidth: 64,
+      paddingHorizontal: 12,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: pressed ? (danger ? TOKENS.colors.dangerTint : TOKENS.colors.neutral200) : 'transparent',
+    })}
+  >
+    <Text
+      style={{
+        ...TOKENS.type.labelLarge,
+        fontSize: 15,
+        color: danger ? TOKENS.colors.danger : primary ? TOKENS.colors.accentText : TOKENS.colors.neutral700,
+      }}
+    >
+      {label}
+    </Text>
+  </Pressable>
+);
+
+const Dialogo = ({ children, onCancel }) => (
+  <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+    <View style={{ flex: 1, backgroundColor: 'rgba(32,30,29,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View
+        accessibilityViewIsModal
+        style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: 28, paddingTop: 24, paddingHorizontal: 24, paddingBottom: 16, width: '100%', maxWidth: 360, ...TOKENS.shadow.lg }}
+      >
+        {children}
+      </View>
+    </View>
+  </Modal>
+);
+
 export const ConfirmModal = ({
   visible,
   title,
@@ -856,43 +1131,34 @@ export const ConfirmModal = ({
   onCancel,
 }) => {
   if (!visible) return null;
+  const apilado = Boolean(extraLabel);
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-        <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: 24, width: '100%', maxWidth: 340, ...TOKENS.shadow.lg }}>
-          {!!title && (
-            <Text style={{ fontSize: TOKENS.fontSizes.h4, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 8 }}>
-              {title}
-            </Text>
-          )}
-          {!!message && (
-            <Text style={{ fontSize: TOKENS.fontSizes.body, color: TOKENS.colors.neutral600, marginBottom: 20 }}>
-              {message}
-            </Text>
-          )}
-          <View style={{ gap: 10 }}>
-            <Button
-              variant={variant === 'danger' ? 'danger' : 'primary'}
-              label={confirmLabel}
-              onPress={onConfirm}
-            />
-            {!!extraLabel && <Button variant="danger" label={extraLabel} onPress={onExtra} />}
-            {!!cancelLabel && (
-              <Button
-                variant="ghost"
-                label={cancelLabel}
-                onPress={onCancel}
-              />
-            )}
-          </View>
-        </View>
+    <Dialogo onCancel={onCancel}>
+      {!!title && (
+        <Text accessibilityRole="header" style={{ ...TOKENS.type.headlineSmall, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 12 }}>
+          {title}
+        </Text>
+      )}
+      {!!message && <Text style={{ ...TOKENS.type.bodyLarge, color: TOKENS.colors.neutral700 }}>{message}</Text>}
+      <View
+        style={{
+          flexDirection: apilado ? 'column' : 'row',
+          alignItems: apilado ? 'flex-end' : 'center',
+          justifyContent: 'flex-end',
+          gap: 4,
+          marginTop: 20,
+        }}
+      >
+        {!!cancelLabel && <AccionTexto label={cancelLabel} onPress={onCancel} />}
+        {!!extraLabel && <AccionTexto label={extraLabel} onPress={onExtra} danger />}
+        <AccionTexto label={confirmLabel} onPress={onConfirm} danger={variant === 'danger'} primary={variant !== 'danger'} />
       </View>
-    </Modal>
+    </Dialogo>
   );
 };
 
 // ─────────────────────────────────────────────────────────────
-// PromptModal — Reemplazo multiplataforma de Alert.prompt
+// PromptModal — Diálogo con un campo de texto (reemplazo de Alert.prompt)
 // ─────────────────────────────────────────────────────────────
 export const PromptModal = ({
   visible,
@@ -914,40 +1180,19 @@ export const PromptModal = ({
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-        <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: 24, width: '100%', maxWidth: 340, ...TOKENS.shadow.lg }}>
-          {!!title && (
-            <Text style={{ fontSize: TOKENS.fontSizes.h4, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 6 }}>
-              {title}
-            </Text>
-          )}
-          {!!message && (
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginBottom: 16 }}>
-              {message}
-            </Text>
-          )}
-          <Field
-            label=""
-            value={value}
-            onChangeText={setValue}
-            placeholder={placeholder}
-            autoFocus
-          />
-          <View style={{ gap: 10, marginTop: 12 }}>
-            <Button
-              label={confirmLabel}
-              onPress={() => onConfirm(value)}
-            />
-            <Button
-              variant="ghost"
-              label={cancelLabel}
-              onPress={onCancel}
-            />
-          </View>
-        </View>
+    <Dialogo onCancel={onCancel}>
+      {!!title && (
+        <Text accessibilityRole="header" style={{ ...TOKENS.type.headlineSmall, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 8 }}>
+          {title}
+        </Text>
+      )}
+      {!!message && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700, marginBottom: 16 }}>{message}</Text>}
+      <Field label="" value={value} onChangeText={setValue} placeholder={placeholder} autoFocus accessibilityLabel={title} />
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
+        <AccionTexto label={cancelLabel} onPress={onCancel} />
+        <AccionTexto label={confirmLabel} onPress={() => onConfirm(value)} primary />
       </View>
-    </Modal>
+    </Dialogo>
   );
 };
 
@@ -978,4 +1223,19 @@ export default {
   Header,
   TabBar,
   ResultCard,
+  ScreenTitle,
+  LecturaNivel,
+  FilaDato,
+  SectionTitle,
+  Banner,
+  Fab,
+  Snackbar,
+  MenuAcciones,
+  IconButton,
+  Chip,
+  HojaOpciones,
+  Foto,
+  NivelBadge,
+  NivelChip,
+  SwatchNivel,
 };

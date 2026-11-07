@@ -6,7 +6,7 @@ import {
   textoResultados, FILTROS_VACIOS,
 } from '../src/linea.js';
 import {
-  puntosTendencia, techoEjeY, marcasEjeY, escalaTendencia, puntoMasCercano, resumenTendencia, lineasAccesibles,
+  puntosTendencia, ubicarRotulo, techoEjeY, marcasEjeY, escalaTendencia, puntoMasCercano, resumenTendencia, lineasAccesibles,
 } from '../src/tendencia.js';
 import { estadoFotoCola, resumenAvance, indiceActivo, textoEtapa } from '../src/cola.js';
 
@@ -167,4 +167,21 @@ test('estadoFotoCola y avance de la cola', () => {
   assert.equal(indiceActivo(cola), 1);
   assert.equal(indiceActivo([{ status: 'lista' }, { status: 'esperando' }]), 1);
   assert.equal(indiceActivo([{ status: 'lista' }]), -1);
+});
+
+test('ubicarRotulo evita tapar puntos: prueba arriba-derecha, luego arriba-izquierda, luego abajo', () => {
+  const area = { ancho: 300, alto: 100 };
+  const u = { etiqueta: 'Moderada desde 10 %', y: 60 };
+  assert.deepEqual(ubicarRotulo(u, [], area).x, 300 - (u.etiqueta.length * 7.2 + 10)); // libre: arriba-derecha
+  const w = u.etiqueta.length * 7.2 + 10;
+  const punto = (x, y) => ({ x, y });
+  // un punto justo donde iría el rótulo arriba-derecha -> se va a la izquierda
+  const izq = ubicarRotulo(u, [punto(300 - w / 2, 50)], area);
+  assert.equal(izq.x, 0);
+  assert.ok(izq.y < u.y);
+  // puntos arriba a ambos lados -> abajo
+  const abajo = ubicarRotulo(u, [punto(300 - w / 2, 50), punto(w / 2, 50)], area);
+  assert.ok(abajo.y > u.y);
+  // una línea pegada al borde superior no se sale del área
+  assert.ok(ubicarRotulo({ etiqueta: 'Severa desde 25 %', y: 2 }, [], area).y >= 2);
 });
