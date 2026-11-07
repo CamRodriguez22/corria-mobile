@@ -34,6 +34,7 @@ export async function getIdToken() {
 
 // ───────────────────────────── Ubicación ─────────────────────────────
 export async function getCurrentLocation() {
+  if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').getCurrentLocationDemo();
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {
     const err = new Error('Sin permiso de ubicación. Actívalo en Ajustes del teléfono.');
@@ -49,6 +50,7 @@ export async function getCurrentLocation() {
 }
 
 export async function reverseGeocode(lat, lng) {
+  if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').reverseGeocodeDemo();
   try {
     const [a] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
     if (!a) return { ciudad: null, barrio: null, direccion: null };
@@ -65,6 +67,7 @@ export async function reverseGeocode(lat, lng) {
 // ───────────────────────────── Cámara / galería ─────────────────────────────
 // Devuelve array de fotos [{ uri, base64, width, height }] o null si se canceló.
 export async function pickPhotos({ fromCamera = false, allowsMultiple = true } = {}) {
+  if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').pickPhotosDemo({ fromCamera, allowsMultiple });
   const perm = fromCamera
     ? await ImagePicker.requestCameraPermissionsAsync()
     : await ImagePicker.requestMediaLibraryPermissionsAsync();

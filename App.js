@@ -70,7 +70,7 @@ import {
   renombrarMedicion,
   renombrarLote,
   eliminarMedicion,
-} from './src/api-real';
+} from './src/api';
 import {
   getCurrentLocation,
   reverseGeocode,
@@ -87,6 +87,10 @@ import {
   construirNotas,
   adaptarBloque,
 } from './src/utils';
+
+// Modo demo (solo `npm run demo`): sin login real ni red. Comparación literal para que Metro
+// elimine la rama (y src/demo/) del bundle de producción.
+const DemoBanner = process.env.EXPO_PUBLIC_DEMO === '1' ? require('./src/demo/DemoBanner').default : null;
 
 Amplify.configure({
   Auth: {
@@ -112,6 +116,7 @@ export default function App() {
     <>
       <StatusBar barStyle="dark-content" />
       <Root />
+      {DemoBanner ? <DemoBanner /> : null}
     </>
   );
 }
@@ -259,6 +264,11 @@ function Root() {
 
   // ───────────────────────── arranque: sesión persistida ─────────────────────────
   useEffect(() => {
+    if (process.env.EXPO_PUBLIC_DEMO === '1') {
+      setLogged(true);
+      setBooting(false);
+      return;
+    }
     (async () => {
       try {
         await getCurrentUser();
@@ -475,6 +485,10 @@ function Root() {
 
   const handleLogin = async () => {
     setAuthError('');
+    if (process.env.EXPO_PUBLIC_DEMO === '1') {
+      setLogged(true); // demo: cualquier credencial entra
+      return;
+    }
     if (!email.trim() || !pass) {
       setAuthError('Escribe tu correo y contraseña.');
       return;
