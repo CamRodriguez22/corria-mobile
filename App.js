@@ -46,6 +46,8 @@ import {
   mezclarMediciones,
   hayMasMediciones as calcularHayMas,
   resumirCola,
+  listaDeRespuesta,
+  esSesionVencida,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -133,6 +135,8 @@ function Root() {
   const [loadingData, setLoadingData] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [errorBloques, setErrorBloques] = useState(false); // GET /bloques falló (distinto de "sin puntos")
+  const sesionVencidaAvisada = useRef(false);
 
   // navegación
   const [tab, setTab] = useState('home');
@@ -181,6 +185,28 @@ function Root() {
     });
 
   // La cola nunca se muta: cada cambio crea objetos nuevos y sincroniza el ref.
+  // Sesión vencida (401): un solo aviso; al confirmar se cierra la sesión local.
+  const avisarSesionVencida = () => {
+    if (sesionVencidaAvisada.current) return;
+    sesionVencidaAvisada.current = true;
+    setConfirmModal({
+      visible: true,
+      title: 'Tu sesión expiró',
+      message: 'Inicia sesión de nuevo para continuar. Tus datos del servidor no se perdieron.',
+      confirmLabel: 'Iniciar sesión',
+      cancelLabel: '',
+      onConfirm: () => {
+        cerrarConfirm();
+        cerrarSesionLocal();
+      },
+    });
+  };
+  // Error de una acción contra el backend: 401 → sesión vencida; si no, aviso con el mensaje.
+  const avisarError = (titulo, e, porDefecto = 'Error del servidor.') => {
+    if (esSesionVencida(e)) avisarSesionVencida();
+    else avisar(titulo, e?.message || porDefecto);
+  };
+
   const fijarCola = (cola) => {
     colaRef.current = cola;
     setColaFotos(cola);
@@ -305,18 +331,37 @@ function Root() {
     if (Array.isArray(cache) && cache.length) setMediciones(cache);
 
     try {
-      const [p, respMeds, blqs, inds] = await Promise.all([
-        getMiPerfil().catch(() => null),
-        getMedicionesRecientes(undefined, PAGINA_MEDICIONES).catch(() => ({ mediciones: [] })),
-        getBloques().catch(() => null),
-        getIndicadores().catch(() => null),
+      // allSettled: un fallo de red NO es una lista vacía. Si /mediciones/recientes
+      // falla se conserva la lista en caché (no se sobrescribe) y se avisa "Sin conexión".
+      const [rPerfil, rMeds, rBloques, rInds] = await Promise.allSettled([
+        getMiPerfil(),
+        getMedicionesRecientes(undefined, PAGINA_MEDICIONES),
+        getBloques(),
+        getIndicadores(),
       ]);
       if (sesion !== sesionRef.current) return;
-      if (p) setPerfil(p);
-      if (inds) setIndicadoresServidor(inds);
-      if (Array.isArray(blqs)) setBloques(blqs.map(adaptarBloque));
+      const fallos = [rPerfil, rMeds, rBloques, rInds].filter((r) => r.status === 'rejected').map((r) => r.reason);
+      if (fallos.some(esSesionVencida)) {
+        avisarSesionVencida();
+        setOffline(true);
+        return;
+      }
+      if (rPerfil.status === 'fulfilled' && rPerfil.value) setPerfil(rPerfil.value);
+      if (rInds.status === 'fulfilled' && rInds.value) setIndicadoresServidor(rInds.value);
+      if (rBloques.status === 'fulfilled' && Array.isArray(rBloques.value)) {
+        setBloques(rBloques.value.map(adaptarBloque));
+        setErrorBloques(false);
+      } else {
+        setErrorBloques(true);
+      }
 
-      const lista = Array.isArray(respMeds) ? respMeds : respMeds?.mediciones || respMeds?.items || [];
+      if (rMeds.status === 'rejected') {
+        console.log('cargarTodo mediciones', rMeds.reason?.message);
+        setOffline(true);
+        return;
+      }
+      const respMeds = rMeds.value;
+      const lista = listaDeRespuesta(respMeds);
       setHayMasMediciones(calcularHayMas(respMeds, PAGINA_MEDICIONES));
 
       const limpio = lista
@@ -348,7 +393,7 @@ function Root() {
     try {
       const resp = await getMedicionesRecientes(undefined, pagina.limit, { hasta: pagina.hasta });
       if (sesion !== sesionRef.current) return;
-      const lista = Array.isArray(resp) ? resp : resp?.mediciones || resp?.items || [];
+      const lista = listaDeRespuesta(resp);
       const nuevas = lista.map(({ mascaras, ...rest }) => rest);
       const { agregadas } = mezclarMediciones(mediciones, nuevas);
       // Actualización funcional: no pisa una medición subida mientras se esperaba.
@@ -356,7 +401,8 @@ function Root() {
       setHayMasMediciones(calcularHayMas(resp, pagina.limit, agregadas));
     } catch (e) {
       console.log('cargarMasMediciones', e?.message);
-      avisar('No se pudieron cargar más mediciones', e.message || 'Revisa tu conexión e intenta de nuevo.');
+      // La lista ya cargada no se toca: solo se avisa.
+      avisarError('No se pudieron cargar más mediciones', e, 'Revisa tu conexión e intenta de nuevo.');
     } finally {
       setCargandoMas(false);
     }
@@ -453,6 +499,7 @@ function Root() {
     setLoadingData(false);
     setRefreshing(false);
     setOffline(false);
+    setErrorBloques(false);
     // login
     setEmail('');
     setPass('');
@@ -486,19 +533,24 @@ function Root() {
     setPromptModal({ visible: false, title: '', message: '', initialValue: '', onConfirm: null });
   };
 
+  const cerrarSesionLocal = async () => {
+    try {
+      await signOut();
+    } catch {}
+    await clearLocalData();
+    sesionVencidaAvisada.current = false;
+    reiniciarEstadoSesion();
+  };
+
   const handleLogout = async () => {
     setConfirmModal({
       visible: true,
       title: 'Cerrar sesión',
       message: '¿Seguro que quieres salir de tu cuenta?',
       variant: 'danger',
-      onConfirm: async () => {
+      onConfirm: () => {
         setConfirmModal((prev) => ({ ...prev, visible: false }));
-        try {
-          await signOut();
-        } catch {}
-        await clearLocalData();
-        reiniciarEstadoSesion();
+        cerrarSesionLocal();
       },
     });
   };
@@ -730,7 +782,7 @@ function Root() {
           setDetalle(act);
           setMediciones((prev) => prev.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
         } catch (e) {
-          avisar('No se pudo renombrar', e.message || 'Error del servidor.');
+          avisarError('No se pudo renombrar', e);
         }
       },
     });
@@ -751,7 +803,7 @@ function Root() {
           setDetalle(null);
           setScreen(folderClave ? 'folder' : tab);
         } catch (e) {
-          avisar('No se pudo eliminar', e.message || 'Error del servidor.');
+          avisarError('No se pudo eliminar', e);
         }
       },
     });
@@ -953,7 +1005,7 @@ function Root() {
                 await renombrarLote(items, nuevo);
                 await cargarTodo(false);
               } catch (e) {
-                avisar('No se pudo renombrar el lote', e.message || 'Error del servidor.');
+                avisarError('No se pudo renombrar el lote', e);
               }
             }}
           />

@@ -140,6 +140,17 @@ export function hayMasMediciones(resp, limitePedido, agregadas = 1) {
   return total >= limitePedido;
 }
 
+// Lista de mediciones de una respuesta de GET /mediciones/recientes (objeto o arreglo).
+export function listaDeRespuesta(resp) {
+  if (Array.isArray(resp)) return resp;
+  return resp?.mediciones || resp?.items || [];
+}
+
+// API Gateway responde 401 cuando el token de Cognito venció o no es válido.
+export function esSesionVencida(e) {
+  return e?.status === 401;
+}
+
 // ───────────────────────── Cola de fotos (lote en análisis) ─────────────────────────
 // Cada ítem: { uri, base64, status: 'esperando'|'subiendo'|'lista'|'error', error?, imagenKey?, medicion? }
 export function resumirCola(cola = []) {

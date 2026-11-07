@@ -14,6 +14,8 @@ import {
   hayMasMediciones,
   resumirCola,
   textoResumenCola,
+  listaDeRespuesta,
+  esSesionVencida,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -197,4 +199,19 @@ test('resumirCola - imagen y medición salen del mismo ítem; fallidas visibles'
   assert.equal(textoResumenCola({ total: 4, listas: 4, fallidas: 0 }), '4 de 4 fotos analizadas.');
   assert.equal(textoResumenCola({ total: 1, listas: 1, fallidas: 0 }), '');
   assert.equal(resumirCola([]).ultimaLista, null);
+});
+
+test('listaDeRespuesta - acepta arreglo, {mediciones} o {items}; nunca revienta', () => {
+  assert.deepEqual(listaDeRespuesta([{ a: 1 }]), [{ a: 1 }]);
+  assert.deepEqual(listaDeRespuesta({ mediciones: [{ b: 2 }] }), [{ b: 2 }]);
+  assert.deepEqual(listaDeRespuesta({ items: [{ c: 3 }] }), [{ c: 3 }]);
+  assert.deepEqual(listaDeRespuesta(null), []);
+  assert.deepEqual(listaDeRespuesta({}), []);
+});
+
+test('esSesionVencida - solo el 401 del backend', () => {
+  assert.equal(esSesionVencida({ status: 401 }), true);
+  assert.equal(esSesionVencida({ status: 403 }), false);
+  assert.equal(esSesionVencida(new Error('Sin conexión con el servidor.')), false);
+  assert.equal(esSesionVencida(null), false);
 });
