@@ -2,11 +2,14 @@ import React, { useEffect, useMemo } from 'react';
 import { View, Text } from 'react-native';
 import { Screen, Header, EmptyState, Button, NivelBadge, Spinner } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
+import GraficaTendencia from '../GraficaTendencia';
 import { TOKENS } from '../DesignTokens';
 import { agruparPorBloque } from '../utils';
 import { mezclarMediciones } from '../logic';
 import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
-import { fechaLarga, formatoPct, plural } from '../fechas';
+import { fechaLarga, formatoPct, plural, hoyLocal } from '../fechas';
+import { aniosDisponibles } from '../linea';
+import { puntosTendencia } from '../tendencia';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -18,6 +21,8 @@ export default function FolderScreen({
   listaBloques,
   empresaLinea,
   historial,
+  resumenes = {},
+  onCargarResumen,
   onCargarHistorial,
   onBack,
   onOpen,
@@ -39,6 +44,18 @@ export default function FolderScreen({
     if (esPuntoReal && !historial) onCargarHistorial?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave]);
+
+  // Tendencia: resumen por día de este punto del año en curso y del anterior (si existe en el backend).
+  const anios = useMemo(() => aniosDisponibles(hoyLocal()).slice(-2), []);
+  useEffect(() => {
+    if (!esPuntoReal) return;
+    anios.forEach((a) => onCargarResumen?.(a, { idPunto: clave }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave]);
+  const resumenesPunto = anios.map((a) => resumenes[`${clave}|${a}`]);
+  const diasPunto = resumenesPunto.flatMap((r) => r?.dias || []);
+  const puntosGrafica = useMemo(() => puntosTendencia(diasPunto), [resumenes, clave]); // eslint-disable-line react-hooks/exhaustive-deps
+  const estadoGrafica = resumenesPunto.some((r) => r?.estado === 'cargando') ? 'cargando' : resumenesPunto.some((r) => r?.estado === 'error') ? 'error' : 'ok';
 
   const cargando = historial?.estado === 'cargando';
   const cargandoMas = historial?.estado === 'mas';
@@ -65,6 +82,18 @@ export default function FolderScreen({
           </Text>
         </View>
       ) : null}
+      {esPuntoReal && (
+        <View style={{ marginTop: 20 }}>
+          <GraficaTendencia
+            puntos={puntosGrafica}
+            estado={estadoGrafica}
+            truncado={resumenesPunto.some((r) => r?.truncado)}
+            error={resumenesPunto.find((r) => r?.estado === 'error')?.error}
+            onReintentar={() => anios.forEach((a) => onCargarResumen?.(a, { idPunto: clave, forzar: true }))}
+            margen={PAD}
+          />
+        </View>
+      )}
     </View>
   );
 

@@ -549,21 +549,22 @@ function Root() {
   };
 
   // Mapa de calor: GET /mediciones/resumen-diario?anio=. Se guarda por año; `forzar` ignora lo guardado.
-  const cargarResumen = async (anio, { forzar = false } = {}) => {
-    const previo = resumenesRef.current[anio];
+  const cargarResumen = async (anio, { forzar = false, idPunto = null } = {}) => {
+    const clave = idPunto ? `${idPunto}|${anio}` : anio;
+    const previo = resumenesRef.current[clave];
     if (!forzar && previo && (previo.estado === 'ok' || previo.estado === 'cargando')) return;
     const sesion = sesionRef.current;
-    setResumenes((r) => ({ ...r, [anio]: { ...(previo || { dias: [] }), estado: 'cargando', error: '' } }));
+    setResumenes((r) => ({ ...r, [clave]: { ...(previo || { dias: [] }), estado: 'cargando', error: '' } }));
     try {
-      const resp = await getResumenDiario(anio);
+      const resp = await getResumenDiario(anio, idPunto);
       if (sesion !== sesionRef.current) return;
-      setResumenes((r) => ({ ...r, [anio]: { estado: 'ok', dias: resp?.dias || [], truncado: Boolean(resp?.truncado), error: '' } }));
+      setResumenes((r) => ({ ...r, [clave]: { estado: 'ok', dias: resp?.dias || [], truncado: Boolean(resp?.truncado), error: '' } }));
     } catch (e) {
       if (sesion !== sesionRef.current) return;
       if (esSesionVencida(e)) avisarSesionVencida();
       setResumenes((r) => ({
         ...r,
-        [anio]: { estado: 'error', dias: r[anio]?.dias || [], truncado: false, error: e?.message || 'No se pudo cargar el mapa de días.' },
+        [clave]: { estado: 'error', dias: r[clave]?.dias || [], truncado: false, error: e?.message || 'No se pudo cargar el resumen por día.' },
       }));
     }
   };
@@ -1268,6 +1269,8 @@ function Root() {
           bloquesMap={bloquesMap}
           listaBloques={listaBloques}
           empresaLinea={empresa.linea}
+          resumenes={resumenes}
+          onCargarResumen={cargarResumen}
           historial={porPunto[folderClave]}
           onCargarHistorial={(opts) => cargarHistorialPunto(folderClave, opts)}
           onBack={volver}
