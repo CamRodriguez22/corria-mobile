@@ -254,6 +254,20 @@ function Root() {
   // Manejador del botón atrás de Android (BackHandler)
   useEffect(() => {
     const onBackPress = () => {
+      // Con un modal abierto, atrás lo cierra primero.
+      if (confirmModal.visible) {
+        cancelarConfirm();
+        return true;
+      }
+      if (promptModal.visible) {
+        setPromptModal((prev) => ({ ...prev, visible: false }));
+        return true;
+      }
+      // Durante el análisis no se puede cancelar la subida: atrás no debe sacar de la app.
+      if (screen === 'analyzing') {
+        avisar('Análisis en curso', 'Espera a que termine el análisis de las fotos.');
+        return true;
+      }
       if (screen === 'detail') {
         setScreen(folderClave ? 'folder' : tab);
         return true;
@@ -276,7 +290,7 @@ function Root() {
         return true;
       }
       if (screen === 'result') {
-        terminarLote();
+        irAInicioConservandoLote();
         return true;
       }
       if (tab !== 'home') {
@@ -289,7 +303,7 @@ function Root() {
 
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [screen, tab, folderClave]);
+  }, [screen, tab, folderClave, confirmModal, promptModal]);
 
   const cargarTodo = useCallback(async (first = false) => {
     if (first) setLoadingData(true);
@@ -491,6 +505,13 @@ function Root() {
     } catch (e) {
       setGpsError(e.message || 'No se pudo obtener la ubicación.');
     }
+  };
+
+  // Atrás desde el resultado: vuelve al inicio sin cerrar el lote (se puede seguir
+  // agregando fotos); cerrar el lote es una acción explícita (terminarLote).
+  const irAInicioConservandoLote = () => {
+    setScreen('home');
+    setTab('home');
   };
 
   const terminarLote = () => {
@@ -821,6 +842,7 @@ function Root() {
           onTerminarLote={terminarLote}
           resumenLote={resumirCola(colaFotos)}
           onReintentar={analizar}
+          onBack={irAInicioConservandoLote}
           onHome={terminarLote}
         />
       );

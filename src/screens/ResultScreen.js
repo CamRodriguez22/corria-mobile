@@ -33,6 +33,7 @@ export default function ResultScreen({
   onTerminarLote,
   resumenLote,
   onReintentar,
+  onBack,
   onHome,
 }) {
   const imagenUri = medicion._localUri || medicion.url_imagen;
@@ -52,7 +53,7 @@ export default function ResultScreen({
 
   return (
     <Screen>
-      <Header title="Resultado del análisis" onBack={onHome} />
+      <Header title="Resultado del análisis" onBack={onBack || onHome} />
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
