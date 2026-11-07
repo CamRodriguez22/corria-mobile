@@ -97,18 +97,39 @@ export function dividirEnTandas(items = [], tam = LOTE_MAX_BACKEND) {
   return tandas;
 }
 
+// Envía un lote por tandas, en orden, con `enviarTanda(tanda)` (async). Si una tanda falla, las
+// anteriores ya quedaron aplicadas: el error trae `idsRenombrados` (solo esas) y un mensaje
+// "Se renombraron N de M fotos. ..." que lo aclara.
+export async function renombrarPorTandas(items, enviarTanda) {
+  const idsRenombrados = [];
+  for (const tanda of dividirEnTandas(items)) {
+    try {
+      await enviarTanda(tanda);
+    } catch (e) {
+      if (idsRenombrados.length) {
+        e.message = `Se renombraron ${idsRenombrados.length} de ${items.length} fotos. ${e.message}`;
+      }
+      e.idsRenombrados = idsRenombrados;
+      throw e;
+    }
+    idsRenombrados.push(...tanda.map((t) => t.id_medicion));
+  }
+  return { idsRenombrados };
+}
+
 // Clasifica el error de subir una foto. 409 = la misma foto aún se está analizando (esperar y
 // reintentar). 410 = la foto ya se procesó antes y el backend no la reanaliza: reintentar con
 // la misma imagen_key daría 410 siempre, así que no es reintentable (el mensaje del backend
 // ya dice qué hacer). El resto (red, 5xx) sí se puede reintentar.
 export function clasificarErrorSubida(e) {
-  const msg = e?.message || 'No se pudo analizar la foto.';
+  const msgServidor = e?.message;
+  const msg = msgServidor || 'No se pudo analizar la foto.';
   if (e?.status === 409) {
     return { mensaje: msg, reintentable: true };
   }
   if (e?.status === 410) {
     return {
-      mensaje: msg || 'Esta foto ya se procesó antes. Revisa la galería: si no aparece, vuelve a subirla.',
+      mensaje: msgServidor || 'Esta foto ya se procesó antes. Revisa la galería: si no aparece, vuelve a subirla.',
       reintentable: false,
     };
   }

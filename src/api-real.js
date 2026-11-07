@@ -26,7 +26,7 @@
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
 import { Platform } from 'react-native';
-import { parteArchivoForm, dividirEnTandas } from './logic';
+import { parteArchivoForm, renombrarPorTandas } from './logic';
 import { AWS_CONFIG, APP_CONFIG } from './config';
 import { getIdToken } from './utils';
 
@@ -153,23 +153,12 @@ export async function renombrarLote(items, nuevoNombre, token) {
     id_punto: it.id_punto,
     id_medicion: it.id_medicion,
   }));
-  const idsRenombrados = [];
-  for (const tanda of dividirEnTandas(formateados)) {
-    try {
-      await req('POST', '/mediciones/lote/renombrar', {
-        token,
-        body: { items: tanda, nombre: nuevoNombre },
-      });
-    } catch (e) {
-      if (idsRenombrados.length) {
-        e.message = `Se renombraron ${idsRenombrados.length} de ${formateados.length} fotos. ${e.message}`;
-      }
-      e.idsRenombrados = idsRenombrados;
-      throw e;
-    }
-    idsRenombrados.push(...tanda.map((t) => t.id_medicion));
-  }
-  return { idsRenombrados };
+  return renombrarPorTandas(formateados, (tanda) =>
+    req('POST', '/mediciones/lote/renombrar', {
+      token,
+      body: { items: tanda, nombre: nuevoNombre },
+    })
+  );
 }
 
 // DELETE /mediciones/{id_punto}?id_medicion={id_medicion}

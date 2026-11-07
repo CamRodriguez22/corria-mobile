@@ -11,6 +11,7 @@ import {
   dividirEnTandas,
   LOTE_MAX_BACKEND,
   clasificarErrorSubida,
+  renombrarPorTandas,
   paginaAnterior,
   mezclarMediciones,
   hayMasMediciones,
@@ -139,6 +140,52 @@ test('clasificarErrorSubida - 409 se reintenta, 410 no, 401 no', () => {
   assert.equal(clasificarErrorSubida({ status: 401 }).reintentable, false);
   assert.equal(clasificarErrorSubida({ status: 500, message: 'Error en el servidor.' }).reintentable, true);
   assert.equal(clasificarErrorSubida(new Error('Sin conexión con el servidor.')).reintentable, true);
+});
+
+test('clasificarErrorSubida - 410 sin mensaje del servidor usa la guía propia', () => {
+  const r = clasificarErrorSubida({ status: 410 });
+  assert.equal(r.reintentable, false);
+  assert.match(r.mensaje, /ya se procesó antes/);
+  assert.match(r.mensaje, /galería/);
+});
+
+const idsDe = (n, desde = 0) => Array.from({ length: n }, (_, i) => ({ id_punto: 'p', id_medicion: `m${desde + i}` }));
+
+test('renombrarPorTandas - éxito total devuelve todos los ids en orden', async () => {
+  const llamadas = [];
+  const items = idsDe(250);
+  const r = await renombrarPorTandas(items, async (t) => llamadas.push(t.length));
+  assert.deepEqual(llamadas, [100, 100, 50]);
+  assert.deepEqual(r.idsRenombrados, items.map((i) => i.id_medicion));
+});
+
+test('renombrarPorTandas - si falla una tanda tardía, el error trae solo los ids anteriores y "N de M"', async () => {
+  const items = idsDe(250);
+  let n = 0;
+  await assert.rejects(
+    renombrarPorTandas(items, async () => {
+      n += 1;
+      if (n === 3) throw new Error('Error del servidor.');
+    }),
+    (e) => {
+      assert.deepEqual(e.idsRenombrados, items.slice(0, 200).map((i) => i.id_medicion));
+      assert.equal(e.message, 'Se renombraron 200 de 250 fotos. Error del servidor.');
+      return true;
+    }
+  );
+});
+
+test('renombrarPorTandas - si falla la primera tanda, ids vacíos y mensaje intacto', async () => {
+  await assert.rejects(
+    renombrarPorTandas(idsDe(150), async () => {
+      throw new Error('Sin conexión.');
+    }),
+    (e) => {
+      assert.deepEqual(e.idsRenombrados, []);
+      assert.equal(e.message, 'Sin conexión.');
+      return true;
+    }
+  );
 });
 
 test('paginaAnterior - hasta = día de la más antigua, límite cubre las ya cargadas', () => {
