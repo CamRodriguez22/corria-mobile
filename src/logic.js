@@ -139,3 +139,26 @@ export function hayMasMediciones(resp, limitePedido, agregadas = 1) {
   const total = Array.isArray(resp) ? resp.length : (resp.mediciones || []).length;
   return total >= limitePedido;
 }
+
+// ───────────────────────── Cola de fotos (lote en análisis) ─────────────────────────
+// Cada ítem: { uri, base64, status: 'esperando'|'subiendo'|'lista'|'error', error?, imagenKey?, medicion? }
+export function resumirCola(cola = []) {
+  const listas = cola.filter((f) => f.status === 'lista');
+  const fallidas = cola.filter((f) => f.status === 'error');
+  return {
+    total: cola.length,
+    listas: listas.length,
+    fallidas: fallidas.length,
+    primerError: fallidas[0]?.error || '',
+    // Última foto analizada con éxito: su imagen y su medición siempre van juntas.
+    ultimaLista: listas.length ? listas[listas.length - 1] : null,
+  };
+}
+
+// Texto de resumen para un lote con varias fotos ("3 de 5 fotos analizadas; 2 fallaron").
+export function textoResumenCola({ total, listas, fallidas }) {
+  if (total <= 1 && !fallidas) return '';
+  const base = `${listas} de ${total} ${total === 1 ? 'foto analizada' : 'fotos analizadas'}`;
+  if (!fallidas) return base + '.';
+  return `${base}; ${fallidas} ${fallidas === 1 ? 'falló' : 'fallaron'}.`;
+}

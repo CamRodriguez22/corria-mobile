@@ -22,6 +22,7 @@ export default function AnalyzingScreen({ etapa, colaFotos, bloqueSel }) {
   }
 
   const procesadas = colaFotos.filter((f) => f.status === 'lista' || f.status === 'error').length;
+  const conError = colaFotos.filter((f) => f.status === 'error').length;
   const total = colaFotos.length || 1;
   const progresoPct = Math.round((procesadas / total) * 100);
 
@@ -56,7 +57,8 @@ export default function AnalyzingScreen({ etapa, colaFotos, bloqueSel }) {
         />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500 }}>
-            {total > 1 ? `Foto ${procesadas + 1} de ${total}` : 'Foto en proceso'}
+            {total > 1 ? `Foto ${Math.min(procesadas + 1, total)} de ${total}` : 'Foto en proceso'}
+            {conError ? ` · ${conError} con error` : ''}
           </Text>
           <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.accent, fontWeight: '700' }}>
             {total > 1 ? `${progresoPct}%` : (etapa === 'analizando_ia' ? 'Fase 2 de 2' : 'Fase 1 de 2')}

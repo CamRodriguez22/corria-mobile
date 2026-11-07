@@ -12,6 +12,8 @@ import {
   paginaAnterior,
   mezclarMediciones,
   hayMasMediciones,
+  resumirCola,
+  textoResumenCola,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -170,4 +172,27 @@ test('hayMasMediciones - usa truncado con rango y el total sin rango', () => {
   // si el rango no aportó nada nuevo, no se ofrece cargar más (evita bucle vacío)
   assert.equal(hayMasMediciones({ mediciones: [], truncado: true }, 60, 0), false);
   assert.equal(hayMasMediciones(null, 30), false);
+});
+
+test('resumirCola - imagen y medición salen del mismo ítem; fallidas visibles', () => {
+  const cola = [
+    { uri: 'file://1', status: 'lista', medicion: { id_medicion: 'm1' } },
+    { uri: 'file://2', status: 'error', error: 'Sin conexión con el servidor.', imagenKey: 'k2' },
+    { uri: 'file://3', status: 'lista', medicion: { id_medicion: 'm3' } },
+    { uri: 'file://4', status: 'error', error: 'Otro' },
+    { uri: 'file://5', status: 'esperando' },
+  ];
+  const r = resumirCola(cola);
+  assert.equal(r.total, 5);
+  assert.equal(r.listas, 2);
+  assert.equal(r.fallidas, 2);
+  assert.equal(r.primerError, 'Sin conexión con el servidor.');
+  assert.equal(r.ultimaLista.uri, 'file://3');
+  assert.equal(r.ultimaLista.medicion.id_medicion, 'm3');
+
+  assert.equal(textoResumenCola({ total: 5, listas: 3, fallidas: 2 }), '3 de 5 fotos analizadas; 2 fallaron.');
+  assert.equal(textoResumenCola({ total: 3, listas: 2, fallidas: 1 }), '2 de 3 fotos analizadas; 1 falló.');
+  assert.equal(textoResumenCola({ total: 4, listas: 4, fallidas: 0 }), '4 de 4 fotos analizadas.');
+  assert.equal(textoResumenCola({ total: 1, listas: 1, fallidas: 0 }), '');
+  assert.equal(resumirCola([]).ultimaLista, null);
 });

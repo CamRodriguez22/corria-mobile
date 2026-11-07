@@ -205,21 +205,39 @@ export async function subirFotoAS3({ url, fields }, uri) {
 }
 
 // ─────────────────────────── POST /medicion (bajo nivel) ───────────────────────────
-export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng, loteId, loteNombre, notas = '', onEtapa }) {
+export async function subirMedicionReal({
+  uri,
+  base64,
+  token,
+  bloqueId,
+  lat,
+  lng,
+  loteId,
+  loteNombre,
+  notas = '',
+  onEtapa,
+  imagenKey: imagenKeyPrevia = null,
+  onImagenKey,
+}) {
   if (!bloqueId) throw new Error('bloque_id es requerido para subir la medición.');
 
   let imgB64 = base64;
-  let imagenKey = null;
+  // Si la foto ya está en S3 (reintento), se reutiliza su imagen_key: POST /medicion es
+  // idempotente por imagen_key y devuelve el resultado previo en vez de duplicar.
+  let imagenKey = imagenKeyPrevia;
 
   // Si la foto es grande o no viene en base64, usa upload-url a S3
   const debeUsarS3 = !imgB64 || (imgB64.length > 3.5 * 1024 * 1024);
 
-  if (debeUsarS3 && uri) {
+  if (imagenKey) {
+    imgB64 = null;
+  } else if (debeUsarS3 && uri) {
     if (onEtapa) onEtapa('preparando_subida');
     const presigned = await pedirUploadUrl('image/jpeg', token);
-    imagenKey = presigned.imagen_key;
     if (onEtapa) onEtapa('subiendo_s3');
     await subirFotoAS3(presigned, uri);
+    imagenKey = presigned.imagen_key;
+    if (onImagenKey) onImagenKey(imagenKey); // solo tras subir con éxito
     imgB64 = null; // no viaja en el body si se subió a S3
   } else if (!imgB64 && uri) {
     imgB64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
@@ -252,7 +270,7 @@ export async function subirMedicionReal({ uri, base64, token, bloqueId, lat, lng
 
 // ─────────────────────────── POST /medicion (alto nivel, para App.js) ───────────────────────────
 // foto: { uri, base64 }  ·  gps: { lat, lng } (opcional) ·  bloqueId: id_bloque real
-export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, notas = '', onEtapa }) {
+export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, notas = '', onEtapa, imagenKey, onImagenKey }) {
   if (!bloqueId) throw new Error('No se pudo determinar el punto de la medición.');
   const medicion = await subirMedicionReal({
     uri: foto?.uri,
@@ -264,6 +282,8 @@ export async function subirMedicion({ foto, gps, bloqueId, loteId, loteNombre, n
     loteNombre,
     notas,
     onEtapa,
+    imagenKey,
+    onImagenKey,
   });
   return { medicion };
 }

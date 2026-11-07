@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Text,
   View,
@@ -54,6 +54,7 @@ import {
   paginaAnterior,
   mezclarMediciones,
   hayMasMediciones as calcularHayMas,
+  resumirCola,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -162,6 +163,9 @@ function Root() {
   const [gpsError, setGpsError] = useState('');
   const [foto, setFoto] = useState(null);
   const [colaFotos, setColaFotos] = useState([]); // [{ uri, base64, status: 'esperando'|'subiendo'|'analizando'|'lista'|'error', error?: string }]
+  const colaRef = useRef([]); // copia síncrona de colaFotos para el bucle de subida
+  const loteIdRef = useRef('');
+  const analizandoRef = useRef(false);
   const [lugar, setLugar] = useState(null); // { ciudad, barrio, direccion } del reverse-geocode
   const [etapaSubida, setEtapaSubida] = useState(''); // preparando_subida | subiendo_s3 | analizando_ia | completado
   const [resultado, setResultado] = useState(null);
@@ -189,6 +193,18 @@ function Root() {
       cancelLabel: '',
       onConfirm: cerrarConfirm,
     });
+
+  // La cola nunca se muta: cada cambio crea objetos nuevos y sincroniza el ref.
+  const fijarCola = (cola) => {
+    colaRef.current = cola;
+    setColaFotos(cola);
+  };
+  const actualizarFoto = (i, cambios) =>
+    fijarCola(colaRef.current.map((f, idx) => (idx === i ? { ...f, ...cambios } : f)));
+  const fijarLoteId = (id) => {
+    loteIdRef.current = id;
+    setLoteIdActual(id);
+  };
 
   const nombre = perfil?.nombre || (perfil?.email || email).split('@')[0] || 'Usuario';
   const iniciales = nombre
@@ -448,10 +464,11 @@ function Root() {
   const irANuevaMedicion = async ({ mantenerLote = false } = {}) => {
     if (!mantenerLote) {
       setBloqueSel('');
-      setLoteIdActual('');
+      fijarLoteId('');
       setLoteNombreInput('');
     }
     setFoto(null);
+    fijarCola([]);
     setGps(null);
     setGpsError('');
     setResultado(null);
@@ -478,7 +495,7 @@ function Root() {
 
   const terminarLote = () => {
     setBloqueSel('');
-    setLoteIdActual('');
+    fijarLoteId('');
     setLoteNombreInput('');
     setScreen('home');
     setTab('home');
@@ -495,7 +512,7 @@ function Root() {
           return;
         }
         setFoto(f);
-        setColaFotos([{ ...f, status: 'esperando' }]);
+        fijarCola([{ ...f, status: 'esperando' }]);
         setScreen('preview');
       } else {
         const fotosSeleccionadas = await pickPhotos({ fromCamera: false, allowsMultiple: true });
@@ -511,7 +528,7 @@ function Root() {
           return;
         }
         setFoto(validas[0]);
-        setColaFotos(validas);
+        fijarCola(validas);
         setScreen('preview');
       }
     } catch (e) {
@@ -519,53 +536,46 @@ function Root() {
     }
   };
 
+  // Envía las fotos de la cola que aún no están `lista`. Un reintento solo reenvía las
+  // fallidas y reutiliza el imagen_key de las que ya llegaron a S3 (POST /medicion es
+  // idempotente por imagen_key), así que nunca duplica una medición ya analizada.
   const analizar = async () => {
-    if (!colaFotos.length || !bloqueSel) return;
+    if (analizandoRef.current || !colaRef.current.length || !bloqueSel) return;
+    analizandoRef.current = true;
     setScreen('analyzing');
     setResultado(null);
+    setEtapaSubida('');
 
     const bloqueElegido = bloquesMap[bloqueSel];
-    let gpsUsar = gps;
-    if (!gpsUsar) {
-      gpsUsar = { lat: bloqueElegido?.lat, lng: bloqueElegido?.lng };
-    }
+    const gpsUsar = gps || { lat: bloqueElegido?.lat, lng: bloqueElegido?.lng };
+    const bloquesNuevos = {};
 
     try {
       const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), descripcion);
       const bloqueIdReal = await resolverBloqueId({ bloque: bloqueElegido });
-      let idLoteParaSubir = loteIdActual;
-      if (!idLoteParaSubir && loteNombreInput) {
-        idLoteParaSubir = `lote_${Date.now()}`;
-        setLoteIdActual(idLoteParaSubir);
-      }
+      if (!loteIdRef.current && loteNombreInput) fijarLoteId(`lote_${Date.now()}`);
 
-      let ultimaMedicion = null;
-      const colaActualizada = [...colaFotos];
-
-      for (let i = 0; i < colaActualizada.length; i++) {
-        const itemFoto = colaActualizada[i];
-        itemFoto.status = 'subiendo';
-        setColaFotos([...colaActualizada]);
+      for (let i = 0; i < colaRef.current.length; i++) {
+        const itemFoto = colaRef.current[i];
+        if (itemFoto.status === 'lista') continue;
+        actualizarFoto(i, { status: 'subiendo', error: undefined });
 
         try {
           const { medicion } = await subirMedicion({
             foto: itemFoto,
             gps: gpsUsar,
             bloqueId: bloqueIdReal,
-            loteId: idLoteParaSubir || undefined,
+            loteId: loteIdRef.current || undefined,
             loteNombre: loteNombreInput || undefined,
             notas,
+            imagenKey: itemFoto.imagenKey,
+            onImagenKey: (k) => actualizarFoto(i, { imagenKey: k }),
             onEtapa: (e) => setEtapaSubida(e),
           });
 
-          itemFoto.status = 'lista';
-          itemFoto.medicion = medicion;
-          ultimaMedicion = medicion;
-          setColaFotos([...colaActualizada]);
-
-          const nuevoMap = { ...bloqueMap, [medicion.id_medicion]: bloqueIdReal };
-          setBloqueMap(nuevoMap);
-          saveLocal(APP_CONFIG.storageKeys.bloquePorMedicion, nuevoMap);
+          actualizarFoto(i, { status: 'lista', medicion, error: undefined });
+          bloquesNuevos[medicion.id_medicion] = bloqueIdReal;
+          setBloqueMap((prev) => ({ ...prev, [medicion.id_medicion]: bloqueIdReal }));
 
           guardarFotoLocal({
             uri: itemFoto.uri,
@@ -584,21 +594,30 @@ function Root() {
           const medConFoto = { ...ligera, url_imagen: medicion.url_imagen || itemFoto.uri, _localUri: itemFoto.uri };
           setMediciones((prev) => [medConFoto, ...prev.filter((m) => m.id_medicion !== medicion.id_medicion)]);
         } catch (errFoto) {
-          itemFoto.status = 'error';
-          itemFoto.error = errFoto.message;
-          setColaFotos([...colaActualizada]);
+          actualizarFoto(i, { status: 'error', error: errFoto.message || 'No se pudo analizar la foto.' });
         }
+      }
+
+      // Se persiste una sola vez, mezclando con lo ya guardado (no con un estado capturado).
+      if (Object.keys(bloquesNuevos).length) {
+        const guardado = await loadLocal(APP_CONFIG.storageKeys.bloquePorMedicion, {});
+        await saveLocal(APP_CONFIG.storageKeys.bloquePorMedicion, { ...guardado, ...bloquesNuevos });
       }
 
       setEtapaSubida('completado');
 
-      if (ultimaMedicion) {
-        const { mascaras, ...ligera } = ultimaMedicion;
-        setResultado({ ...ligera, url_imagen: ultimaMedicion.url_imagen || colaFotos[0]?.uri, _localUri: colaFotos[0]?.uri });
-        setScreen('result');
-      } else {
-        throw new Error('No se pudo procesar ninguna foto.');
+      // La imagen y el análisis que se muestran salen del MISMO ítem de la cola.
+      const { ultimaLista } = resumirCola(colaRef.current);
+      if (!ultimaLista) {
+        throw new Error(resumirCola(colaRef.current).primerError || 'No se pudo procesar ninguna foto.');
       }
+      const { mascaras, ...ligera } = ultimaLista.medicion;
+      setResultado({
+        ...ligera,
+        url_imagen: ultimaLista.medicion.url_imagen || ultimaLista.uri,
+        _localUri: ultimaLista.uri,
+      });
+      setScreen('result');
     } catch (e) {
       setConfirmModal({
         visible: true,
@@ -613,6 +632,8 @@ function Root() {
         // Nunca dejar al usuario atrapado en "analyzing": volver a revisar la foto.
         onCancel: () => setScreen('preview'),
       });
+    } finally {
+      analizandoRef.current = false;
     }
   };
 
@@ -798,6 +819,8 @@ function Root() {
           onSaveObs={guardarObs}
           onNext={() => irANuevaMedicion({ mantenerLote: true })}
           onTerminarLote={terminarLote}
+          resumenLote={resumirCola(colaFotos)}
+          onReintentar={analizar}
           onHome={terminarLote}
         />
       );

@@ -13,6 +13,7 @@ import {
 import { Screen, Header, ResultCard, Field, Button } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconCheck } from '../Icons';
+import { textoResumenCola } from '../logic';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -30,6 +31,8 @@ export default function ResultScreen({
   onSaveObs,
   onNext,
   onTerminarLote,
+  resumenLote,
+  onReintentar,
   onHome,
 }) {
   const imagenUri = medicion._localUri || medicion.url_imagen;
@@ -44,6 +47,9 @@ export default function ResultScreen({
     }).start();
   }, [fadeAnim]);
 
+  const resumen = resumenLote ? textoResumenCola(resumenLote) : '';
+  const hayFallidas = Boolean(resumenLote?.fallidas);
+
   return (
     <Screen>
       <Header title="Resultado del análisis" onBack={onHome} />
@@ -54,6 +60,37 @@ export default function ResultScreen({
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
         <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+          {!!resumen && (
+            <View
+              style={{
+                backgroundColor: hayFallidas ? TOKENS.colors.dangerTint : TOKENS.colors.successTint,
+                borderRadius: TOKENS.radius.md,
+                padding: 14,
+                marginBottom: 14,
+                gap: 10,
+              }}
+            >
+              <Text
+                style={{
+                  color: hayFallidas ? TOKENS.colors.danger : TOKENS.colors.accent2_800,
+                  fontSize: TOKENS.fontSizes.small,
+                  fontWeight: '700',
+                }}
+              >
+                {resumen}
+                {resumenLote.listas > 1 ? ' Aquí ves la última foto analizada.' : ''}
+              </Text>
+              {hayFallidas && !!resumenLote.primerError && (
+                <Text style={{ color: TOKENS.colors.neutral700, fontSize: TOKENS.fontSizes.small }}>
+                  {resumenLote.primerError}
+                </Text>
+              )}
+              {hayFallidas && onReintentar && (
+                <Button variant="secondary" label="Reintentar las fallidas" onPress={onReintentar} />
+              )}
+            </View>
+          )}
+
           {imagenUri ? (
             <Image
               source={{ uri: imagenUri }}
