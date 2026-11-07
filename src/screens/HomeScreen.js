@@ -14,7 +14,7 @@ import {
   EmptyState,
 } from '../DesignComponents';
 import { TOKENS, num } from '../DesignTokens';
-import { IconAlertTriangle } from '../Icons';
+import { IconAlertTriangle, IconPlus } from '../Icons';
 import { formatDate } from '../utils';
 import { tituloBloque } from '../helpers';
 
@@ -117,7 +117,8 @@ export default function HomeScreen({
       {!esCliente && (
         <View style={{ marginTop: 20 }}>
           <Button
-            label="＋  Nueva medición"
+            label="Nueva medición"
+            left={<IconPlus size={20} color="#fff" />}
             onPress={onNueva}
             accessibilityHint="Abre la cámara o galería para una nueva inspección"
           />

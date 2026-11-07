@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Screen, Header, ResultCard, Field, Button } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
-import { IconCheck } from '../Icons';
+import { IconCheck, IconPlus, IconMinus } from '../Icons';
 import { textoResumenCola } from '../logic';
 
 const PAD = TOKENS.spacing.lg;
@@ -154,9 +154,11 @@ export default function ResultScreen({
             <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text }}>
               Observaciones de campo <Text style={{ color: TOKENS.colors.neutral500, fontWeight: '400' }}>(opcional)</Text>
             </Text>
-            <Text style={{ fontSize: 20, color: TOKENS.colors.accentText, fontWeight: '700' }}>
-              {obsOpen ? '−' : '＋'}
-            </Text>
+            {obsOpen ? (
+              <IconMinus size={20} color={TOKENS.colors.accentText} />
+            ) : (
+              <IconPlus size={20} color={TOKENS.colors.accentText} />
+            )}
           </Pressable>
 
           {obsOpen && (
@@ -191,7 +193,8 @@ export default function ResultScreen({
               </Text>
               <Button
                 variant="ghost"
-                label={obsSaved ? 'Guardado en este teléfono ✓' : 'Guardar notas en este teléfono'}
+                label={obsSaved ? 'Guardado en este teléfono' : 'Guardar notas en este teléfono'}
+                left={obsSaved ? <IconCheck size={18} color={TOKENS.colors.accent2_700} /> : null}
                 onPress={onSaveObs}
               />
             </View>

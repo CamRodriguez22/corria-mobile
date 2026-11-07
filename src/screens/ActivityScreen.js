@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Button, Segmented, EmptyState } from '../DesignComponents';
 import { TOKENS, num, severidad } from '../DesignTokens';
+import { IconChevronRight } from '../Icons';
 import { tituloBloque } from '../helpers';
 
 const PAD = TOKENS.spacing.lg;
@@ -125,7 +126,7 @@ export default function ActivityScreen({
                           </Text>
                         )}
                       </View>
-                      <Text style={{ fontSize: 16, color: TOKENS.colors.neutral400 }}>›</Text>
+                      <IconChevronRight size={18} color={TOKENS.colors.neutral500} />
                     </Pressable>
                   );
                 })}

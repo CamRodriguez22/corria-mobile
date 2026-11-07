@@ -17,7 +17,7 @@ import {
   Modal,
 } from 'react-native';
 import { TOKENS, severidad, confianzaPct, num } from './DesignTokens';
-import { IconHome, IconLotes, IconPuntos, IconActivity, IconSettings } from './Icons';
+import { IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot } from './Icons';
 
 // ─────────────────────────────────────────────────────────────
 // Screen — contenedor de pantalla con "safe area" sin dependencias nativas extra.
@@ -488,7 +488,7 @@ export const Header = ({ title, subtitle, onBack = null, right = null }) => (
         hitSlop={TOKENS.hitSlop}
         style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: TOKENS.colors.neutral300, alignItems: 'center', justifyContent: 'center' }}
       >
-        <Text style={{ fontSize: 22, color: TOKENS.colors.text, marginTop: -2 }}>‹</Text>
+        <IconChevronLeft size={22} color={TOKENS.colors.text} />
       </Pressable>
     )}
     <View style={{ flex: 1 }}>
@@ -515,7 +515,7 @@ const renderTabIcon = (key, color) => {
     case 'settings':
       return <IconSettings size={20} color={color} />;
     default:
-      return <Text style={{ fontSize: 18, color }}>•</Text>;
+      return <IconDot size={20} color={color} />;
   }
 };
 

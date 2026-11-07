@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { EmptyState } from '../DesignComponents';
 import { TOKENS, severidad } from '../DesignTokens';
-import { IconPuntos } from '../Icons';
+import { IconPuntos, IconChevronRight } from '../Icons';
 import { ENTIDAD, CIUDAD } from '../config';
 import { agruparPorBloque } from '../utils';
 import { inicialBloque } from '../helpers';
@@ -115,7 +115,7 @@ export default function FoldersScreen({
                   {g.items.length ? ` · máx ${g.peorPct.toFixed(0)}%` : ''}
                 </Text>
               </View>
-              <Text style={{ fontSize: 18, color: TOKENS.colors.neutral500 }}>›</Text>
+              <IconChevronRight size={20} color={TOKENS.colors.neutral500} />
             </Pressable>
           );
         })

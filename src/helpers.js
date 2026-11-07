@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { TOKENS } from './DesignTokens';
+import { IconCheck } from './Icons';
 import { bloqueDeMedicion } from './utils';
 
 export * from './logic';
@@ -23,7 +24,7 @@ export function ErrorText({ text }) {
 export function CheckRow({ text }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-      <Text style={{ color: TOKENS.colors.accent2_700, fontWeight: '800' }}>✓</Text>
+      <IconCheck size={16} color={TOKENS.colors.accent2_700} />
       <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.text }}>{text}</Text>
     </View>
   );

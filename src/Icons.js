@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Path, Polyline, Line, Circle, Rect } from 'react-native-svg';
 
-export function IconHome({ size = 22, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconHome({ size = 22, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -10,7 +10,7 @@ export function IconHome({ size = 22, color = '#2563eb', strokeWidth = 2, style 
   );
 }
 
-export function IconLotes({ size = 22, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconLotes({ size = 22, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Path d="m16.5 9.4-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -20,7 +20,7 @@ export function IconLotes({ size = 22, color = '#2563eb', strokeWidth = 2, style
   );
 }
 
-export function IconPuntos({ size = 22, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconPuntos({ size = 22, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
@@ -29,7 +29,7 @@ export function IconPuntos({ size = 22, color = '#2563eb', strokeWidth = 2, styl
   );
 }
 
-export function IconActivity({ size = 22, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconActivity({ size = 22, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Circle cx="12" cy="12" r="10" />
@@ -38,7 +38,7 @@ export function IconActivity({ size = 22, color = '#2563eb', strokeWidth = 2, st
   );
 }
 
-export function IconSettings({ size = 22, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconSettings({ size = 22, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Circle cx="12" cy="12" r="3" />
@@ -47,7 +47,7 @@ export function IconSettings({ size = 22, color = '#2563eb', strokeWidth = 2, st
   );
 }
 
-export function IconCamera({ size = 22, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconCamera({ size = 22, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
@@ -56,7 +56,7 @@ export function IconCamera({ size = 22, color = '#2563eb', strokeWidth = 2, styl
   );
 }
 
-export function IconAlertTriangle({ size = 20, color = '#f59e0b', strokeWidth = 2, style }) {
+export function IconAlertTriangle({ size = 20, color = '#f59e0b', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
@@ -66,7 +66,7 @@ export function IconAlertTriangle({ size = 20, color = '#f59e0b', strokeWidth = 
   );
 }
 
-export function IconCheckCircle({ size = 20, color = '#10b981', strokeWidth = 2, style }) {
+export function IconCheckCircle({ size = 20, color = '#10b981', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -75,7 +75,7 @@ export function IconCheckCircle({ size = 20, color = '#10b981', strokeWidth = 2,
   );
 }
 
-export function IconBuilding({ size = 20, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconBuilding({ size = 20, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
@@ -93,7 +93,7 @@ export function IconBuilding({ size = 20, color = '#2563eb', strokeWidth = 2, st
   );
 }
 
-export function IconGps({ size = 20, color = '#2563eb', strokeWidth = 2, style }) {
+export function IconGps({ size = 20, color = '#2563eb', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Circle cx="12" cy="12" r="10" />
@@ -105,7 +105,7 @@ export function IconGps({ size = 20, color = '#2563eb', strokeWidth = 2, style }
   );
 }
 
-export function IconCheck({ size = 20, color = '#10b981', strokeWidth = 2, style }) {
+export function IconCheck({ size = 20, color = '#10b981', strokeWidth = 2.2, style }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
       <Polyline points="20 6 9 17 4 12" />
@@ -113,3 +113,53 @@ export function IconCheck({ size = 20, color = '#10b981', strokeWidth = 2, style
   );
 }
 
+
+export function IconChevronLeft({ size = 20, color = '#201e1d', strokeWidth = 2.2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Polyline points="15 18 9 12 15 6" />
+    </Svg>
+  );
+}
+
+export function IconChevronRight({ size = 20, color = '#201e1d', strokeWidth = 2.2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Polyline points="9 18 15 12 9 6" />
+    </Svg>
+  );
+}
+
+export function IconArrowLeft({ size = 20, color = '#201e1d', strokeWidth = 2.2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Line x1="19" y1="12" x2="5" y2="12" />
+      <Polyline points="12 19 5 12 12 5" />
+    </Svg>
+  );
+}
+
+export function IconPlus({ size = 20, color = '#201e1d', strokeWidth = 2.2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Line x1="12" y1="5" x2="12" y2="19" />
+      <Line x1="5" y1="12" x2="19" y2="12" />
+    </Svg>
+  );
+}
+
+export function IconMinus({ size = 20, color = '#201e1d', strokeWidth = 2.2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Line x1="5" y1="12" x2="19" y2="12" />
+    </Svg>
+  );
+}
+
+export function IconDot({ size = 20, color = '#201e1d', strokeWidth = 2.2, style }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Circle cx="12" cy="12" r="3" fill={color} />
+    </Svg>
+  );
+}

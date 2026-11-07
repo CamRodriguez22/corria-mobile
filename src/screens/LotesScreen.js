@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Button, MeasurementRow, EmptyState, PromptModal } from '../DesignComponents';
 import { TOKENS, num, severidad } from '../DesignTokens';
-import { IconLotes } from '../Icons';
+import { IconLotes, IconChevronRight, IconArrowLeft } from '../Icons';
 import { formatDate } from '../utils';
 import { tituloBloque } from '../helpers';
 
@@ -83,7 +83,8 @@ export default function LotesScreen({
           accessibilityLabel="Volver a la lista de lotes"
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14, minHeight: 44, justifyContent: 'flex-start' }}
         >
-          <Text style={{ fontSize: 16, color: TOKENS.colors.accentText, fontWeight: '700' }}>← Volver a lotes</Text>
+          <IconArrowLeft size={20} color={TOKENS.colors.accentText} />
+          <Text style={{ fontSize: 16, color: TOKENS.colors.accentText, fontWeight: '700' }}>Volver a lotes</Text>
         </Pressable>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -220,7 +221,7 @@ export default function LotesScreen({
                 {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'} · Máx {lote.maxPct.toFixed(1)}% (Nivel {lote.maxNivel?.i ?? '—'})
               </Text>
             </View>
-            <Text style={{ fontSize: 18, color: TOKENS.colors.neutral500 }}>›</Text>
+            <IconChevronRight size={20} color={TOKENS.colors.neutral500} />
           </Pressable>
         ))
       )}
