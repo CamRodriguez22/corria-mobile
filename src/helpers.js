@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { TOKENS } from './DesignTokens';
 import { IconCheck } from './Icons';
 import { bloqueDeMedicion } from './utils';
+import { tituloPunto } from './galeria';
 
 export * from './logic';
 
@@ -10,6 +11,11 @@ export function tituloBloque(m, bloqueMap, bloquesMap = {}) {
   const listaReal = Object.values(bloquesMap);
   const b = bloqueDeMedicion(m, bloqueMap, listaReal.length ? listaReal : undefined);
   return b ? (bloquesMap[b]?.nombre || 'Punto sin nombre') : 'Sin punto';
+}
+
+// "Punto A · Cubierta" para una medición (resuelve el punto igual que el resto de la app).
+export function nombrePuntoDe(m, bloqueMap, bloquesMap = {}) {
+  return tituloPunto(tituloBloque(m, bloqueMap, bloquesMap));
 }
 
 export function ErrorText({ text }) {

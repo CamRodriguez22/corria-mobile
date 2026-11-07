@@ -202,6 +202,70 @@ export function listarRecientes(mediciones, { limit = 15, desde, hasta } = {}) {
   return { total: page.length, mediciones: page, truncado: lista.length > tope };
 }
 
+// GET /mediciones/{id_punto}?resumen=1&limite&desde&hasta -> { id_punto, total, mediciones, truncado? }.
+// Mismas reglas que el handler: sin rango, límite por defecto 50 (máx. 500) y sin `truncado`;
+// con rango, límite por defecto 500 y `truncado` si había más.
+export function listarPorPunto(mediciones, id_punto, { limite, desde, hasta } = {}) {
+  const conRango = Boolean(desde || hasta);
+  const tope = Math.max(1, Math.min(limite ?? (conRango ? 500 : 50), 500));
+  let lista = mediciones.filter((m) => m.id_punto === id_punto).sort((a, z) => (a.timestamp < z.timestamp ? 1 : -1));
+  if (desde) lista = lista.filter((m) => diaLocal(m.timestamp) >= desde);
+  if (hasta) lista = lista.filter((m) => diaLocal(m.timestamp) <= hasta);
+  const page = lista.slice(0, tope).map(sinPesados);
+  const cuerpo = { id_punto, total: page.length, mediciones: page };
+  if (conRango) cuerpo.truncado = lista.length > tope;
+  return cuerpo;
+}
+
+// GET /mediciones/resumen-diario?anio&id_punto -> agregados por día local (misma forma que el handler).
+export function resumenDiario(mediciones, anio, id_punto = null) {
+  const dias = {};
+  let imagenes = 0;
+  const lotesTotal = new Set();
+  let enLotes = 0;
+  for (const m of mediciones) {
+    if (id_punto && m.id_punto !== id_punto) continue;
+    const dia = diaLocal(m.timestamp);
+    if (!dia || !dia.startsWith(`${anio}-`)) continue;
+    const d = (dias[dia] ||= { fecha: dia, total: 0, por_nivel: [0, 0, 0, 0], peor_nivel: null, max_pct: null, sumPct: 0, nPct: 0, sumNiv: 0, nNiv: 0, lotes: {} });
+    d.total++;
+    imagenes++;
+    const nivel = m.nivel_corrosion;
+    if (Number.isInteger(nivel) && nivel >= 0 && nivel <= 3) {
+      d.por_nivel[nivel]++;
+      d.sumNiv += nivel;
+      d.nNiv++;
+      d.peor_nivel = d.peor_nivel === null ? nivel : Math.max(d.peor_nivel, nivel);
+    }
+    const pct = parseFloat(m.area_corroida_pct);
+    if (Number.isFinite(pct)) {
+      d.max_pct = d.max_pct === null ? pct : Math.max(d.max_pct, pct);
+      d.sumPct += pct;
+      d.nPct++;
+    }
+    if (m.lote_id) {
+      d.lotes[m.lote_id] = (d.lotes[m.lote_id] || 0) + 1;
+      lotesTotal.add(m.lote_id);
+      enLotes++;
+    }
+  }
+  const salida = Object.keys(dias).sort().map((k) => {
+    const d = dias[k];
+    return {
+      fecha: d.fecha,
+      total: d.total,
+      por_nivel: d.por_nivel,
+      peor_nivel: d.peor_nivel,
+      max_pct: d.max_pct,
+      promedio_pct: d.nPct ? d.sumPct / d.nPct : null,
+      nivel_promedio: d.nNiv ? Math.round((d.sumNiv / d.nNiv) * 100) / 100 : null,
+      nivel_ponderado: d.nNiv ? Math.floor(d.sumNiv / d.nNiv + 0.5) : null,
+      lotes: { count: Object.keys(d.lotes).length, imagenes: Object.values(d.lotes).reduce((a, b) => a + b, 0) },
+    };
+  });
+  return { anio, id_punto, dias: salida, totales: { imagenes, lotes: lotesTotal.size, imagenes_en_lotes: enLotes }, truncado: false };
+}
+
 export function obtenerMedicion(mediciones, id_punto, id_medicion) {
   const m = mediciones.find((x) => x.id_punto === id_punto && x.id_medicion === id_medicion);
   return m ? [{ ...m }] : [];

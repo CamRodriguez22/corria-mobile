@@ -93,10 +93,15 @@ export const Logo = ({ size = 14, gap = 3 }) => {
 // ─────────────────────────────────────────────────────────────
 const VARIANTS = {
   primary: { bg: TOKENS.colors.accent, bgPressed: TOKENS.colors.accent700, fg: '#fff', border: 'transparent' },
-  secondary: { bg: TOKENS.colors.accent2_700, bgPressed: TOKENS.colors.accent2_800, fg: '#fff', border: 'transparent' },
-  ghost: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.neutral700, border: TOKENS.colors.neutral300 },
+  // Tonal (Material 3 "filled tonal"): salvia suave con texto oscuro (>= 10:1).
+  tonal: { bg: TOKENS.colors.accent2_200, bgPressed: TOKENS.colors.accent2_300, fg: TOKENS.colors.accent2_900, border: 'transparent' },
+  // Outlined y texto: acciones secundarias y de bajo énfasis.
+  outlined: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.neutral700, border: TOKENS.colors.neutral400 },
+  text: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.accentText, border: 'transparent' },
   danger: { bg: 'transparent', bgPressed: TOKENS.colors.dangerTint, fg: TOKENS.colors.danger, border: TOKENS.colors.danger },
 };
+VARIANTS.secondary = VARIANTS.tonal;
+VARIANTS.ghost = VARIANTS.outlined;
 
 export const Button = ({
   label,

@@ -8,6 +8,8 @@ import {
   FOTOS,
   generarMediciones,
   listarRecientes,
+  listarPorPunto,
+  resumenDiario,
   obtenerMedicion,
   renombrar,
   renombrarLoteEnStore,
@@ -54,6 +56,19 @@ export async function getMedicionesRecientes(_token, limit = 15, { hasta, desde 
   await red(350);
   if (paramDemo('vacio') === '1') return { total: 0, mediciones: [], truncado: false };
   return clonar(listarRecientes(meds(), { limit, hasta, desde }));
+}
+
+export async function getMedicionesPunto(idPunto, { limite, desde, hasta } = {}) {
+  await red(300);
+  if (paramDemo('vacio') === '1') return { id_punto: idPunto, total: 0, mediciones: [] };
+  return clonar(listarPorPunto(meds(), idPunto, { limite, desde, hasta }));
+}
+
+export async function getResumenDiario(anio, idPunto) {
+  await red(300);
+  if (anio < 2026) throw new Error('Elige un año válido (desde 2026) e inténtalo de nuevo');
+  if (paramDemo('vacio') === '1') return { anio, id_punto: idPunto || null, dias: [], totales: { imagenes: 0, lotes: 0, imagenes_en_lotes: 0 }, truncado: false };
+  return clonar(resumenDiario(meds(), anio, idPunto || null));
 }
 
 export async function getMedicionCompleta(id_punto, id_medicion) {

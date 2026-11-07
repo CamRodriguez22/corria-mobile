@@ -43,6 +43,8 @@ import {
   puedeGestionarLote,
   traducirAuthError,
   PAGINA_MEDICIONES,
+  PAGINA_PUNTO,
+  LIMITE_PUNTO_MAX,
   paginaAnterior,
   mezclarMediciones,
   hayMasMediciones as calcularHayMas,
@@ -65,6 +67,7 @@ import {
   getMiPerfil,
   getIndicadores,
   getMedicionesRecientes,
+  getMedicionesPunto,
   getMedicionCompleta,
   getBloques,
   resolverBloqueId,
@@ -152,6 +155,10 @@ function Root() {
   const [cargandoBloques, setCargandoBloques] = useState(false);
   const sesionVencidaAvisada = useRef(false);
   const medicionesRef = useRef([]); // copia de `mediciones` para el reloj de URL vencidas
+  // Historial real de cada punto: { [id_punto]: { lista, hayMas, estado: 'cargando'|'mas'|'ok'|'error', error } }.
+  // Va aparte de `mediciones` (la lista continua de Inicio/Actividad, que pagina por fecha).
+  const [porPunto, setPorPunto] = useState({});
+  const porPuntoRef = useRef({});
 
   // navegación
   const [tab, setTab] = useState('home');
@@ -240,6 +247,7 @@ function Root() {
   };
 
   medicionesRef.current = mediciones;
+  porPuntoRef.current = porPunto;
 
   const nombre = perfil?.nombre || (perfil?.email || email).split('@')[0] || 'Usuario';
   const iniciales = nombre
@@ -476,6 +484,59 @@ function Root() {
     }
   };
 
+  // Aplica un cambio (renombrar, borrar...) a la lista general y a los historiales por punto.
+  const mapearTodo = (fn) => {
+    setMediciones((prev) => fn(prev));
+    setPorPunto((prev) =>
+      Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, lista: fn(v.lista || []) }]))
+    );
+  };
+
+  // Historial real de un punto: GET /mediciones/{id_punto}?resumen=1. La primera vez trae
+  // PAGINA_PUNTO; con `mas` pide hasta el día de la foto más antigua cargada (como /recientes).
+  const cargarHistorialPunto = async (idPunto, { mas = false } = {}) => {
+    const previo = porPuntoRef.current[idPunto];
+    if (!idPunto || previo?.estado === 'cargando' || previo?.estado === 'mas') return;
+    const sesion = sesionRef.current;
+    let params = { limite: PAGINA_PUNTO };
+    if (mas) {
+      const pag = paginaAnterior(previo?.lista || [], PAGINA_PUNTO, LIMITE_PUNTO_MAX);
+      if (!pag) return;
+      params = { limite: pag.limit, hasta: pag.hasta };
+    }
+    setPorPunto((p) => ({
+      ...p,
+      [idPunto]: { lista: previo?.lista || [], hayMas: previo?.hayMas ?? false, estado: mas ? 'mas' : 'cargando', error: '' },
+    }));
+    try {
+      const resp = await getMedicionesPunto(idPunto, params);
+      if (sesion !== sesionRef.current) return;
+      const nuevas = marcarCarga(listaDeRespuesta(resp).map(({ mascaras, ...rest }) => rest));
+      const { agregadas } = mezclarMediciones(previo?.lista || [], nuevas);
+      setPorPunto((p) => ({
+        ...p,
+        [idPunto]: {
+          lista: mezclarMediciones(p[idPunto]?.lista || [], nuevas).lista,
+          hayMas: calcularHayMas(resp, params.limite, mas ? agregadas : 1),
+          estado: 'ok',
+          error: '',
+        },
+      }));
+    } catch (e) {
+      if (sesion !== sesionRef.current) return;
+      if (esSesionVencida(e)) avisarSesionVencida();
+      setPorPunto((p) => ({
+        ...p,
+        [idPunto]: {
+          lista: p[idPunto]?.lista || [],
+          hayMas: p[idPunto]?.hayMas ?? false,
+          estado: 'error',
+          error: e?.message || 'No se pudo cargar el historial del punto.',
+        },
+      }));
+    }
+  };
+
   // Reintento puntual de GET /bloques (sin recargar todo lo demás). Si falla, se conserva
   // el catálogo que ya hubiera y se muestra el error: nunca "tu zona no tiene puntos".
   const recargarBloques = async () => {
@@ -595,6 +656,7 @@ function Root() {
     setMediciones([]);
     setHayMasMediciones(false);
     setCargandoMas(false);
+    setPorPunto({});
     setBloques([]);
     setBloqueMap({});
     setObsMap({});
@@ -928,6 +990,14 @@ function Root() {
       });
   };
 
+  // Ficha de lote (Actividad / Punto): abre el lote en la pestaña Lotes.
+  const abrirLote = (claveLote) => {
+    setTab('lotes');
+    setScreen('lotes');
+    setFolderClave(null);
+    setLoteSel(claveLote);
+  };
+
   const compartir = async (m) => {
     try {
       const s = severidad(m);
@@ -959,7 +1029,7 @@ function Root() {
           await renombrarMedicion(m.id_punto, m.id_medicion, nuevoNombre.trim());
           const act = { ...m, nombre: nuevoNombre.trim() };
           setDetalle(act);
-          setMediciones((prev) => prev.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
+          mapearTodo((lista) => lista.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
         } catch (e) {
           avisarError('No se pudo renombrar', e);
         }
@@ -978,7 +1048,7 @@ function Root() {
         setConfirmModal((prev) => ({ ...prev, visible: false }));
         try {
           await eliminarMedicion(m.id_punto, m.id_medicion);
-          setMediciones((prev) => prev.filter((x) => x.id_medicion !== m.id_medicion));
+          mapearTodo((lista) => lista.filter((x) => x.id_medicion !== m.id_medicion));
           refrescarIndicadores();
           setDetalle(null);
           setScreen(folderClave ? 'folder' : tab);
@@ -1141,8 +1211,11 @@ function Root() {
           bloquesMap={bloquesMap}
           listaBloques={listaBloques}
           empresaLinea={empresa.linea}
+          historial={porPunto[folderClave]}
+          onCargarHistorial={(opts) => cargarHistorialPunto(folderClave, opts)}
           onBack={volver}
           onOpen={abrirDetalle}
+          onAbrirLote={abrirLote}
         />
       );
 
@@ -1193,7 +1266,7 @@ function Root() {
             onRenameLote={async (items, nuevo) => {
               // Se actualiza el estado local (sin recargar: cargarTodo reiniciaría las páginas ya cargadas).
               const aplicar = (ids) =>
-                setMediciones((prev) => prev.map((x) => (ids.includes(x.id_medicion) ? { ...x, lote_nombre: nuevo } : x)));
+                mapearTodo((lista) => lista.map((x) => (ids.includes(x.id_medicion) ? { ...x, lote_nombre: nuevo } : x)));
               try {
                 const { idsRenombrados } = await renombrarLote(items, nuevo);
                 aplicar(idsRenombrados);
@@ -1229,6 +1302,7 @@ function Root() {
             onCargarMas={cargarMasMediciones}
             onRefresh={onRefresh}
             onOpen={abrirDetalle}
+            onAbrirLote={abrirLote}
           />
         )}
         {tab === 'settings' && (

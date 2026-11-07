@@ -11,6 +11,11 @@
 //   POST   /bloques                           -> bloque creado (tecnico/admin; NO cliente)
 //   GET    /mediciones/recientes?limit=N      -> { total, mediciones:[...] }   (máx 1000; acepta desde/hasta YYYY-MM-DD)
 //   GET    /mediciones/{id_punto}             -> [ ...mediciones ]
+//   GET    /mediciones/{id_punto}?resumen=1&limite=N(max 500)&desde&hasta
+//                                             -> { id_punto, total, mediciones, truncado? } (truncado solo con rango)
+//   GET    /mediciones/resumen-diario?anio=YYYY[&id_punto=]
+//                                             -> { anio, id_punto, dias:[{fecha,total,por_nivel,peor_nivel,max_pct,
+//                                                promedio_pct,nivel_promedio,nivel_ponderado,lotes}], totales, truncado }
 //   POST   /medicion                          -> objeto medición (corre análisis IA)
 //   PATCH  /mediciones/{id_punto}?id_medicion={id} -> renombra foto { nombre }
 //   POST   /mediciones/lote/renombrar         -> renombra lote { mediciones: [{id_punto, id_medicion}], nombre }
@@ -21,7 +26,7 @@
 //   area_corroida_pct  : string en los GET ("36.66") / number en el POST  -> usar parseFloat
 //   confianza_promedio : 0..1 (string/number)
 //   detecciones, mascaras : arrays (mascaras puede pesar cientos de KB — ignorar en móvil)
-//   url_imagen, url_thumbnail : URLs S3 prefirmadas (~7 días). El S3 crudo da 403.
+//   url_imagen, url_thumbnail : URLs S3 prefirmadas, VENCEN A LA HORA (ver src/miniaturas.js). El S3 crudo da 403.
 //   s3_key_imagen / _thumbnail / _resultado : claves (no accesibles directo)
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
@@ -114,6 +119,27 @@ export async function getMedicionesRecientes(
   let path = `/mediciones/recientes?limit=${lim}&resumen=1`;
   if (desde) path += `&desde=${encodeURIComponent(desde)}`;
   if (hasta) path += `&hasta=${encodeURIComponent(hasta)}`;
+  return req('GET', path, { token });
+}
+
+// Historial REAL de un punto (no solo la página cargada en Inicio/Actividad). `resumen=1` quita los
+// campos pesados. Sin rango no trae `truncado` (se infiere por el tamaño); con `hasta` sí.
+// Máximo del backend: 500 por solicitud (LIMITE_PUNTO_MAX).
+export const LIMITE_PUNTO_MAX = 500;
+export async function getMedicionesPunto(idPunto, { limite = 60, desde, hasta, token } = {}) {
+  if (!idPunto) throw new Error('Falta el punto.');
+  const lim = Math.max(1, Math.min(limite, LIMITE_PUNTO_MAX));
+  let path = `/mediciones/${encodeURIComponent(idPunto)}?resumen=1&limite=${lim}`;
+  if (desde) path += `&desde=${encodeURIComponent(desde)}`;
+  if (hasta) path += `&hasta=${encodeURIComponent(hasta)}`;
+  return req('GET', path, { token });
+}
+
+// Agregados por día local (UTC-5) de un año, con o sin punto: alimentan el mapa de calor y la tendencia.
+// El backend exige anio >= 2026.
+export async function getResumenDiario(anio, idPunto, token) {
+  let path = `/mediciones/resumen-diario?anio=${encodeURIComponent(anio)}`;
+  if (idPunto) path += `&id_punto=${encodeURIComponent(idPunto)}`;
   return req('GET', path, { token });
 }
 

@@ -6,7 +6,10 @@ import {
   Pressable,
   RefreshControl,
 } from 'react-native';
-import { Button, MeasurementRow, EmptyState, PromptModal } from '../DesignComponents';
+import { Button, EmptyState, PromptModal } from '../DesignComponents';
+import GaleriaFotos from '../GaleriaFotos';
+import { filasDeGaleria } from '../galeria';
+import { formatoPct } from '../fechas';
 import { TOKENS, num, severidad } from '../DesignTokens';
 import { IconLotes, IconChevronRight, IconArrowLeft } from '../Icons';
 import { formatDate } from '../utils';
@@ -76,11 +79,8 @@ export default function LotesScreen({
 
   if (loteAbierto) {
     const lote = loteAbierto;
-    return (
-      <ScrollView
-        contentContainerStyle={{ padding: PAD, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
-      >
+    const cabecera = (
+      <View style={{ padding: PAD, paddingBottom: 12 }}>
         <Pressable
           onPress={() => setLoteSeleccionado(null)}
           accessibilityRole="button"
@@ -113,30 +113,31 @@ export default function LotesScreen({
           )}
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, textTransform: 'uppercase', fontWeight: '700' }}>Promedio</Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text, marginTop: 2 }}>{lote.avgPct.toFixed(1)}%</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, fontWeight: '700' }}>Promedio</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text, marginTop: 2 }}>{formatoPct(lote.avgPct)}</Text>
           </View>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, textTransform: 'uppercase', fontWeight: '700' }}>Máximo</Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2 }}>{lote.maxPct.toFixed(1)}%</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, fontWeight: '700' }}>Máximo</Text>
+            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2 }}>{formatoPct(lote.maxPct)}</Text>
           </View>
         </View>
-
-        <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 12 }}>
-          Fotos del lote ({lote.items.length})
+        <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text, marginTop: 20 }}>
+          Fotos del lote
         </Text>
-        {lote.items.map((m) => (
-          <MeasurementRow
-            key={m.id_medicion}
-            medicion={m}
-            title={formatDate(m.timestamp)}
-            subtitle={`${num(m.area_corroida_pct, 0).toFixed(1)}% corroído · Nivel ${m.nivel_corrosion ?? m.nivel ?? '—'}`}
-            onPress={() => onOpen(m)}
-          />
-        ))}
-
+      </View>
+    );
+    return (
+      <>
+        <GaleriaFotos
+          filas={filasDeGaleria(lote.items, { porDia: false, agrupar: false })}
+          nombrePunto={() => lote.puntoTitulo}
+          onAbrirFoto={onOpen}
+          ListHeaderComponent={cabecera}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        />
         {renombrandoLote && (
           <PromptModal
             visible={Boolean(renombrandoLote)}
@@ -159,7 +160,7 @@ export default function LotesScreen({
             }}
           />
         )}
-      </ScrollView>
+      </>
     );
   }
 

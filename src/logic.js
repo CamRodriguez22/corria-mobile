@@ -149,6 +149,9 @@ export function clasificarErrorSubida(e) {
 // listas usan `resumen=1` (sin máscaras): ~1 KB por medición, 1000 caben en 6 MB.
 export const PAGINA_MEDICIONES = 30;
 export const LIMITE_MEDICIONES_MAX = 1000;
+// GET /mediciones/{id_punto}: página inicial y tope del backend (LIMITE_PUNTO_MAX).
+export const PAGINA_PUNTO = 60;
+export const LIMITE_PUNTO_MAX = 500;
 
 function tsMs(m) {
   const t = Date.parse(m?.timestamp);
