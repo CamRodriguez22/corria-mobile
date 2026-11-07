@@ -9,7 +9,7 @@
 //   GET    /usuarios/me
 //   GET    /bloques                           -> { bloques:[...] } (filtrado por empresa del caller)
 //   POST   /bloques                           -> bloque creado (tecnico/admin; NO cliente)
-//   GET    /mediciones/recientes?limit=N      -> { total, mediciones:[...] }   (máx 100)
+//   GET    /mediciones/recientes?limit=N      -> { total, mediciones:[...] }   (máx 1000; acepta desde/hasta YYYY-MM-DD)
 //   GET    /mediciones/{id_punto}             -> [ ...mediciones ]
 //   POST   /medicion                          -> objeto medición (corre análisis IA)
 //   PATCH  /mediciones/{id_punto}?id_medicion={id} -> renombra foto { nombre }
@@ -122,12 +122,17 @@ export async function getIndicadores(token) {
 }
 
 // ─────────────────────────── Mediciones ───────────────────────────
-export async function getMedicionesRecientes(token, limit = APP_CONFIG.limiteHistorialMovil, cursor = null) {
-  const lim = Math.min(limit, APP_CONFIG.limiteHistorialMax);
+// Sin cursor: la paginación se hace con `hasta`/`desde` (YYYY-MM-DD), ver paginaAnterior en logic.js.
+export async function getMedicionesRecientes(
+  token,
+  limit = APP_CONFIG.limiteHistorialMovil,
+  { hasta, desde } = {}
+) {
+  const lim = Math.max(1, Math.min(limit, APP_CONFIG.limiteHistorialMax));
   let path = `/mediciones/recientes?limit=${lim}`;
-  if (cursor) path += `&cursor=${encodeURIComponent(cursor)}`;
-  const data = await req('GET', path, { token });
-  return data;
+  if (desde) path += `&desde=${encodeURIComponent(desde)}`;
+  if (hasta) path += `&hasta=${encodeURIComponent(hasta)}`;
+  return req('GET', path, { token });
 }
 // Alias con nombre pedido en el prompt.
 export const listarMediciones = (limit) => getMedicionesRecientes(undefined, limit);

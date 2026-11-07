@@ -11,7 +11,7 @@ export const AWS_CONFIG = {
   //   GET  /usuarios/me
   //   GET  /bloques                              -> { bloques: [...] } (filtrado por empresa del caller)
   //   POST /bloques                              -> bloque creado (tecnico/admin; NO cliente)
-  //   GET  /mediciones/recientes?limit=N        -> { total, mediciones: [...] }   (máx 100)
+  //   GET  /mediciones/recientes?limit=N        -> { total, mediciones: [...] }   (máx 1000)
   //   GET  /mediciones/{id_punto}               -> [ ...mediciones ]
   //   GET  /alertas?horas=N&nivel_minimo=LEVE|MODERADA|SEVERA|CRITICA
   //   POST /medicion                            -> objeto medición (corre análisis IA); requiere bloque_id en la raíz
@@ -23,8 +23,8 @@ export const AWS_CONFIG = {
 export const APP_CONFIG = {
   // Radio (m) para agrupar una foto nueva con un punto de inspección ya existente.
   radioAgrupacionMetros: 100,
-  // Límite real del backend para GET /mediciones/recientes.
-  limiteHistorialMax: 100,
+  // Límite real del backend para GET /mediciones/recientes (LIMITE_RECIENTES_MAX).
+  limiteHistorialMax: 1000,
   // Traemos pocas para el móvil: cada medición real puede traer máscaras de cientos de KB.
   limiteHistorialMovil: 15,
   paginaHistorial: 10,

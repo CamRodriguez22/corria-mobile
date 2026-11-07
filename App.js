@@ -50,6 +50,10 @@ import {
   puedeGestionarMedicion,
   puedeGestionarLote,
   traducirAuthError,
+  PAGINA_MEDICIONES,
+  paginaAnterior,
+  mezclarMediciones,
+  hayMasMediciones as calcularHayMas,
 } from './src/helpers';
 import {
   AWS_CONFIG,
@@ -135,7 +139,6 @@ function Root() {
   const [perfil, setPerfil] = useState(null);
   const [indicadoresServidor, setIndicadoresServidor] = useState(null);
   const [mediciones, setMediciones] = useState([]);
-  const [cursorPaginacion, setCursorPaginacion] = useState(null);
   const [hayMasMediciones, setHayMasMediciones] = useState(false);
   const [cargandoMas, setCargandoMas] = useState(false);
   const [bloques, setBloques] = useState([]); // catálogo real (GET /bloques), adaptado
@@ -287,7 +290,7 @@ function Root() {
     try {
       const [p, respMeds, blqs, inds] = await Promise.all([
         getMiPerfil().catch(() => null),
-        getMedicionesRecientes(undefined, 30).catch(() => ({ mediciones: [] })),
+        getMedicionesRecientes(undefined, PAGINA_MEDICIONES).catch(() => ({ mediciones: [] })),
         getBloques().catch(() => null),
         getIndicadores().catch(() => null),
       ]);
@@ -296,8 +299,7 @@ function Root() {
       if (Array.isArray(blqs)) setBloques(blqs.map(adaptarBloque));
 
       const lista = Array.isArray(respMeds) ? respMeds : respMeds?.mediciones || respMeds?.items || [];
-      setCursorPaginacion(respMeds?.cursor || null);
-      setHayMasMediciones(Boolean(respMeds?.cursor));
+      setHayMasMediciones(calcularHayMas(respMeds, PAGINA_MEDICIONES));
 
       const limpio = lista
         .map(({ mascaras, ...rest }) => rest)
@@ -317,25 +319,24 @@ function Root() {
     }
   }, []);
 
+  // El backend no tiene cursor: se pide `hasta` = día de la medición más antigua
+  // cargada y se deduplica por id_medicion (ver paginaAnterior en src/logic.js).
   const cargarMasMediciones = async () => {
-    if (!cursorPaginacion || cargandoMas) return;
+    if (cargandoMas) return;
+    const pagina = paginaAnterior(mediciones);
+    if (!pagina) return;
     setCargandoMas(true);
     try {
-      const resp = await getMedicionesRecientes(undefined, 30, cursorPaginacion);
+      const resp = await getMedicionesRecientes(undefined, pagina.limit, { hasta: pagina.hasta });
       const lista = Array.isArray(resp) ? resp : resp?.mediciones || resp?.items || [];
-      setCursorPaginacion(resp?.cursor || null);
-      setHayMasMediciones(Boolean(resp?.cursor));
-      if (lista.length) {
-        const nuevo = lista
-          .map(({ mascaras, ...rest }) => rest)
-          .sort((a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0));
-        setMediciones((prev) => {
-          const ids = new Set(prev.map((m) => m.id_medicion));
-          return [...prev, ...nuevo.filter((m) => !ids.has(m.id_medicion))];
-        });
-      }
+      const nuevas = lista.map(({ mascaras, ...rest }) => rest);
+      const { agregadas } = mezclarMediciones(mediciones, nuevas);
+      // Actualización funcional: no pisa una medición subida mientras se esperaba.
+      setMediciones((prev) => mezclarMediciones(prev, nuevas).lista);
+      setHayMasMediciones(calcularHayMas(resp, pagina.limit, agregadas));
     } catch (e) {
       console.log('cargarMasMediciones', e?.message);
+      avisar('No se pudieron cargar más mediciones', e.message || 'Revisa tu conexión e intenta de nuevo.');
     } finally {
       setCargandoMas(false);
     }
@@ -869,6 +870,9 @@ function Root() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             onOpen={abrirDetalle}
+            hayMas={hayMasMediciones}
+            cargandoMas={cargandoMas}
+            onCargarMas={cargarMasMediciones}
             puedeRenombrarLote={(items) => puedeGestionarLote(perfil, items)}
             onRenameLote={async (items, nuevo) => {
               try {

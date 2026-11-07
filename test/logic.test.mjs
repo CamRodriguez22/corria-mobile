@@ -9,6 +9,9 @@ import {
   traducirAuthError,
   calcularNivelCorrosion,
   calcularMetricasLote,
+  paginaAnterior,
+  mezclarMediciones,
+  hayMasMediciones,
 } from '../src/logic.js';
 
 test('puedeGestionarMedicion - permisos por rol (forma real de /usuarios/me)', () => {
@@ -123,4 +126,48 @@ test('calcularMetricasLote - agregación de fotos en tanda/lote', () => {
   assert.equal(resultado.avgPct, 15);
   assert.equal(resultado.maxPct, 25);
   assert.equal(resultado.maxNivel, 3); // Severa
+});
+
+test('paginaAnterior - hasta = día de la más antigua, límite cubre las ya cargadas', () => {
+  assert.equal(paginaAnterior([]), null);
+  assert.equal(paginaAnterior([{ id_medicion: 'x' }]), null);
+
+  const meds = [
+    { id_medicion: 'a', timestamp: '2026-11-05T15:00:00+00:00' },
+    { id_medicion: 'b', timestamp: '2026-11-04T10:00:00+00:00' },
+    { id_medicion: 'c', timestamp: '2026-11-04T09:00:00+00:00' },
+  ];
+  const p = paginaAnterior(meds, 30);
+  assert.equal(p.hasta, '2026-11-04');
+  // 'b' y 'c' caen en el rango pedido; 'a' (11-05 15:00Z) queda fuera del fin del día local 11-04
+  assert.equal(p.limit, 2 + 30);
+  // el límite nunca pasa del máximo del backend
+  assert.equal(paginaAnterior(meds, 5000, 1000).limit, 1000);
+});
+
+test('mezclarMediciones - dedupe por id y orden descendente', () => {
+  const actuales = [
+    { id_medicion: 'a', timestamp: '2026-11-05T10:00:00Z', _localUri: 'file://a' },
+    { id_medicion: 'b', timestamp: '2026-11-04T10:00:00Z' },
+  ];
+  const nuevas = [
+    { id_medicion: 'b', timestamp: '2026-11-04T10:00:00Z' },
+    { id_medicion: 'c', timestamp: '2026-11-03T10:00:00Z' },
+    { id_medicion: 'd', timestamp: '2026-11-04T12:00:00Z' },
+  ];
+  const { lista, agregadas } = mezclarMediciones(actuales, nuevas);
+  assert.deepEqual(lista.map((m) => m.id_medicion), ['a', 'd', 'b', 'c']);
+  assert.equal(agregadas, 2);
+  assert.equal(lista[0]._localUri, 'file://a');
+  assert.equal(mezclarMediciones(actuales, actuales).agregadas, 0);
+});
+
+test('hayMasMediciones - usa truncado con rango y el total sin rango', () => {
+  assert.equal(hayMasMediciones({ total: 30, mediciones: new Array(30) }, 30), true);
+  assert.equal(hayMasMediciones({ total: 12, mediciones: new Array(12) }, 30), false);
+  assert.equal(hayMasMediciones({ mediciones: [], truncado: true }, 60, 5), true);
+  assert.equal(hayMasMediciones({ mediciones: [], truncado: false }, 60, 5), false);
+  // si el rango no aportó nada nuevo, no se ofrece cargar más (evita bucle vacío)
+  assert.equal(hayMasMediciones({ mediciones: [], truncado: true }, 60, 0), false);
+  assert.equal(hayMasMediciones(null, 30), false);
 });

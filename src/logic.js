@@ -89,3 +89,53 @@ export function calcularMetricasLote(items = []) {
     maxNivel: calcularNivelCorrosion(maxPct),
   };
 }
+
+// ───────────────────────── Paginación de GET /mediciones/recientes ─────────────────────────
+// El backend NO tiene cursor. Acepta `limit` (máx. 1000), `desde`/`hasta` (YYYY-MM-DD,
+// días locales UTC-5, ambos inclusivos) y, cuando se manda un rango, devuelve
+// `truncado: true` si había más resultados que el límite. Para "cargar anteriores"
+// se pide `hasta` = día de la medición más antigua cargada: el resultado repite las
+// mediciones de ese día (se deduplican por id_medicion) y trae las anteriores.
+export const PAGINA_MEDICIONES = 30;
+export const LIMITE_MEDICIONES_MAX = 1000;
+
+function tsMs(m) {
+  const t = Date.parse(m?.timestamp);
+  return Number.isNaN(t) ? null : t;
+}
+
+// Parámetros de la siguiente consulta o null si no hay referencia (lista vacía).
+export function paginaAnterior(mediciones = [], tamano = PAGINA_MEDICIONES, max = LIMITE_MEDICIONES_MAX) {
+  const conFecha = mediciones.map(tsMs).filter((t) => t !== null);
+  if (!conFecha.length) return null;
+  const masAntigua = Math.min(...conFecha);
+  const d = new Date(masAntigua);
+  const hasta = d.toISOString().slice(0, 10); // día UTC >= día local UTC-5: nunca se salta datos
+  // El rango pedido llega hasta el fin de ese día local (UTC-5) = día siguiente 05:00 UTC.
+  const cota = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 5, 0, 0);
+  const yaCargadas = conFecha.filter((t) => t <= cota).length;
+  return { hasta, limit: Math.min(max, yaCargadas + tamano) };
+}
+
+// Une sin duplicar por id_medicion (gana la ya cargada, que puede traer campos locales)
+// y ordena de la más reciente a la más antigua.
+export function mezclarMediciones(actuales = [], nuevas = []) {
+  const vistos = new Set(actuales.map((m) => m.id_medicion));
+  const unicas = nuevas.filter((m) => {
+    if (vistos.has(m.id_medicion)) return false;
+    vistos.add(m.id_medicion);
+    return true;
+  });
+  const lista = [...actuales, ...unicas].sort((a, z) => (tsMs(z) ?? 0) - (tsMs(a) ?? 0));
+  return { lista, agregadas: unicas.length };
+}
+
+// ¿Puede haber más mediciones en el servidor?
+// - con rango, el backend lo dice con `truncado`;
+// - sin rango (primera página) se infiere: llegó el máximo pedido.
+export function hayMasMediciones(resp, limitePedido, agregadas = 1) {
+  if (!resp || agregadas === 0) return false;
+  if (typeof resp.truncado === 'boolean') return resp.truncado;
+  const total = Array.isArray(resp) ? resp.length : (resp.mediciones || []).length;
+  return total >= limitePedido;
+}

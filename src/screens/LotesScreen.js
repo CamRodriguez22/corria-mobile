@@ -23,6 +23,9 @@ export default function LotesScreen({
   onOpen,
   onRenameLote,
   puedeRenombrarLote,
+  hayMas,
+  cargandoMas,
+  onCargarMas,
 }) {
   const [loteSeleccionado, setLoteSeleccionado] = useState(null);
   const [renombrandoLote, setRenombrandoLote] = useState(null);
@@ -220,6 +223,16 @@ export default function LotesScreen({
             <Text style={{ fontSize: 18, color: TOKENS.colors.neutral500 }}>›</Text>
           </Pressable>
         ))
+      )}
+      {hayMas && onCargarMas && (
+        <View style={{ marginTop: 14 }}>
+          <Button
+            variant="secondary"
+            label={cargandoMas ? 'Cargando más…' : 'Cargar mediciones anteriores'}
+            onPress={onCargarMas}
+            loading={cargandoMas}
+          />
+        </View>
       )}
     </ScrollView>
   );
