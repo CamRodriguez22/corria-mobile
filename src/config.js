@@ -37,6 +37,7 @@ export const APP_CONFIG = {
     // Perfil y puntos para el modo sin conexión (con el sub del usuario; se borran al cerrar sesión).
     perfilCache: 'pixelrust_perfil_cache',
     bloquesCache: 'pixelrust_bloques_cache',
+    indicadoresCache: 'pixelrust_indicadores_cache',
   },
   carpetaFotos: 'PIXELRUST_Mediciones',
 };

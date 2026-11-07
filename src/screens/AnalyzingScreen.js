@@ -1,70 +1,94 @@
 import React from 'react';
-import { View, Text } from 'react-native';
-import { Screen, Spinner, ProgressBar } from '../DesignComponents';
-import { TOKENS } from '../DesignTokens';
+import { View, Text, ScrollView, useWindowDimensions } from 'react-native';
+import { Screen, Spinner, ProgressBar, Foto } from '../DesignComponents';
+import { TOKENS, NIVELES } from '../DesignTokens';
+import { IconCheck, IconAlertTriangle, IconNivel } from '../Icons';
+import { estadoFotoCola, resumenAvance, indiceActivo, textoEtapa } from '../cola';
+import { nivelDeMedicion } from '../niveles';
+
+const PAD = TOKENS.spacing.lg;
+
+function IconoEstado({ estado, item }) {
+  if (estado.clave === 'activa') return <Spinner size={22} thickness={3} />;
+  if (estado.clave === 'lista') return <IconNivel nivel={nivelDeMedicion(item.medicion || {})} size={22} color={NIVELES[nivelDeMedicion(item.medicion || {})].texto} />;
+  if (estado.clave === 'error') return <IconAlertTriangle size={22} color={TOKENS.colors.danger} />;
+  return <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: TOKENS.colors.neutral400 }} />;
+}
 
 export default function AnalyzingScreen({ etapa, colaFotos, bloqueSel }) {
-  let mensaje = 'Procesando inspección…';
-  let detalle = 'Conectando con el servidor';
-
-  if (etapa === 'preparando_subida') {
-    mensaje = 'Preparando almacenamiento';
-    detalle = 'Generando enlace seguro en la nube';
-  } else if (etapa === 'subiendo_s3') {
-    mensaje = 'Subiendo imagen a la nube';
-    detalle = 'Cargando foto en alta resolución';
-  } else if (etapa === 'analizando_ia') {
-    mensaje = 'Analizando corrosión con IA';
-    detalle = 'Segmentando placa y calculando severidad';
-  } else if (etapa === 'completado') {
-    mensaje = '¡Análisis completado!';
-    detalle = 'Sincronizando registros en el sistema';
-  }
-
-  const procesadas = colaFotos.filter((f) => f.status === 'lista' || f.status === 'error').length;
-  const conError = colaFotos.filter((f) => f.status === 'error').length;
-  const total = colaFotos.length || 1;
-  const progresoPct = Math.round((procesadas / total) * 100);
+  const { width } = useWindowDimensions();
+  const avance = resumenAvance(colaFotos);
+  const idx = indiceActivo(colaFotos);
+  const actual = colaFotos[idx >= 0 ? idx : colaFotos.length - 1];
+  const terminado = etapa === 'completado';
+  const titulo = terminado ? 'Análisis completo' : textoEtapa(etapa);
 
   return (
-    <Screen center style={{ padding: 36, gap: 24 }}>
-      <Spinner size={88} thickness={5} />
-      <View style={{ alignItems: 'center' }}>
-        <Text
-          style={{
-            fontSize: TOKENS.fontSizes.h3,
-            fontWeight: '800',
-            color: TOKENS.colors.text,
-            textAlign: 'center',
-          }}
-        >
-          {mensaje}
-        </Text>
-        <Text
-          style={{
-            fontSize: TOKENS.fontSizes.small,
-            color: TOKENS.colors.neutral600,
-            marginTop: 6,
-            textAlign: 'center',
-          }}
-        >
-          Punto {bloqueSel} · {detalle}
-        </Text>
-      </View>
-      <View style={{ width: '100%', gap: 10 }}>
-        <ProgressBar
-          value={total > 1 ? progresoPct : (etapa === 'analizando_ia' ? 75 : etapa === 'completado' ? 100 : 35)}
-        />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.neutral500 }}>
-            {total > 1 ? `Foto ${Math.min(procesadas + 1, total)} de ${total}` : 'Foto en proceso'}
-            {conError ? ` · ${conError} con error` : ''}
+    <Screen>
+      <ScrollView contentContainerStyle={{ padding: PAD, gap: 18 }}>
+        <View>
+          <Foto uri={actual?.uri} style={{ width: width - PAD * 2, height: (width - PAD * 2) * 0.72, borderRadius: TOKENS.radius.lg }} iconSize={40} />
+          {!terminado && (
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: 0,
+                borderRadius: TOKENS.radius.lg,
+                backgroundColor: 'rgba(32,30,29,0.38)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: 40, padding: 14 }}>
+                <Spinner size={44} thickness={5} />
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
+          <Text accessibilityRole="header" style={{ ...TOKENS.type.headlineSmall, color: TOKENS.colors.text }}>
+            {titulo}
           </Text>
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, color: TOKENS.colors.accentText, fontWeight: '700' }}>
-            {total > 1 ? `${progresoPct}%` : (etapa === 'analizando_ia' ? 'Fase 2 de 2' : 'Fase 1 de 2')}
+          <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+            Punto {bloqueSel}
+            {avance.total > 1 && idx >= 0 ? ` · Foto ${idx + 1} de ${avance.total}` : ''}
           </Text>
         </View>
-      </View>
+
+        <View style={{ gap: 8 }}>
+          <ProgressBar value={avance.total > 1 ? avance.porcentaje : etapa === 'analizando_ia' ? 70 : terminado ? 100 : 30} />
+          <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>{avance.texto}</Text>
+        </View>
+
+        {avance.total > 1 && (
+          <View style={{ gap: 4 }}>
+            {colaFotos.map((f, i) => {
+              const estado = estadoFotoCola(f, i === idx ? etapa : '');
+              return (
+                <View
+                  key={i}
+                  accessible
+                  accessibilityLabel={`Foto ${i + 1}: ${estado.texto}`}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 4 }}
+                >
+                  <Foto uri={f.uri} style={{ width: 48, height: 48, borderRadius: 10 }} iconSize={20} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text }}>Foto {i + 1}</Text>
+                    <Text style={{ ...TOKENS.type.bodyMedium, color: estado.clave === 'error' ? TOKENS.colors.danger : TOKENS.colors.neutral600 }}>
+                      {estado.texto}
+                    </Text>
+                  </View>
+                  <IconoEstado estado={estado} item={f} />
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
     </Screen>
   );
 }

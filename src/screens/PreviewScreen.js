@@ -1,48 +1,47 @@
 import React from 'react';
-import { View, ScrollView, Image } from 'react-native';
-import { Screen, Header, Button } from '../DesignComponents';
+import { View, Text, ScrollView, useWindowDimensions } from 'react-native';
+import { Screen, Header, Button, Foto } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
-import { CheckRow } from '../helpers';
+import { IconCheck } from '../Icons';
+import { plural } from '../fechas';
 
 const PAD = TOKENS.spacing.lg;
 
-export default function PreviewScreen({ foto, bloqueSel, onBack, onConfirm }) {
+export default function PreviewScreen({ foto, cola = [], bloqueSel, onBack, onConfirm }) {
+  const { width } = useWindowDimensions();
+  const varias = cola.length > 1;
   return (
     <Screen>
-      <Header title="Revisar foto" subtitle={`Punto ${bloqueSel} · validada`} onBack={onBack} />
-      <ScrollView contentContainerStyle={{ padding: PAD }}>
-        {foto?.uri ? (
-          <Image
-            source={{ uri: foto.uri }}
-            style={{
-              width: '100%',
-              height: 280,
-              borderRadius: TOKENS.radius.lg,
-              backgroundColor: TOKENS.colors.neutral200,
-            }}
-            resizeMode="cover"
-          />
-        ) : null}
-        <View
-          style={{
-            marginTop: 16,
-            backgroundColor: TOKENS.colors.surfaceAlt,
-            borderRadius: TOKENS.radius.lg,
-            padding: 16,
-            gap: 12,
-            borderWidth: 1,
-            borderColor: TOKENS.colors.border,
-            ...TOKENS.shadow.sm,
-          }}
-        >
-          <CheckRow text={`Resolución ${foto?.width || '—'} × ${foto?.height || '—'} px`} />
-          <CheckRow text="Formato y compresión optimizados" />
-          <CheckRow text={`Asociado al punto ${bloqueSel}`} />
+      <Header
+        title={varias ? `${cola.length} fotos seleccionadas` : 'Revisar foto'}
+        subtitle={`Punto ${bloqueSel}`}
+        onBack={onBack}
+      />
+      <ScrollView contentContainerStyle={{ padding: PAD, gap: 16 }}>
+        <Foto uri={foto?.uri} style={{ width: width - PAD * 2, height: (width - PAD * 2) * 0.8, borderRadius: TOKENS.radius.lg }} iconSize={40} />
+        {varias && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {cola.map((f, i) => (
+              <Foto key={i} uri={f.uri} style={{ width: (width - PAD * 2 - 6 * 3) / 4, height: (width - PAD * 2 - 6 * 3) / 4, borderRadius: 10 }} iconSize={18} />
+            ))}
+          </View>
+        )}
+        <View style={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <IconCheck size={18} color={TOKENS.colors.accent2_700} />
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.text }}>
+              {foto?.width && foto?.height ? `Resolución ${foto.width} × ${foto.height} px` : 'Resolución válida'}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <IconCheck size={18} color={TOKENS.colors.accent2_700} />
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.text }}>Se asociará al punto {bloqueSel}</Text>
+          </View>
         </View>
       </ScrollView>
-      <View style={{ padding: PAD, gap: 10 }}>
-        <Button label="Usar foto y analizar" onPress={onConfirm} />
-        <Button variant="ghost" label="Retomar foto" onPress={onBack} />
+      <View style={{ padding: PAD, gap: 8 }}>
+        <Button label={varias ? `Analizar ${plural(cola.length, 'foto', 'fotos')}` : 'Usar foto y analizar'} onPress={onConfirm} />
+        <Button variant="text" label={varias ? 'Elegir otras fotos' : 'Retomar foto'} onPress={onBack} />
       </View>
     </Screen>
   );

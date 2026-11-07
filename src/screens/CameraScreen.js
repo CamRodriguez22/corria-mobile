@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { Screen, Header, Button } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
-import { IconCamera } from '../Icons';
+import { IconCamera, IconImages } from '../Icons';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -13,31 +13,27 @@ export default function CameraScreen({ bloqueSel, onBack, onPick }) {
       <View style={{ flex: 1, padding: PAD, justifyContent: 'center', alignItems: 'center', gap: 20 }}>
         <View
           style={{
-            width: 220,
-            height: 220,
-            borderRadius: 24,
+            width: 200,
+            height: 200,
+            borderRadius: 28,
             borderWidth: 2,
             borderColor: TOKENS.colors.accent300,
             borderStyle: 'dashed',
             backgroundColor: TOKENS.colors.surfaceAlt,
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 12,
           }}
         >
           <IconCamera size={56} color={TOKENS.colors.accent} strokeWidth={1.8} />
-          <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.small, fontWeight: '600' }}>
-            Mín. 640 × 480 px
-          </Text>
         </View>
-        <Text style={{ textAlign: 'center', color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.small, maxWidth: 280, lineHeight: 20 }}>
-          Enfoca la placa metálica de frente. Puedes tomar una foto en campo o elegir varias fotos de la galería en lote.
+        <Text style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, textAlign: 'center' }}>Enfoca la placa de frente</Text>
+        <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, textAlign: 'center', maxWidth: 300 }}>
+          Toma una foto en campo o elige varias de la galería para subirlas juntas. Mínimo 640 × 480 px.
         </Text>
       </View>
       <View style={{ padding: PAD, gap: 12 }}>
-        <Button label="Tomar foto con cámara" onPress={() => onPick(true)} />
-        <Button variant="secondary" label="Elegir foto(s) de la galería" onPress={() => onPick(false)} />
-        <Button variant="ghost" label="Volver" onPress={onBack} />
+        <Button label="Tomar foto con la cámara" left={<IconCamera size={20} color="#fff" />} onPress={() => onPick(true)} />
+        <Button variant="tonal" label="Elegir fotos de la galería" left={<IconImages size={20} color={TOKENS.colors.accent2_900} />} onPress={() => onPick(false)} />
       </View>
     </Screen>
   );

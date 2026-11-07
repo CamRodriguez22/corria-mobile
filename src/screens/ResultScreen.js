@@ -1,24 +1,19 @@
-import React, { useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
-  Easing,
-} from 'react-native';
-import { Screen, Header, ResultCard, Field, Button } from '../DesignComponents';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
+import { Screen, Header, ResultCard, Field, Button, Banner, Foto, SectionTitle, useReducedMotion } from '../DesignComponents';
+import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
 import { IconCheck, IconPlus, IconMinus } from '../Icons';
 import { textoResumenCola } from '../logic';
+import { construirMosaico, dividirEnFilas } from '../galeria';
+import { imagenDe } from '../miniaturas';
 
 const PAD = TOKENS.spacing.lg;
 
 export default function ResultScreen({
   medicion,
+  cola = [],
+  onSeleccionar,
   bloqueSel,
   loteNombre,
   espesor,
@@ -36,181 +31,138 @@ export default function ResultScreen({
   onBack,
   onHome,
 }) {
-  const imagenUri = medicion._localUri || medicion.url_imagen;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { width } = useWindowDimensions();
+  const reducido = useReducedMotion();
+  const fadeAnim = useRef(new Animated.Value(reducido ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 280,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
+    if (reducido) {
+      fadeAnim.setValue(1);
+      return;
+    }
+    Animated.timing(fadeAnim, { toValue: 1, duration: 280, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
+  }, [fadeAnim, reducido]);
+
+  // Todas las fotos analizadas de la tanda (con su foto local) y la elegida.
+  const analizadas = useMemo(
+    () => cola.filter((f) => f.status === 'lista' && f.medicion).map((f) => ({ ...f.medicion, _localUri: f.uri })),
+    [cola]
+  );
+  const filas = useMemo(() => dividirEnFilas(construirMosaico(analizadas, { agrupar: false }), 3), [analizadas]);
+  const lado = anchoFicha(width, 3, PAD);
+  const varias = analizadas.length > 1;
 
   const resumen = resumenLote ? textoResumenCola(resumenLote) : '';
   const hayFallidas = Boolean(resumenLote?.fallidas);
+  const uri = imagenDe(medicion);
 
   return (
     <Screen>
-      <Header title="Resultado del análisis" onBack={onBack || onHome} />
+      <Header title="Resultado" subtitle={resumen || `Punto ${bloqueSel}`} onBack={onBack || onHome} />
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
-        <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
-          {!!resumen && (
-            <View
-              style={{
-                backgroundColor: hayFallidas ? TOKENS.colors.dangerTint : TOKENS.colors.successTint,
-                borderRadius: TOKENS.radius.md,
-                padding: 14,
-                marginBottom: 14,
-                gap: 10,
-              }}
-            >
-              <Text
-                style={{
-                  color: hayFallidas ? TOKENS.colors.danger : TOKENS.colors.accent2_800,
-                  fontSize: TOKENS.fontSizes.small,
-                  fontWeight: '700',
-                }}
-              >
-                {resumen}
-                {resumenLote.listas > 1 ? ' Aquí ves la última foto analizada.' : ''}
-              </Text>
-              {hayFallidas && !!resumenLote.primerError && (
-                <Text style={{ color: TOKENS.colors.neutral700, fontSize: TOKENS.fontSizes.small }}>
-                  {resumenLote.primerError}
-                </Text>
-              )}
-              {resumenLote?.reintentables > 0 && onReintentar && (
-                <Button variant="secondary" label="Reintentar las fallidas" onPress={onReintentar} />
-              )}
-            </View>
-          )}
-
-          {imagenUri ? (
-            <Image
-              source={{ uri: imagenUri }}
-              style={{
-                width: '100%',
-                height: 220,
-                borderRadius: TOKENS.radius.lg,
-                marginBottom: 14,
-                backgroundColor: TOKENS.colors.neutral200,
-              }}
-              resizeMode="cover"
-            />
-          ) : null}
-
-          <ResultCard
-            medicion={medicion}
-            ubicacion={`Punto ${bloqueSel}`}
-            loteNombre={medicion.lote_nombre || loteNombre}
-          />
-
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: 10,
-              marginBottom: 12,
-              paddingHorizontal: 4,
-            }}
-          >
-            <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.small }}>
-              Estado de sincronización
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <IconCheck size={16} color={TOKENS.colors.accent2_800} />
-              <Text style={{ color: TOKENS.colors.accent2_800, fontWeight: '700', fontSize: TOKENS.fontSizes.small }}>
-                En la nube
-              </Text>
-            </View>
-          </View>
-
-          <Pressable
-            onPress={() => setObsOpen((v) => !v)}
-            accessibilityRole="button"
-            accessibilityLabel="Alternar observaciones de campo"
-            style={{
-              backgroundColor: TOKENS.colors.surfaceAlt,
-              borderRadius: TOKENS.radius.md,
-              padding: 16,
-              marginTop: 4,
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: TOKENS.colors.border,
-              minHeight: 52,
-              ...TOKENS.shadow.sm,
-            }}
-          >
-            <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text }}>
-              Observaciones de campo <Text style={{ color: TOKENS.colors.neutral500, fontWeight: '400' }}>(opcional)</Text>
-            </Text>
-            {obsOpen ? (
-              <IconMinus size={20} color={TOKENS.colors.accentText} />
-            ) : (
-              <IconPlus size={20} color={TOKENS.colors.accentText} />
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+          <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 24, gap: 16 }} keyboardShouldPersistTaps="handled">
+            {hayFallidas && (
+              <View style={{ gap: 10 }}>
+                <Banner tone="danger" text={resumenLote.primerError || 'Algunas fotos no se pudieron analizar.'} />
+                {resumenLote?.reintentables > 0 && onReintentar && <Button variant="tonal" label="Reintentar las fallidas" onPress={onReintentar} />}
+              </View>
             )}
-          </Pressable>
 
-          {obsOpen && (
-            <View
+            {varias && (
+              <View>
+                <SectionTitle title="Fotos analizadas" />
+                <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginBottom: 10 }}>
+                  Toca una para ver su resultado.
+                </Text>
+                <View style={{ marginHorizontal: -PAD }}>
+                  {filas.map((fichas, i) => (
+                    <FilaGaleria
+                      key={i}
+                      fichas={fichas}
+                      lado={lado}
+                      margen={PAD}
+                      radio={12}
+                      seleccionadaId={medicion?.id_medicion}
+                      onAbrirFoto={onSeleccionar}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Foto uri={uri} style={{ width: width - PAD * 2, height: (width - PAD * 2) * 0.58, borderRadius: TOKENS.radius.lg }} iconSize={40} />
+
+            <ResultCard medicion={medicion} ubicacion={`Punto ${bloqueSel}`} loteNombre={medicion.lote_nombre || loteNombre} />
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 }}>
+              <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Estado de sincronización</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <IconCheck size={16} color={TOKENS.colors.accent2_800} />
+                <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.accent2_800 }}>En la nube</Text>
+              </View>
+            </View>
+
+            <Pressable
+              onPress={() => setObsOpen((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel="Alternar observaciones de campo"
+              accessibilityState={{ expanded: obsOpen }}
               style={{
-                marginTop: 12,
                 backgroundColor: TOKENS.colors.surfaceAlt,
-                borderRadius: TOKENS.radius.lg,
-                padding: 16,
+                borderRadius: TOKENS.radius.md,
+                paddingHorizontal: 16,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
                 borderWidth: 1,
                 borderColor: TOKENS.colors.border,
-                ...TOKENS.shadow.sm,
+                minHeight: 56,
               }}
             >
-              <Field
-                label="Espesor de placa (mm)"
-                value={espesor}
-                onChangeText={setEspesor}
-                placeholder="Ej. 2.4"
-                keyboardType="decimal-pad"
-              />
-              <Field
-                label="Descripción y notas"
-                value={descripcion}
-                onChangeText={setDescripcion}
-                placeholder="Condiciones observadas, orientación, notas…"
-                multiline
-                autoCapitalize="sentences"
-              />
-              <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginBottom: 12, lineHeight: 20 }}>
-                * El espesor y notas se guardan de forma local en este dispositivo móvil.
+              <Text style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text }}>
+                Observaciones de campo <Text style={{ color: TOKENS.colors.neutral600, fontWeight: '400' }}>(opcional)</Text>
               </Text>
-              <Button
-                variant="ghost"
-                label={obsSaved ? 'Guardado en este teléfono' : 'Guardar notas en este teléfono'}
-                left={obsSaved ? <IconCheck size={18} color={TOKENS.colors.accent2_700} /> : null}
-                onPress={onSaveObs}
-              />
-            </View>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+              {obsOpen ? <IconMinus size={20} color={TOKENS.colors.accentText} /> : <IconPlus size={20} color={TOKENS.colors.accentText} />}
+            </Pressable>
 
-        <View style={{ padding: PAD, gap: 10, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200 }}>
-          <Button
-            label={loteNombre ? 'Siguiente foto en este lote' : 'Siguiente foto en este punto'}
-            onPress={onNext}
-          />
-          {!!loteNombre && (
-            <Button variant="secondary" label="Terminar lote" onPress={onTerminarLote} />
-          )}
-          <Button variant="ghost" label="Volver al inicio" onPress={onHome} />
+            {obsOpen && (
+              <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: 16, borderWidth: 1, borderColor: TOKENS.colors.border }}>
+                <Field label="Espesor de placa (mm)" value={espesor} onChangeText={setEspesor} placeholder="Por ejemplo 2.4" keyboardType="decimal-pad" />
+                <Field
+                  label="Descripción y notas"
+                  value={descripcion}
+                  onChangeText={setDescripcion}
+                  placeholder="Condiciones observadas, orientación, notas…"
+                  multiline
+                  autoCapitalize="sentences"
+                />
+                <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginBottom: 12 }}>
+                  El espesor y las notas se guardan solo en este teléfono.
+                </Text>
+                <Button
+                  variant="outlined"
+                  label={obsSaved ? 'Guardado en este teléfono' : 'Guardar notas en este teléfono'}
+                  left={obsSaved ? <IconCheck size={18} color={TOKENS.colors.accent2_700} /> : null}
+                  onPress={onSaveObs}
+                />
+              </View>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        <View style={{ padding: PAD, gap: 8, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200 }}>
+          <Button label={loteNombre ? 'Siguiente foto en este lote' : 'Siguiente foto en este punto'} onPress={onNext} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {!!loteNombre && (
+              <View style={{ flex: 1 }}>
+                <Button variant="tonal" compact label="Terminar lote" onPress={onTerminarLote} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Button variant={loteNombre ? 'text' : 'tonal'} compact label="Volver al inicio" onPress={onHome} />
+            </View>
+          </View>
         </View>
       </Animated.View>
     </Screen>

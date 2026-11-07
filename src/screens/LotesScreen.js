@@ -1,19 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  RefreshControl,
-} from 'react-native';
-import { Button, EmptyState, PromptModal } from '../DesignComponents';
+import { View, Text, Pressable, RefreshControl, FlatList } from 'react-native';
+import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
-import { filasDeGaleria } from '../galeria';
-import { formatoPct } from '../fechas';
-import { TOKENS, num, severidad } from '../DesignTokens';
-import { IconLotes, IconChevronRight, IconArrowLeft } from '../Icons';
-import { formatDate } from '../utils';
-import { tituloBloque } from '../helpers';
+import { TOKENS, NIVELES } from '../DesignTokens';
+import { IconChevronRight, IconEdit, IconNivel } from '../Icons';
+import { nombrePuntoDe } from '../helpers';
+import { filasDeGaleria, agruparLotes, miniaturaDe } from '../galeria';
+import { formatoPct, fechaCorta, diaLocal, plural } from '../fechas';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -34,41 +27,13 @@ export default function LotesScreen({
   setLoteSeleccionado,
 }) {
   const [renombrandoLote, setRenombrandoLote] = useState(null);
-  const [nuevoNombre, setNuevoNombre] = useState('');
 
-  // Agrupar mediciones por lote_id o lote_nombre
-  const lotes = useMemo(() => {
-    const mapa = {};
-    for (const m of mediciones) {
-      const loteClave = m.lote_id || m.lote_nombre || 'Sin lote';
-      if (!mapa[loteClave]) {
-        mapa[loteClave] = {
-          id: loteClave,
-          nombre: m.lote_nombre || (m.lote_id ? `Lote ${m.lote_id.slice(-6)}` : 'Sin lote'),
-          items: [],
-          puntoId: m.punto_id || m.id_punto,
-          fechaReciente: m.timestamp || 0,
-        };
-      }
-      mapa[loteClave].items.push(m);
-      if (new Date(m.timestamp || 0) > new Date(mapa[loteClave].fechaReciente)) {
-        mapa[loteClave].fechaReciente = m.timestamp;
-      }
-    }
-
-    return Object.values(mapa).map((lote) => {
-      const pcts = lote.items.map((i) => num(i.area_corroida_pct, 0));
-      const maxPct = pcts.length ? Math.max(...pcts) : 0;
-      const avgPct = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
-      const primerItem = lote.items[0];
-      return {
-        ...lote,
-        maxPct,
-        avgPct,
-        maxNivel: primerItem ? severidad({ area_corroida_pct: maxPct }) : null,
-        puntoTitulo: tituloBloque(primerItem, bloqueMap, bloquesMap),
-      };
-    }).sort((a, b) => new Date(b.fechaReciente) - new Date(a.fechaReciente));
+  const { lotes, sueltas } = useMemo(() => {
+    const r = agruparLotes(mediciones);
+    return {
+      sueltas: r.sueltas,
+      lotes: r.lotes.map((l) => ({ ...l, puntoTitulo: nombrePuntoDe(l.items[0], bloqueMap, bloquesMap), maxNivel: NIVELES[l.peorNivel] })),
+    };
   }, [mediciones, bloqueMap, bloquesMap]);
 
   const loteAbierto = loteSeleccionado ? lotes.find((l) => l.id === loteSeleccionado) : null;
@@ -77,53 +42,59 @@ export default function LotesScreen({
     if (loteSeleccionado && !loteAbierto) setLoteSeleccionado(null);
   }, [loteSeleccionado, loteAbierto, setLoteSeleccionado]);
 
+  const modalRenombrar = renombrandoLote && (
+    <PromptModal
+      visible
+      title="Renombrar lote"
+      message={`Nuevo nombre para este lote de ${plural(renombrandoLote.items.length, 'foto', 'fotos')}:`}
+      initialValue={renombrandoLote.nombre}
+      placeholder="Nombre del lote"
+      onCancel={() => setRenombrandoLote(null)}
+      onConfirm={async (valor) => {
+        const target = renombrandoLote;
+        setRenombrandoLote(null);
+        const nombreFinal = (valor || '').trim();
+        if (target && nombreFinal && nombreFinal !== target.nombre) {
+          await onRenameLote(
+            target.items.map((i) => ({ id_punto: i.id_punto || i.punto_id, id_medicion: i.id_medicion })),
+            nombreFinal
+          );
+        }
+      }}
+    />
+  );
+
   if (loteAbierto) {
     const lote = loteAbierto;
+    const puedeRenombrar = Boolean(onRenameLote && puedeRenombrarLote?.(lote.items));
     const cabecera = (
-      <View style={{ padding: PAD, paddingBottom: 12 }}>
-        <Pressable
-          onPress={() => setLoteSeleccionado(null)}
-          accessibilityRole="button"
-          accessibilityLabel="Volver a la lista de lotes"
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14, minHeight: 44, justifyContent: 'flex-start' }}
-        >
-          <IconArrowLeft size={20} color={TOKENS.colors.accentText} />
-          <Text style={{ fontSize: 16, color: TOKENS.colors.accentText, fontWeight: '700' }}>Volver a lotes</Text>
-        </Pressable>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.h2, fontWeight: '800', color: TOKENS.colors.text }}>
-              {lote.nombre}
-            </Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 4 }}>
-              {lote.puntoTitulo} · {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'}
-            </Text>
-          </View>
-          {onRenameLote && puedeRenombrarLote?.(lote.items) && lote.id !== 'Sin lote' && (
-            <Button
-              label="Renombrar"
-              variant="secondary"
-              fullWidth={false}
-              onPress={() => {
-                setNuevoNombre(lote.nombre);
-                setRenombrandoLote(lote);
-              }}
-            />
-          )}
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+      <View style={{ paddingBottom: 4 }}>
+        <Header
+          title={lote.nombre}
+          subtitle={`${lote.puntoTitulo} · ${plural(lote.items.length, 'foto', 'fotos')}`}
+          onBack={() => setLoteSeleccionado(null)}
+          right={
+            puedeRenombrar ? (
+              <IconButton onPress={() => setRenombrandoLote(lote)} label="Renombrar lote">
+                <IconEdit size={22} color={TOKENS.colors.text} />
+              </IconButton>
+            ) : null
+          }
+        />
+        <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 6 }}>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, fontWeight: '700' }}>Promedio</Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text, marginTop: 2 }}>{formatoPct(lote.avgPct)}</Text>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Promedio del lote</Text>
+            <Text style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text, marginTop: 2 }}>{formatoPct(lote.avgPct)}</Text>
           </View>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
-            <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, fontWeight: '700' }}>Máximo</Text>
-            <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2 }}>{formatoPct(lote.maxPct)}</Text>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Peor foto</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+              <IconNivel nivel={lote.peorNivel} size={18} color={lote.maxNivel.texto} />
+              <Text style={{ ...TOKENS.type.titleLarge, color: lote.maxNivel.texto }}>{formatoPct(lote.maxPct)}</Text>
+            </View>
           </View>
         </View>
-        <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text, marginTop: 20 }}>
+        <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, paddingHorizontal: PAD, paddingTop: 16, paddingBottom: 10 }}>
           Fotos del lote
         </Text>
       </View>
@@ -138,108 +109,83 @@ export default function LotesScreen({
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
           contentContainerStyle={{ paddingBottom: 40 }}
         />
-        {renombrandoLote && (
-          <PromptModal
-            visible={Boolean(renombrandoLote)}
-            title="Renombrar lote"
-            message={`Ingresa el nuevo nombre para este lote de ${renombrandoLote.items.length} fotos:`}
-            initialValue={nuevoNombre}
-            placeholder="Nombre del lote"
-            onCancel={() => setRenombrandoLote(null)}
-            onConfirm={async (valor) => {
-              const target = renombrandoLote;
-              setRenombrandoLote(null);
-              const nombreFinal = (valor || nuevoNombre).trim();
-              if (target && nombreFinal && nombreFinal !== target.nombre) {
-                const itemsPayload = target.items.map((i) => ({
-                  id_punto: i.id_punto || i.punto_id,
-                  id_medicion: i.id_medicion,
-                }));
-                await onRenameLote(itemsPayload, nombreFinal);
-              }
-            }}
-          />
-        )}
+        {modalRenombrar}
       </>
     );
   }
 
+  const cabecera = (
+    <View style={{ gap: 4, marginBottom: 14 }}>
+      <ScreenTitle title="Lotes" subtitle="Fotos que subiste juntas en una misma inspección" />
+    </View>
+  );
+
   return (
-    <ScrollView
+    <FlatList
+      data={lotes}
+      keyExtractor={(l) => l.id}
       contentContainerStyle={{ padding: PAD, paddingBottom: 36 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
-    >
-      <Text style={{ fontSize: TOKENS.fontSizes.h2, fontWeight: '800', color: TOKENS.colors.text }}>Lotes</Text>
-      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 16 }}>
-        Grupos de inspección por fecha o campaña
-      </Text>
-
-      {lotes.length === 0 ? (
+      ListHeaderComponent={cabecera}
+      ListEmptyComponent={
         <EmptyState
-          title="No hay lotes registrados"
-          subtitle="Las fotos que tomes en grupo o por lote aparecerán organizadas aquí."
+          title="Aún no hay lotes"
+          subtitle="Cuando subas varias fotos con el nombre de un lote, aparecerán agrupadas aquí."
         />
-      ) : (
-        lotes.map((lote) => (
-          <Pressable
-            key={lote.id}
-            onPress={() => setLoteSeleccionado(lote.id)}
-            accessibilityRole="button"
-            accessibilityLabel={`Lote ${lote.nombre}, ${lote.items.length} fotos, severidad máxima ${lote.maxPct.toFixed(1)}%`}
-            style={({ pressed }) => [
-              {
-                backgroundColor: TOKENS.colors.surfaceAlt,
-                borderRadius: TOKENS.radius.lg,
-                padding: 16,
-                marginBottom: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 14,
-                opacity: pressed ? 0.85 : 1,
-                borderWidth: 1,
-                borderColor: TOKENS.colors.border,
-                minHeight: 64,
-                ...TOKENS.shadow.sm,
-              },
-            ]}
-          >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: lote.maxNivel?.tint || TOKENS.colors.neutral200,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <IconLotes size={22} color={lote.maxNivel?.color || TOKENS.colors.text} />
+      }
+      renderItem={({ item: lote }) => (
+        <Pressable
+          onPress={() => setLoteSeleccionado(lote.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Lote ${lote.nombre}, ${plural(lote.items.length, 'foto', 'fotos')}, ${lote.puntoTitulo}, peor nivel ${lote.maxNivel.label}`}
+          style={({ pressed }) => ({
+            backgroundColor: TOKENS.colors.surfaceAlt,
+            borderRadius: TOKENS.radius.lg,
+            padding: 12,
+            marginBottom: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14,
+            opacity: pressed ? 0.85 : 1,
+            borderWidth: 1,
+            borderColor: TOKENS.colors.border,
+          })}
+        >
+          <Foto uri={miniaturaDe(lote.portada)} style={{ width: 80, height: 80, borderRadius: 14 }} />
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text numberOfLines={2} style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text }}>
+              {lote.nombre}
+            </Text>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+              {plural(lote.items.length, 'foto', 'fotos')}
+              {lote.fechaReciente ? ` · ${fechaCorta(diaLocal(lote.fechaReciente))}` : ''}
+            </Text>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{lote.puntoTitulo}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <NivelBadge nivel={lote.peorNivel} compacto />
+              <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>hasta {formatoPct(lote.maxPct)}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: TOKENS.fontSizes.body, fontWeight: '700', color: TOKENS.colors.text }}>
-                {lote.nombre}
-              </Text>
-              <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>
-                {lote.puntoTitulo} · {formatDate(lote.fechaReciente)}
-              </Text>
-              <Text style={{ fontSize: TOKENS.fontSizes.small, color: lote.maxNivel?.texto || TOKENS.colors.text, marginTop: 2, fontWeight: '600' }}>
-                {lote.items.length} {lote.items.length === 1 ? 'foto' : 'fotos'} · Máx {lote.maxPct.toFixed(1)}% (Nivel {lote.maxNivel?.i ?? '—'})
-              </Text>
-            </View>
-            <IconChevronRight size={20} color={TOKENS.colors.neutral500} />
-          </Pressable>
-        ))
+          </View>
+          <IconChevronRight size={20} color={TOKENS.colors.neutral500} />
+        </Pressable>
       )}
-      {hayMas && onCargarMas && (
-        <View style={{ marginTop: 14 }}>
-          <Button
-            variant="secondary"
-            label={cargandoMas ? 'Cargando más…' : 'Cargar mediciones anteriores'}
-            onPress={onCargarMas}
-            loading={cargandoMas}
-          />
+      ListFooterComponent={
+        <View style={{ gap: 12, paddingTop: 4 }}>
+          {sueltas > 0 && (
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+              {plural(sueltas, 'foto no pertenece', 'fotos no pertenecen')} a ningún lote. Las encuentras en Actividad.
+            </Text>
+          )}
+          {hayMas && onCargarMas && (
+            <Button
+              variant="tonal"
+              label={cargandoMas ? 'Cargando más…' : 'Cargar fotos anteriores'}
+              onPress={onCargarMas}
+              loading={cargandoMas}
+            />
+          )}
         </View>
-      )}
-    </ScrollView>
+      }
+    />
   );
 }

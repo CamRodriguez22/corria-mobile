@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, RefreshControl, ScrollView, Pressable } from 'react-native';
-import { Button, Chip, HojaOpciones, EmptyState } from '../DesignComponents';
+import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import MapaCalor from '../MapaCalor';
 import { TOKENS, NIVELES } from '../DesignTokens';
@@ -183,6 +183,19 @@ export default function ActivityScreen({
       />
     </View>
   );
+
+  // Sin ninguna foto cargada y sin filtros, el mapa de días y los filtros no sirven: estado vacío simple.
+  if (!mediciones.length && !filtrado && resumen?.estado === 'ok' && !resumen.dias.length) {
+    return (
+      <ScrollView
+        contentContainerStyle={{ padding: PAD, paddingBottom: 36 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
+      >
+        <ScreenTitle title="Actividad" subtitle="Todas las fotos, día por día" />
+        <EmptyState title="Aún no hay fotos" subtitle="Cuando subas tus primeras mediciones, las verás aquí día por día." />
+      </ScrollView>
+    );
+  }
 
   return (
     <GaleriaFotos

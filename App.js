@@ -21,6 +21,7 @@ import {
   TabBar,
   ConfirmModal,
   PromptModal,
+  Snackbar,
 } from './src/DesignComponents';
 import {
   LoginScreen,
@@ -57,6 +58,7 @@ import {
   datosEmpresa,
   clasificarErrorSubida,
 } from './src/helpers';
+import { tituloPunto } from './src/galeria';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
 import {
   AWS_CONFIG,
@@ -198,6 +200,10 @@ function Root() {
   // modales interactivos (reemplazo de Alert.alert y Alert.prompt en web y móvil)
   const [confirmModal, setConfirmModal] = useState({ visible: false, title: '', message: '', variant: 'primary', onConfirm: null, onCancel: null });
   const [promptModal, setPromptModal] = useState({ visible: false, title: '', message: '', initialValue: '', onConfirm: null });
+
+  // Aviso breve y pasajero (Snackbar de Material 3) para confirmar acciones que salieron bien.
+  const [aviso, setAviso] = useState('');
+  const cerrarAviso = useCallback(() => setAviso(''), []);
 
   const cerrarConfirm = () => setConfirmModal((prev) => ({ ...prev, visible: false }));
   const cancelarConfirm = () => {
@@ -387,12 +393,13 @@ function Root() {
     const sesion = sesionRef.current;
     if (first) setLoadingData(true);
     // cache local primero (para pintar algo sin red)
-    const [cache, bmap, omap, perfilCache, bloquesCache] = await Promise.all([
+    const [cache, bmap, omap, perfilCache, bloquesCache, indicadoresCache] = await Promise.all([
       loadLocal(APP_CONFIG.storageKeys.historialCache, []),
       loadLocal(APP_CONFIG.storageKeys.bloquePorMedicion, {}),
       loadLocal(APP_CONFIG.storageKeys.obsPorMedicion, {}),
       loadLocal(APP_CONFIG.storageKeys.perfilCache, null),
       loadLocal(APP_CONFIG.storageKeys.bloquesCache, null),
+      loadLocal(APP_CONFIG.storageKeys.indicadoresCache, null),
     ]);
     if (sesion !== sesionRef.current) return;
     setBloqueMap(bmap || {});
@@ -400,6 +407,8 @@ function Root() {
     // Perfil y puntos guardados: sin red el nombre y el punto de cada foto siguen visibles.
     const perfilGuardado = leerCache(perfilCache);
     if (perfilGuardado) setPerfil((prev) => prev || perfilGuardado);
+    const indicadoresGuardados = leerCache(indicadoresCache, perfilGuardado?.cognito_sub);
+    if (indicadoresGuardados) setIndicadoresServidor((prev) => prev || indicadoresGuardados);
     const bloquesGuardados = leerCache(bloquesCache, perfilGuardado?.cognito_sub);
     if (Array.isArray(bloquesGuardados) && bloquesGuardados.length) setBloques((prev) => (prev.length ? prev : bloquesGuardados));
     // Las URL firmadas de la caché pueden haber vencido (1 h): no se pintan.
@@ -425,7 +434,13 @@ function Root() {
         setPerfil(rPerfil.value);
         saveLocal(APP_CONFIG.storageKeys.perfilCache, envolverCache(rPerfil.value.cognito_sub, rPerfil.value));
       }
-      if (rInds.status === 'fulfilled' && rInds.value) setIndicadoresServidor(rInds.value);
+      if (rInds.status === 'fulfilled' && rInds.value) {
+        setIndicadoresServidor(rInds.value);
+        saveLocal(
+          APP_CONFIG.storageKeys.indicadoresCache,
+          envolverCache(rPerfil.status === 'fulfilled' ? rPerfil.value?.cognito_sub : perfilGuardado?.cognito_sub, rInds.value)
+        );
+      }
       if (rBloques.status === 'fulfilled' && Array.isArray(rBloques.value)) {
         const adaptados = rBloques.value.map(adaptarBloque);
         setBloques(adaptados);
@@ -772,6 +787,7 @@ function Root() {
       visible: true,
       title: 'Cerrar sesión',
       message: '¿Seguro que quieres salir de tu cuenta?',
+      confirmLabel: 'Cerrar sesión',
       variant: 'danger',
       onConfirm: () => {
         setConfirmModal((prev) => ({ ...prev, visible: false }));
@@ -863,6 +879,19 @@ function Root() {
         continuar();
       },
     });
+  };
+
+  // En el resultado de una tanda, elegir otra foto cambia la lectura que se muestra. Las notas
+  // escritas para la foto anterior se guardan antes de cambiar (no se pierden).
+  const seleccionarResultado = async (m) => {
+    if (!m || m.id_medicion === resultado?.id_medicion) return;
+    if (resultado && (espesor.trim() || descripcion.trim())) await guardarObs();
+    const guardada = obsMap[m.id_medicion];
+    setEspesor(guardada?.espesor || '');
+    setDescripcion(guardada?.descripcion || '');
+    setObsSaved(Boolean(guardada));
+    const { mascaras, ...ligera } = m;
+    setResultado(ligera);
   };
 
   const terminarLote = () => {
@@ -1087,6 +1116,7 @@ function Root() {
           await renombrarMedicion(m.id_punto, m.id_medicion, nuevoNombre.trim());
           const act = { ...m, nombre: nuevoNombre.trim() };
           setDetalle(act);
+          setAviso('Foto renombrada');
           mapearTodo((lista) => lista.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
         } catch (e) {
           avisarError('No se pudo renombrar', e);
@@ -1100,7 +1130,8 @@ function Root() {
     setConfirmModal({
       visible: true,
       title: 'Eliminar medición',
-      message: 'Esta acción no se puede deshacer. Se borrará la foto y el registro.',
+      message: 'Esta acción no se puede deshacer. Se borrará la foto y su resultado.',
+      confirmLabel: 'Eliminar',
       variant: 'danger',
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, visible: false }));
@@ -1110,6 +1141,7 @@ function Root() {
           refrescarIndicadores();
           setDetalle(null);
           setScreen(folderClave ? 'folder' : tab);
+          setAviso('Foto eliminada');
         } catch (e) {
           avisarError('No se pudo eliminar', e);
         }
@@ -1209,6 +1241,7 @@ function Root() {
       return (
         <PreviewScreen
           foto={foto}
+          cola={colaFotos}
           bloqueSel={bloqueSelLabel}
           onBack={() => setScreen('camera')}
           onConfirm={analizar}
@@ -1222,6 +1255,8 @@ function Root() {
       return (
         <ResultScreen
           medicion={resultado}
+          cola={colaFotos}
+          onSeleccionar={seleccionarResultado}
           bloqueSel={bloqueSelLabel}
           loteNombre={loteNombreInput}
           espesor={espesor}
@@ -1249,7 +1284,7 @@ function Root() {
         <DetailScreen
           medicion={detalle}
           empresa={empresa}
-          bloque={detalleClaveBloque ? nombreCortoBloque(bloquesMap[detalleClaveBloque], detalleClaveBloque) : null}
+          puntoNombre={detalleClaveBloque ? tituloPunto(bloquesMap[detalleClaveBloque]?.nombre) : null}
           obs={obsMap[detalle.id_medicion]}
           puedeGestionar={puedeGestionar}
           onBack={volver}
@@ -1306,6 +1341,7 @@ function Root() {
             onRefresh={onRefresh}
             onNueva={irANuevaMedicion}
             onOpen={abrirDetalle}
+            onVerTodas={() => setTabAndScreen('activity')}
             onSettings={() => setTabAndScreen('settings')}
           />
         )}
@@ -1330,6 +1366,7 @@ function Root() {
               try {
                 const { idsRenombrados } = await renombrarLote(items, nuevo);
                 aplicar(idsRenombrados);
+                setAviso('Lote renombrado');
               } catch (e) {
                 if (e.idsRenombrados?.length) aplicar(e.idsRenombrados);
                 avisarError('No se pudo renombrar el lote', e);
@@ -1380,6 +1417,7 @@ function Root() {
   return (
     <>
       {renderPantalla()}
+      <Snackbar visible={Boolean(aviso)} message={aviso} onDismiss={cerrarAviso} />
       {modales}
     </>
   );
