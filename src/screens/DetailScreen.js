@@ -3,7 +3,7 @@ import { View, ScrollView, Image, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
 import { Screen, Header, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle, Segmented } from '../DesignComponents';
 import FotoConMascara from '../FotoConMascara';
-import { hayMascara } from '../mascara';
+import { hayMascara, aspectoParaMascara } from '../mascara';
 import { TOKENS } from '../DesignTokens';
 import { IconShare, IconMoreVertical, IconEdit, IconTrash } from '../Icons';
 import { imagenDe } from '../miniaturas';
@@ -13,9 +13,11 @@ import { plural } from '../fechas';
 const PAD = TOKENS.spacing.lg;
 
 // Proporción real de la foto (ancho/alto) para mostrarla completa y a todo el ancho.
-function useAspecto(uri, porDefecto = 4 / 3) {
-  const [aspecto, setAspecto] = useState(porDefecto);
+// Devuelve null mientras no se conozca (o si no se puede medir).
+function useAspecto(uri) {
+  const [aspecto, setAspecto] = useState(null);
   useEffect(() => {
+    setAspecto(null);
     if (!uri) return undefined;
     let vivo = true;
     Image.getSize(
@@ -35,12 +37,16 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
   const [vista, setVista] = useState('original'); // 'original' | 'corrosion'
   const { width } = useWindowDimensions();
   const uri = imagenDe(medicion);
-  const aspecto = useAspecto(uri);
+  const medido = useAspecto(uri);
+  // Aspecto real: el del API o el medido en la imagen. Solo mientras se desconoce, la caja usa 4:3 y la máscara
+  // no se dibuja (con un aspecto supuesto saldría estirada).
+  const aspectoReal = aspectoParaMascara({ medicion, medido });
+  const aspecto = aspectoReal || 4 / 3;
   // Foto a todo el ancho (con un margen pequeño y esquinas redondeadas); el alto sigue su proporción real,
   // acotado para que la lectura de abajo siempre se vea. Con tope, la foto se recorta (cover), nunca hay franjas.
   const anchoFoto = width - 24;
   const altoFoto = Math.round(Math.min(Math.max(anchoFoto / aspecto, anchoFoto * 0.62), anchoFoto * 1.12));
-  const conMascara = hayMascara(medicion);
+  const conMascara = hayMascara(medicion) && aspectoReal != null;
   const lat = medicion.latitud_real ?? medicion.punto_info?.coordenadas?.lat;
   const lng = medicion.longitud_real ?? medicion.punto_info?.coordenadas?.lng;
   const clima = medicion.clima || {};

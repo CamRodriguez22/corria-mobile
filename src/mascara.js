@@ -34,3 +34,17 @@ export function rectDeFoto(ancho, alto, aspecto, modo = 'cover') {
 export function puntosAPixeles(puntos, rect) {
   return puntos.map((p) => `${(rect.x + Number(p.x) * rect.w).toFixed(2)},${(rect.y + Number(p.y) * rect.h).toFixed(2)}`).join(' ');
 }
+
+// Proporción (ancho/alto) que trae la medición del API (`width`/`height` en píxeles), o null si no viene.
+export function aspectoDeMedicion(medicion) {
+  const w = Number(medicion?.width);
+  const h = Number(medicion?.height);
+  return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? w / h : null;
+}
+
+// Aspecto para dibujar la máscara: el real (API o medido en la imagen) y, solo si se desconoce, null. La máscara
+// no se dibuja con un aspecto supuesto: saldría estirada o corrida.
+export function aspectoParaMascara({ medicion, medido = null } = {}) {
+  const real = aspectoDeMedicion(medicion) ?? (Number.isFinite(medido) && medido > 0 ? medido : null);
+  return real;
+}

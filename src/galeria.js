@@ -1,6 +1,6 @@
 // src/galeria.js — Lógica pura de la galería de fotos (mosaico por día y por lote). Sin React Native.
 // Espejo de lib/mosaico.js de la web: fichas cuadradas, un lote se resume en una ficha con portada.
-import { nivelDeMedicion, nombreNivel } from './niveles.js';
+import { nivelDeMedicion, nombreNivel, nivelAcotado } from './niveles.js';
 import { MESES, diaLocal, fechaLarga, rotuloDia, formatoPct, plural, hoyLocal, sumarDias } from './fechas.js';
 import { miniaturaDe } from './miniaturas.js';
 
@@ -104,6 +104,7 @@ export function tituloMes(ym) {
   const m = /^(\d{4})-(\d{2})$/.exec(String(ym));
   if (!m) return 'Sin fecha';
   const nombre = MESES[Number(m[2]) - 1];
+  if (!nombre) return 'Sin fecha'; // mes fuera de 01-12
   return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} de ${m[1]}`;
 }
 
@@ -111,7 +112,9 @@ export function tituloMes(ym) {
 // encabezado por mes, el día va en cada ficha), 'dia' (un encabezado por día) o 'ninguno'.
 //   { tipo: 'dia', clave, dia, titulo, total, cargadas }  ·  { tipo: 'fila', clave, fichas }
 export function filasDeGaleria(mediciones = [], { columnas = COLUMNAS_GALERIA, agrupar = true, por = 'mes', porDia, hoy = hoyLocal(), totalesMes = null } = {}) {
-  const modo = porDia === false ? 'ninguno' : por;
+  // `porDia` es el parámetro antiguo: false = sin encabezados, true = por día. Tiene prioridad sobre `por`.
+  const pedido = porDia === false ? 'ninguno' : porDia === true ? 'dia' : por;
+  const modo = pedido === 'dia' || pedido === 'ninguno' ? pedido : 'mes';
   const grupos =
     modo === 'dia' ? agruparPorDia(mediciones) : modo === 'mes' ? agruparPorMes(mediciones) : [{ dia: null, items: mediciones }];
   const filas = [];
@@ -225,8 +228,9 @@ export function indicadoresLocales(mediciones = [], puntosItems = [], hoy = hoyL
 // `grupos` = [{ clave, bloque: { nombre }, estado: estadoPunto(items) }]. `urgente`: Moderada o peor.
 export function puntoDeAtencion(indicadores, grupos = []) {
   const mc = indicadores?.mas_critico;
-  if (mc && mc.id_punto && mc.nivel != null) {
-    return { clave: mc.id_punto, nombre: tituloPunto(mc.nombre), nivel: mc.nivel, pct: mc.promedio_pct ?? null, dia: mc.fecha || null, urgente: mc.nivel >= 2 };
+  if (mc && mc.id_punto && mc.nivel != null && mc.nivel !== '' && Number.isFinite(Number(mc.nivel))) {
+    const nivel = nivelAcotado(mc.nivel); // siempre 0..3: Inicio indexa NIVELES con él
+    return { clave: mc.id_punto, nombre: tituloPunto(mc.nombre), nivel, pct: mc.promedio_pct ?? null, dia: mc.fecha || null, urgente: nivel >= 2 };
   }
   let mejor = null;
   for (const g of grupos) {

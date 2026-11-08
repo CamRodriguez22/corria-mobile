@@ -46,7 +46,8 @@ export default function ActivityScreen({
   // y los totales reales por mes de la galería. Se pide una vez por año y se guarda en App.
   const anios = useMemo(() => aniosDisponibles(hoy), [hoy]);
   useEffect(() => {
-    anios.forEach((a) => onCargarResumen?.(a, { idPunto: filtros.idPunto || null }));
+    // Al tirar para refrescar (refreshing) se vuelve a pedir aunque ya estuviera guardado.
+    anios.forEach((a) => onCargarResumen?.(a, { idPunto: filtros.idPunto || null, forzar: refreshing }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anios, filtros.idPunto, refreshing]);
   const resumenesAnio = anios.map((a) => resumenes[filtros.idPunto ? `${filtros.idPunto}|${a}` : a]);
@@ -64,7 +65,7 @@ export default function ActivityScreen({
       return;
     }
     let vivo = true;
-    Promise.resolve(onCargarRango?.(rango)).then((r) => vivo && setParcial(Boolean(r?.truncado)));
+    Promise.resolve(onCargarRango?.(rango, { forzar: refreshing })).then((r) => vivo && setParcial(Boolean(r?.truncado)));
     return () => {
       vivo = false;
     };

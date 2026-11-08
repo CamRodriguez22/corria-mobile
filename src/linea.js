@@ -98,9 +98,14 @@ export function aplicarFiltrosADias(dias = [], filtros = FILTROS_VACIOS, hoy = h
   if (!niveles.length && !desde && !hasta) return dias || [];
   return (dias || []).map((d) => {
     if ((desde && d.fecha < desde) || (hasta && d.fecha > hasta)) return { ...d, total: 0, peor_nivel: null };
-    if (!niveles.length || !Array.isArray(d.por_nivel)) return d;
-    const vistos = niveles.filter((n) => (d.por_nivel[n] || 0) > 0);
-    return { ...d, total: vistos.reduce((t, n) => t + d.por_nivel[n], 0), peor_nivel: vistos.length ? Math.max(...vistos) : null };
+    if (!niveles.length) return d;
+    if (!Array.isArray(d.por_nivel)) {
+      // Sin desglose por nivel no se puede contar: se decide por el peor nivel del día (el total queda como viene).
+      return niveles.includes(d.peor_nivel) ? d : { ...d, total: 0, peor_nivel: null };
+    }
+    const cuenta = (n) => Number(d.por_nivel[n]) || 0; // el backend podría mandar cadenas: nunca concatenar
+    const vistos = niveles.filter((n) => cuenta(n) > 0);
+    return { ...d, total: vistos.reduce((t, n) => t + cuenta(n), 0), peor_nivel: vistos.length ? Math.max(...vistos) : null };
   });
 }
 

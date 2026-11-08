@@ -6,7 +6,7 @@ import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
 import { IconPlus, IconWifiOff, IconNivel, IconChevronRight } from '../Icons';
 import { ICONO_SOBRE_NIVEL } from '../paleta';
-import { nombreNivel } from '../niveles';
+import { nombreNivel, nivelAcotado } from '../niveles';
 import { formatoPct, fechaCorta, plural } from '../fechas';
 import { nombrePuntoDe } from '../helpers';
 import { construirMosaico, dividirEnFilas, indicadoresLocales, estadoPunto, puntoDeAtencion } from '../galeria';
@@ -52,7 +52,8 @@ export default function HomeScreen({
   );
   const totalMediciones = indicadoresServidor?.mediciones_30d ?? locales?.fotos30 ?? 0;
   const totalPuntos = indicadoresServidor?.total_puntos ?? Object.keys(bloquesMap).length;
-  const porNivel = indicadoresServidor?.por_nivel || locales?.porNivel || [0, 0, 0, 0];
+  const porNivelSrv = indicadoresServidor?.por_nivel;
+  const porNivel = Array.isArray(porNivelSrv) && porNivelSrv.length === 4 ? porNivelSrv.map((n) => Number(n) || 0) : locales?.porNivel || [0, 0, 0, 0];
   const totalConEstado = porNivel.reduce((a, b) => a + b, 0);
   // Punto que más atención pide: el `mas_critico` del servidor o, sin él, el peor de los cargados.
   const grupos = useMemo(
@@ -61,6 +62,7 @@ export default function HomeScreen({
   );
   const atencion = useMemo(() => puntoDeAtencion(indicadoresServidor, grupos), [indicadoresServidor, grupos]);
   const puedeAbrirAtencion = Boolean(atencion && bloquesMap[atencion.clave]);
+  const nivelAt = atencion ? nivelAcotado(atencion.nivel) : 0;
   const primerNombre = String(nombre || '').split(' ')[0] || nombre;
 
   return (
@@ -89,9 +91,9 @@ export default function HomeScreen({
           <Pressable
             onPress={puedeAbrirAtencion ? () => onAbrirPunto?.(atencion.clave) : undefined}
             disabled={!puedeAbrirAtencion}
-            accessibilityRole="button"
-            accessibilityLabel={`${atencion.urgente ? 'Requiere atención' : 'Punto con más corrosión'}: ${atencion.nombre}, ${nombreNivel(atencion.nivel)}${atencion.pct == null ? '' : ', ' + formatoPct(atencion.pct)}`}
-            accessibilityHint="Abre el punto"
+            accessibilityRole={puedeAbrirAtencion ? 'button' : undefined}
+            accessibilityLabel={`${atencion.urgente ? 'Requiere atención' : 'Punto con más corrosión'}: ${atencion.nombre}, ${nombreNivel(nivelAt)}${atencion.pct == null ? '' : ', ' + formatoPct(atencion.pct)}`}
+            accessibilityHint={puedeAbrirAtencion ? 'Abre el punto' : undefined}
             style={({ pressed }) => ({
               marginTop: 20,
               flexDirection: 'row',
@@ -106,18 +108,18 @@ export default function HomeScreen({
               ...TOKENS.shadow.card,
             })}
           >
-            <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: NIVELES[atencion.nivel].color, alignItems: 'center', justifyContent: 'center' }}>
-              <IconNivel nivel={atencion.nivel} size={30} color={ICONO_SOBRE_NIVEL[atencion.nivel]} />
+            <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: NIVELES[nivelAt].color, alignItems: 'center', justifyContent: 'center' }}>
+              <IconNivel nivel={nivelAt} size={30} color={ICONO_SOBRE_NIVEL[nivelAt]} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={{ ...TOKENS.type.labelSmall, letterSpacing: 0.8, color: NIVELES[atencion.nivel].texto }}>
+              <Text style={{ ...TOKENS.type.labelSmall, letterSpacing: 0.8, color: NIVELES[nivelAt].texto }}>
                 {atencion.urgente ? 'REQUIERE ATENCIÓN' : 'PUNTO CON MÁS CORROSIÓN'}
               </Text>
               <Text numberOfLines={2} style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text }}>
                 {atencion.nombre}
               </Text>
               <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text }}>
-                {nombreNivel(atencion.nivel)}
+                {nombreNivel(nivelAt)}
                 {atencion.pct == null ? '' : ` · ${formatoPct(atencion.pct)}`}
               </Text>
               {!!atencion.dia && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Promedio del {fechaCorta(atencion.dia)}</Text>}

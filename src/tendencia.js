@@ -38,7 +38,8 @@ export function puntosTendencia(dias = [], max = DIAS_TENDENCIA_MAX) {
 
 const PASOS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100];
 
-// Techo del eje Y: el menor paso >= máximo con aire (mínimo 15 %, para que unas décimas no llenen el eje).
+// Techo del eje Y: el menor paso >= máximo con aire. El objetivo mínimo es UMBRAL_MODERADA + 2 (12 %), que cae en el
+// paso de 15 %: así unas décimas no llenan el eje.
 export function techoEjeY(maximo) {
   const objetivo = Math.max((maximo || 0) * 1.15, UMBRAL_MODERADA + 2);
   return PASOS.find((p) => p >= objetivo) ?? 100;
@@ -63,7 +64,9 @@ export function escalaTendencia(puntos = [], { ancho, alto, altoBarras = 0 } = {
   const span = Math.max(t1 - t0, MS_DIA);
   const x = (fecha) => (puntos.length < 2 ? ancho / 2 : ((msDia(fecha) - t0) / span) * ancho);
   // Barras de fotos por nivel (panel inferior): altura proporcional al día con más fotos.
-  const maxFotos = Math.max(1, ...puntos.map((p) => p.total));
+  // Se escala con lo que realmente se apila (suma de `porNivel`); `total` solo si el día no trae desglose.
+  const apiladas = (p) => (p.porNivel ? p.porNivel.reduce((a, n) => a + n, 0) : p.total);
+  const maxFotos = Math.max(1, ...puntos.map(apiladas));
   const unidad = altoBarras / maxFotos;
   const salida = puntos.map((p, i) => {
     const px = x(p.fecha);
@@ -139,6 +142,7 @@ export function textoDia(p) {
 }
 
 // "7 días con fotos en 92 días (7 ago a 7 nov)": el eje cubre todo el período, no solo los días con datos.
+// Con un solo día devuelve solo "1 día con fotos" (no hay período que describir).
 export function rotuloPeriodo(puntos = []) {
   if (!puntos.length) return '';
   const primero = puntos[0];

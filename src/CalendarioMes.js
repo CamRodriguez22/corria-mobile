@@ -54,7 +54,7 @@ export function Celda({ celda, ancho, seleccionada, onPress }) {
 
 export default function CalendarioMes({ dias = [], estado, truncado = false, error = '', filtrado = false, diaSel, onSelDia, onReintentar, onCambiarMes, hoy = hoyLocal() }) {
   const { width: anchoPantalla } = useWindowDimensions();
-  const [mes, setMes] = useState(() => mesDe(hoy) || { anio: 2026, mes: 1 });
+  const [mes, setMes] = useState(() => mesDe(hoy) || { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 });
   const cal = useMemo(() => calendarioMes(dias, mes, hoy), [dias, mes, hoy]);
   const lim = limitesMes(mes, hoy);
   const celdaSel = useMemo(() => cal.semanas.flat().find((c) => c && c.fecha === diaSel) || null, [cal, diaSel]);
