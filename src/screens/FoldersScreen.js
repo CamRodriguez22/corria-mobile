@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Pressable, RefreshControl, FlatList } from 'react-native';
 import { Text } from '../Typography';
-import { EmptyState, Foto, NivelBadge, ScreenTitle } from '../DesignComponents';
+import { EmptyState, Foto, NivelBadge, ScreenTitle, AvatarButton } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconChevronRight } from '../Icons';
 import { agruparPorBloque } from '../utils';
@@ -10,7 +10,7 @@ import { formatoPct, fechaCorta, plural } from '../fechas';
 
 const PAD = TOKENS.spacing.lg;
 
-export default function FoldersScreen({ mediciones, bloqueMap, listaBloques, empresaLinea, refreshing, onRefresh, onOpen }) {
+export default function FoldersScreen({ iniciales, onSettings, mediciones, bloqueMap, listaBloques, empresaLinea, refreshing, onRefresh, onOpen }) {
   const grupos = useMemo(
     () =>
       agruparPorBloque(mediciones, bloqueMap, listaBloques).map((g) => ({
@@ -25,6 +25,7 @@ export default function FoldersScreen({ mediciones, bloqueMap, listaBloques, emp
     <View style={{ marginBottom: 14 }}>
       <ScreenTitle
         title="Puntos"
+        right={<AvatarButton iniciales={iniciales} onPress={onSettings} />}
         subtitle={[empresaLinea, plural(mediciones.length, 'foto cargada', 'fotos cargadas')].filter(Boolean).join(' · ')}
       />
     </View>

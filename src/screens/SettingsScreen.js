@@ -1,14 +1,14 @@
 import React from 'react';
 import { View, ScrollView } from 'react-native';
 import { Text } from '../Typography';
-import { Button, FilaDato, ScreenTitle } from '../DesignComponents';
+import { Screen, Header, Button, FilaDato } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconLogout } from '../Icons';
 import { nombreRol } from '../logic';
 
 const PAD = TOKENS.spacing.lg;
 
-export default function SettingsScreen({ perfil, nombre, iniciales, onLogout }) {
+export default function SettingsScreen({ perfil, nombre, iniciales, onLogout, onBack }) {
   let appVersion = '2.0.0';
   try {
     appVersion = require('../../app.json').expo?.version || '2.0.0';
@@ -21,10 +21,10 @@ export default function SettingsScreen({ perfil, nombre, iniciales, onLogout }) 
   ].filter(Boolean);
 
   return (
+    <Screen>
+    <Header title="Ajustes" subtitle="Tu cuenta y la sesión" onBack={onBack} />
     <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 36 }}>
-      <ScreenTitle title="Ajustes" subtitle="Tu cuenta y la sesión" />
-
-      <View style={{ marginTop: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+      <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
         <View
           style={{
             width: 64,
@@ -61,5 +61,6 @@ export default function SettingsScreen({ perfil, nombre, iniciales, onLogout }) 
         PIXELRUST · versión {appVersion}
       </Text>
     </ScrollView>
+    </Screen>
   );
 }

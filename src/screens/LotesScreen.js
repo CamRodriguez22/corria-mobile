@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Pressable, RefreshControl, FlatList } from 'react-native';
 import { Text } from '../Typography';
-import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton } from '../DesignComponents';
+import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton, AvatarButton } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconChevronRight, IconEdit, IconNivel } from '../Icons';
@@ -12,6 +12,8 @@ import { formatoPct, fechaCorta, diaLocal, plural } from '../fechas';
 const PAD = TOKENS.spacing.lg;
 
 export default function LotesScreen({
+  iniciales,
+  onSettings,
   mediciones,
   bloqueMap,
   bloquesMap,
@@ -118,7 +120,7 @@ export default function LotesScreen({
 
   const cabecera = (
     <View style={{ gap: 4, marginBottom: 14 }}>
-      <ScreenTitle title="Lotes" subtitle="Fotos que subiste juntas en una misma inspección" />
+      <ScreenTitle title="Lotes" subtitle="Fotos que subiste juntas en una misma inspección" right={<AvatarButton iniciales={iniciales} onPress={onSettings} />} />
     </View>
   );
 

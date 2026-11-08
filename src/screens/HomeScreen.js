@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
-import { Fab, Spinner, EmptyState, Banner, SectionTitle, SwatchNivel } from '../DesignComponents';
+import { Fab, Spinner, EmptyState, Banner, SectionTitle, SwatchNivel, AvatarButton } from '../DesignComponents';
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
 import { IconPlus, IconWifiOff, IconNivel } from '../Icons';
@@ -78,23 +78,7 @@ export default function HomeScreen({
             </Text>
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 2 }}>Así van tus inspecciones</Text>
           </View>
-          <Pressable
-            onPress={onSettings}
-            accessibilityRole="button"
-            accessibilityLabel="Abrir ajustes de perfil"
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              backgroundColor: TOKENS.colors.accent200,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: TOKENS.colors.accent300,
-            }}
-          >
-            <Text style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.accent800 }}>{iniciales}</Text>
-          </Pressable>
+          <AvatarButton iniciales={iniciales} onPress={onSettings} />
         </View>
 
         {offline && (

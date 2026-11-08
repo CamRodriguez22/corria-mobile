@@ -961,6 +961,27 @@ const renderTabIcon = (key, color) => {
   }
 };
 
+// Avatar con las iniciales: abre Ajustes (cuenta y cerrar sesión) desde cualquier pestaña.
+export const AvatarButton = ({ iniciales, onPress }) => (
+  <Pressable
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel="Abrir ajustes y cuenta"
+    style={({ pressed }) => ({
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: pressed ? TOKENS.colors.accent300 : TOKENS.colors.accent200,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: TOKENS.colors.accent300,
+    })}
+  >
+    <Text style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.accent800 }}>{iniciales}</Text>
+  </Pressable>
+);
+
 export const TabBar = ({ current, onChange, items }) => (
   <View
     accessibilityRole="tablist"
@@ -999,7 +1020,8 @@ export const TabBar = ({ current, onChange, items }) => (
           >
             {renderTabIcon(it.key, color)}
           </View>
-          <Text numberOfLines={1} style={{ fontSize: TOKENS.fontSizes.small, fontWeight: active ? '800' : '600', color }}>
+          {/* 12 sp (como Material 3): con 360 dp o letra grande, 4 rótulos caben sin apretarse. */}
+          <Text numberOfLines={1} style={{ ...TOKENS.type.labelSmall, fontWeight: active ? '800' : '600', color }}>
             {it.label}
           </Text>
         </Pressable>

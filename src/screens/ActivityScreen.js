@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, RefreshControl, ScrollView, Pressable } from 'react-native';
 import { Text } from '../Typography';
-import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle } from '../DesignComponents';
+import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle, AvatarButton } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import CalendarioMes from '../CalendarioMes';
 import { TOKENS, NIVELES } from '../DesignTokens';
@@ -20,6 +20,8 @@ import { bloqueDeMedicion } from '../utils';
 const PAD = TOKENS.spacing.lg;
 
 export default function ActivityScreen({
+  iniciales,
+  onSettings,
   mediciones,
   bloqueMap,
   bloquesMap,
@@ -100,10 +102,9 @@ export default function ActivityScreen({
   const cabecera = (
     <View style={{ paddingTop: PAD, paddingBottom: 4 }}>
       <View style={{ paddingHorizontal: PAD }}>
-        <Text style={{ ...TOKENS.type.headlineMedium, color: TOKENS.colors.text }}>Actividad</Text>
-        <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 18 }}>
-          Todas las fotos, día por día
-        </Text>
+        <View style={{ marginBottom: 14 }}>
+          <ScreenTitle title="Actividad" subtitle="Todas las fotos, día por día" right={<AvatarButton iniciales={iniciales} onPress={onSettings} />} />
+        </View>
         <CalendarioMes
           dias={diasFiltrados}
           estado={estadoResumen}
@@ -217,7 +218,7 @@ export default function ActivityScreen({
         contentContainerStyle={{ padding: PAD, paddingBottom: 36 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
       >
-        <ScreenTitle title="Actividad" subtitle="Todas las fotos, día por día" />
+        <ScreenTitle title="Actividad" subtitle="Todas las fotos, día por día" right={<AvatarButton iniciales={iniciales} onPress={onSettings} />} />
         <EmptyState title="Aún no hay fotos" subtitle="Cuando subas tus primeras mediciones, las verás aquí día por día." />
       </ScrollView>
     );

@@ -221,6 +221,8 @@ export async function parteArchivoForm({ uri, type = 'image/jpeg', nombre = 'fot
 // Salir de una carpeta siempre limpia folderClave y salir de un lote limpia loteSel, para
 // que un "atrás" posterior nunca caiga en una carpeta o lote viejo.
 export function navegarAtras({ screen, tab, folderClave = null, loteSel = null }) {
+  // Ajustes se abre desde el avatar de cualquier pestaña: atrás vuelve a esa pestaña tal como estaba.
+  if (screen === 'settings') return { screen: tab };
   if (screen === 'detail') return { screen: folderClave ? 'folder' : tab };
   if (screen === 'folder') return { screen: 'folders', folderClave: null };
   if (tab === 'lotes' && loteSel) return { loteSel: null };

@@ -323,6 +323,9 @@ test('navegarAtras - limpia carpeta y lote al salir y nunca cae en uno viejo', (
     folderClave: null,
     loteSel: null,
   });
+  // Ajustes (desde el avatar) vuelve a la pestaña de origen, con su lote o carpeta intactos
+  assert.deepEqual(navegarAtras({ screen: 'settings', tab: 'activity' }), { screen: 'activity' });
+  assert.deepEqual(navegarAtras({ screen: 'settings', tab: 'lotes', loteSel: 'L1' }), { screen: 'lotes' });
   // en inicio no hay a dónde volver (Android sale de la app)
   assert.equal(navegarAtras({ screen: 'home', tab: 'home' }), null);
 });

@@ -127,7 +127,6 @@ const TABS = [
   { key: 'lotes', label: 'Lotes' },
   { key: 'folders', label: 'Puntos' },
   { key: 'activity', label: 'Actividad' },
-  { key: 'settings', label: 'Ajustes' },
 ];
 
 export default function App() {
@@ -1318,6 +1317,10 @@ function Root() {
       );
     }
 
+    // Ajustes: se abre desde el avatar de cualquier pestaña (sin barra inferior); atrás vuelve a la pestaña.
+    if (screen === 'settings')
+      return <SettingsScreen perfil={perfil} nombre={nombre} iniciales={iniciales} onLogout={handleLogout} onBack={volver} />;
+
     if (screen === 'folder' && folderClave)
       return (
         <FolderScreen
@@ -1338,6 +1341,7 @@ function Root() {
       );
 
     // pantallas con tab bar
+    const abrirAjustes = () => setScreen('settings');
     const setTabAndScreen = (k) => {
       setTab(k);
       setScreen(k);
@@ -1365,11 +1369,13 @@ function Root() {
             onNueva={irANuevaMedicion}
             onOpen={abrirDetalle}
             onVerTodas={() => setTabAndScreen('activity')}
-            onSettings={() => setTabAndScreen('settings')}
+            onSettings={abrirAjustes}
           />
         )}
         {tab === 'lotes' && (
           <LotesScreen
+            iniciales={iniciales}
+            onSettings={abrirAjustes}
             mediciones={mediciones}
             bloqueMap={bloqueMap}
             bloquesMap={bloquesMap}
@@ -1399,6 +1405,8 @@ function Root() {
         )}
         {tab === 'folders' && (
           <FoldersScreen
+            iniciales={iniciales}
+            onSettings={abrirAjustes}
             mediciones={mediciones}
             bloqueMap={bloqueMap}
             listaBloques={listaBloques}
@@ -1413,6 +1421,8 @@ function Root() {
         )}
         {tab === 'activity' && (
           <ActivityScreen
+            iniciales={iniciales}
+            onSettings={abrirAjustes}
             mediciones={medicionesTodas}
             resumenes={resumenes}
             onCargarResumen={cargarResumen}
@@ -1427,9 +1437,6 @@ function Root() {
             onOpen={abrirDetalle}
             onAbrirLote={abrirLote}
           />
-        )}
-        {tab === 'settings' && (
-          <SettingsScreen perfil={perfil} nombre={nombre} iniciales={iniciales} onLogout={handleLogout} />
         )}
       </View>
       <TabBar current={tab} onChange={setTabAndScreen} items={TABS} />
