@@ -59,3 +59,14 @@ export const MENSAJE_CANCELADA = 'Análisis cancelado. Puedes reintentarla.';
 export function marcarCanceladas(cola = []) {
   return cola.map((f) => (f.status === 'esperando' || !f.status ? { ...f, status: 'error', error: MENSAJE_CANCELADA, definitivo: false } : f));
 }
+
+// ¿A dónde va la app al terminar el bucle de análisis? 'preview' si se canceló antes de terminar ninguna foto
+// (sin error), 'error' si ninguna salió bien, 'result' con la última foto analizada.
+export function destinoTrasAnalisis({ cola = [], cancelada = false } = {}) {
+  const listas = cola.filter((f) => f.status === 'lista');
+  const ultima = listas.length ? listas[listas.length - 1] : null;
+  if (ultima) return { destino: 'result', ultima };
+  if (cancelada) return { destino: 'preview', ultima: null };
+  const primerError = cola.find((f) => f.status === 'error')?.error || '';
+  return { destino: 'error', ultima: null, mensaje: primerError || 'No se pudo procesar ninguna foto.' };
+}

@@ -70,7 +70,10 @@ import {
   clasificarErrorSubida,
 } from './src/helpers';
 import { tituloPunto } from './src/galeria';
-import { quitarDeCola, marcarCanceladas } from './src/cola';
+import { quitarDeCola, marcarCanceladas, destinoTrasAnalisis } from './src/cola';
+import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranque';
+import { marcarFuentes } from './src/tipografia';
+import { notasCambiaron, guardarNota, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
 import {
@@ -154,6 +157,14 @@ function Root() {
     IBMPlexMono_600SemiBold,
     IBMPlexMono_700Bold,
   });
+  // La tipografía de toda la app se decide aquí, antes de pintar nada.
+  marcarFuentes(fuentesCargadas({ fuentesListas, errorFuentes }));
+  // Tiempo máximo en la pantalla de arranque: si la sesión o las fuentes se cuelgan, la app sigue igual.
+  const [esperaAgotada, setEsperaAgotada] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setEsperaAgotada(true), TIEMPO_ARRANQUE_MS);
+    return () => clearTimeout(t);
+  }, []);
   // auth
   const [booting, setBooting] = useState(true);
   const [logged, setLogged] = useState(false);
@@ -189,7 +200,7 @@ function Root() {
   // Fotos traídas por rango de fechas (día del mapa de calor, 7/30/90 días): van aparte de
   // `mediciones` para no romper su paginación por fecha. Actividad ve la unión de las dos.
   const [extras, setExtras] = useState([]);
-  const rangosCargados = useRef(new Set());
+  const rangosCargados = useRef(new Map()); // clave de rango -> ¿truncado?
   // Resumen por día de cada año: { [anio]: { estado: 'cargando'|'ok'|'error', dias, truncado, error } }.
   const [resumenes, setResumenes] = useState({});
   const resumenesRef = useRef({});
@@ -283,9 +294,12 @@ function Root() {
       confirmLabel: 'Cancelar análisis',
       variant: 'danger',
       cancelLabel: 'Seguir analizando',
+      esCancelarAnalisis: true, // se cierra solo si el análisis termina con el aviso abierto
       onConfirm: () => {
         cerrarConfirm();
-        cancelarRef.current = true;
+        // Si el análisis ya terminó mientras el aviso estaba abierto, no hay nada que cancelar (y no se deja
+        // la bandera puesta para el siguiente).
+        if (analizandoRef.current) cancelarRef.current = true;
       },
     });
 
@@ -632,17 +646,18 @@ function Root() {
   };
 
   // Trae TODAS las fotos de un rango de días (inclusivo, UTC-5) y las suma a `extras`.
-  const cargarRango = async ({ desde, hasta }) => {
+  const cargarRango = async ({ desde, hasta }, { forzar = false } = {}) => {
     if (!desde && !hasta) return { truncado: false };
     const clave = `${desde || ''}|${hasta || ''}`;
-    if (rangosCargados.current.has(clave)) return { truncado: false };
-    rangosCargados.current.add(clave);
+    if (!forzar && rangosCargados.current.has(clave)) return { truncado: rangosCargados.current.get(clave) };
+    if (!rangosCargados.current.has(clave)) rangosCargados.current.set(clave, false);
     const sesion = sesionRef.current;
     try {
       const resp = await getMedicionesRecientes(undefined, 500, { desde, hasta });
       if (sesion !== sesionRef.current) return { truncado: false };
       const nuevas = marcarCarga(listaDeRespuesta(resp).map(({ mascaras, ...rest }) => rest));
       setExtras((prev) => mezclarMediciones(prev, nuevas).lista);
+      rangosCargados.current.set(clave, Boolean(resp?.truncado));
       return { truncado: Boolean(resp?.truncado) };
     } catch (e) {
       rangosCargados.current.delete(clave); // se podrá reintentar
@@ -685,7 +700,7 @@ function Root() {
     setRefreshing(true);
     setResumenes({});
     setExtras([]);
-    rangosCargados.current = new Set();
+    rangosCargados.current = new Map();
     cargarTodo(false);
   };
 
@@ -775,7 +790,7 @@ function Root() {
     setCargandoMas(false);
     setPorPunto({});
     setExtras([]);
-    rangosCargados.current = new Set();
+    rangosCargados.current = new Map();
     setResumenes({});
     setBloques([]);
     setBloqueMap({});
@@ -887,10 +902,7 @@ function Root() {
   // se pregunta antes. "Quedarme aquí" es la opción segura (también la del botón atrás).
   // ¿Las observaciones escritas difieren de lo guardado en el teléfono? (autoguardado)
   const guardadaObs = resultado ? obsMap[resultado.id_medicion] : null;
-  const obsCambiaron =
-    Boolean(resultado) &&
-    (String(guardadaObs?.espesor || '') !== espesor || String(guardadaObs?.descripcion || '') !== descripcion) &&
-    Boolean(espesor.trim() || descripcion.trim() || guardadaObs);
+  const obsCambiaron = notasCambiaron({ hayResultado: Boolean(resultado), guardada: guardadaObs, espesor, descripcion });
   useEffect(() => {
     if (!obsCambiaron) return undefined;
     const t = setTimeout(() => guardarObs(), 700);
@@ -1075,15 +1087,13 @@ function Root() {
       if (Object.keys(bloquesNuevos).length) refrescarIndicadores();
 
       // La imagen y el análisis que se muestran salen del MISMO ítem de la cola.
-      const { ultimaLista } = resumirCola(colaRef.current);
-      if (!ultimaLista && cancelada) {
+      const { destino, ultima: ultimaLista, mensaje } = destinoTrasAnalisis({ cola: colaRef.current, cancelada });
+      if (destino === 'preview') {
         // Se canceló antes de terminar ninguna: se vuelve a revisar las fotos, sin error.
         setScreen('preview');
         return;
       }
-      if (!ultimaLista) {
-        throw new Error(resumirCola(colaRef.current).primerError || 'No se pudo procesar ninguna foto.');
-      }
+      if (destino === 'error') throw new Error(mensaje);
       const { mascaras, ...ligera } = ultimaLista.medicion;
       setResultado({
         ...ligera,
@@ -1108,16 +1118,34 @@ function Root() {
       });
     } finally {
       // Si la sesión cambió, reiniciarEstadoSesion ya liberó el candado (y puede haber otro análisis).
-      if (vigente()) analizandoRef.current = false;
+      if (vigente()) {
+        analizandoRef.current = false;
+        // Si el aviso de cancelar quedó abierto y el análisis ya acabó, se cierra (ya no aplica).
+        setConfirmModal((prev) => (prev.esCancelarAnalisis ? { ...prev, visible: false } : prev));
+      }
     }
   };
 
+  // Autoguardado: si el almacenamiento falla, el texto escrito se conserva en pantalla, se avisa una vez (sin
+  // bloquear) y el siguiente cambio (o salir del resultado) lo reintenta.
+  const avisoNotaPendiente = useRef(false);
   const guardarObs = async () => {
     if (!resultado) return;
-    const nuevo = { ...obsMap, [resultado.id_medicion]: { espesor, descripcion } };
-    setObsMap(nuevo);
-    await saveLocal(APP_CONFIG.storageKeys.obsPorMedicion, nuevo);
-    setObsSaved(true);
+    const r = await guardarNota({
+      obsMap,
+      id: resultado.id_medicion,
+      espesor,
+      descripcion,
+      avisoPendiente: avisoNotaPendiente.current,
+      guardar: (mapa) => saveLocal(APP_CONFIG.storageKeys.obsPorMedicion, mapa),
+    });
+    avisoNotaPendiente.current = r.avisoPendiente;
+    if (r.ok) {
+      setObsMap(r.obsMap);
+      setObsSaved(true);
+    } else if (r.avisar) {
+      setAviso(MENSAJE_NOTA_NO_GUARDADA);
+    }
   };
 
   // La lista viene en modo resumen (sin detecciones ni clima): se muestra el detalle de
@@ -1241,7 +1269,7 @@ function Root() {
   );
 
   const renderPantalla = () => {
-    if (booting || !(fuentesListas || errorFuentes)) {
+    if (!arranqueListo({ booting, fuentesListas, errorFuentes, esperaAgotada })) {
       return (
         <Screen center style={{ gap: 18 }}>
           <Logo size={16} />
