@@ -119,8 +119,8 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
             </React.Fragment>
           ))}
           {escala.umbrales.map((u) => {
-            // Rótulo a la derecha, dentro del área y sobre su línea, con fondo del color de la tarjeta.
-            const r = ubicarRotulo(u, [], area);
+            // Rótulo sobre su línea, con fondo del color de la tarjeta, en la primera esquina que no tape puntos.
+            const r = ubicarRotulo(u, escala.puntos, area);
             return (
               <React.Fragment key={u.valor}>
                 <Line x1={M.izq} x2={M.izq + area.ancho} y1={M.arr + u.y} y2={M.arr + u.y} stroke={TINTA} strokeWidth={1.25} />
