@@ -21,6 +21,7 @@ import { TOKENS, NIVELES, severidad, confianzaPct, num } from './DesignTokens';
 import { nivelDeMedicion } from './niveles';
 import { miniaturaDe } from './miniaturas';
 import { formatoPct } from './fechas';
+import { COLORES_SOBRE_NIVEL } from './paleta';
 import {
   IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot, IconNivel, IconImageOff,
   IconChevronDown, IconClose, IconCheck, IconArrowLeft, IconAlertTriangle, IconWifiOff,
@@ -310,7 +311,7 @@ export const SwatchNivel = ({ nivel = 0, size = 18 }) => {
   const s = NIVELES[Math.max(0, Math.min(3, nivel))];
   return (
     <View style={{ width: size, height: size, borderRadius: 4, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
-      <IconNivel nivel={s.i} size={size - 6} color="#201e1d" />
+      <IconNivel nivel={s.i} size={size - 6} color={COLORES_SOBRE_NIVEL[s.i]} />
     </View>
   );
 };
@@ -448,6 +449,23 @@ export const MeasurementRow = ({ medicion, title, subtitle, onPress }) => {
       </View>
       <SeverityBadge medicion={medicion} />
     </Pressable>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Cifra de porcentaje: dígitos en IBM Plex Mono y el % en Outfit, más pequeño (en mono la coma y el % ocupan
+// una celda entera y la cifra se ve suelta). Sin número: raya.
+// ─────────────────────────────────────────────────────────────
+export const PctMono = ({ value, size = 34, color = TOKENS.colors.text, weight = '700', style }) => {
+  const n = typeof value === 'string' ? parseFloat(value) : Number(value);
+  if (value == null || value === '' || !Number.isFinite(n)) {
+    return <Text style={[{ fontFamily: TOKENS.fonts.mono, fontSize: size, lineHeight: Math.round(size * 1.2), fontWeight: weight, color }, style]}>—</Text>;
+  }
+  return (
+    <Text style={[{ color, lineHeight: Math.round(size * 1.2) }, style]}>
+      <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: size, fontWeight: weight }}>{n.toFixed(1).replace('.', ',')}</Text>
+      <Text style={{ fontSize: Math.round(size * 0.55), fontWeight: '600' }}> %</Text>
+    </Text>
   );
 };
 
@@ -1037,6 +1055,36 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
   const s = severidad(medicion || {});
   const sobrePlaca = medicion?.area_base === 'placa' || medicion?.area_corroida_pct_foto != null;
   const conf = medicion?.confianza_promedio;
+  if (compacta) {
+    // Bloque compacto (detalle de foto): ícono + nivel + aclaración a la izquierda y el % grande en cifras a la derecha.
+    return (
+      <View
+        accessible
+        accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado${conf != null ? `, confianza del modelo ${confianzaPct(conf)} %` : ''}`}
+        style={{ gap: 10 }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+            <IconNivel nivel={s.i} size={28} color={COLORES_SOBRE_NIVEL[s.i]} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...TOKENS.type.titleMedium, color: s.texto }}>{s.label}</Text>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{sobrePlaca ? 'Aproximado sobre la placa' : 'Aproximado sobre la foto'}</Text>
+          </View>
+          <PctMono value={medicion?.area_corroida_pct} size={32} />
+        </View>
+        {conf != null && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Confianza del modelo</Text>
+            <View style={{ flex: 1 }}>
+              <ProgressBar value={confianzaPct(conf)} color={TOKENS.colors.piedra_600} />
+            </View>
+            <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 14, fontWeight: '600', color: TOKENS.colors.text }}>{confianzaPct(conf)}%</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
   return (
     <View
       accessible
@@ -1045,13 +1093,11 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
         <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
-          <IconNivel nivel={s.i} size={32} color="#201e1d" />
+          <IconNivel nivel={s.i} size={32} color={COLORES_SOBRE_NIVEL[s.i]} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ ...TOKENS.type.titleLarge, color: s.texto }}>{s.label}</Text>
-          <Text style={{ fontSize: compacta ? 32 : 40, lineHeight: compacta ? 38 : 46, fontWeight: '800', color: TOKENS.colors.text }}>
-            {formatoPct(medicion?.area_corroida_pct)}
-          </Text>
+          <PctMono value={medicion?.area_corroida_pct} size={38} />
         </View>
       </View>
       <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>

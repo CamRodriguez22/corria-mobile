@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo } from 'react';
 import { View } from 'react-native';
 import { Text } from '../Typography';
-import { Screen, Header, EmptyState, Button, NivelBadge, Spinner } from '../DesignComponents';
+import { Screen, Header, EmptyState, Button, NivelBadge, Spinner, PctMono } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import GraficaTendencia from '../GraficaTendencia';
 import { TOKENS } from '../DesignTokens';
 import { agruparPorBloque } from '../utils';
 import { mezclarMediciones } from '../logic';
 import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
-import { fechaLarga, fechaMedia, formatoPct, formatoPctMono, plural, hoyLocal } from '../fechas';
+import { fechaLarga, fechaMedia, formatoPct, plural, hoyLocal } from '../fechas';
 import { nombreNivel } from '../niveles';
 import { aniosDisponibles, totalesPorMes } from '../linea';
 import { puntosTendencia } from '../tendencia';
@@ -89,9 +89,7 @@ export default function FolderScreen({
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={{ ...TOKENS.type.labelSmall, color: TOKENS.colors.neutral600 }}>PROMEDIO DEL DÍA</Text>
               {estado.promedio !== null && (
-                <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 24, lineHeight: 30, fontWeight: '700', color: TOKENS.colors.text }}>
-                  {formatoPctMono(estado.promedio)}
-                </Text>
+                <PctMono value={estado.promedio} size={24} />
               )}
               <NivelBadge nivel={estado.nivel} compacto />
             </View>
@@ -99,9 +97,7 @@ export default function FolderScreen({
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={{ ...TOKENS.type.labelSmall, color: TOKENS.colors.neutral600 }}>PEOR FOTO DEL DÍA</Text>
               {estado.peorPct !== null && (
-                <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 24, lineHeight: 30, fontWeight: '700', color: TOKENS.colors.text }}>
-                  {formatoPctMono(estado.peorPct)}
-                </Text>
+                <PctMono value={estado.peorPct} size={24} />
               )}
               <NivelBadge nivel={estado.peor} compacto />
             </View>

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, Image, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
-import { Screen, Header, Foto, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle } from '../DesignComponents';
+import { Screen, Header, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle, Segmented } from '../DesignComponents';
+import FotoConMascara from '../FotoConMascara';
+import { hayMascara } from '../mascara';
 import { TOKENS } from '../DesignTokens';
 import { IconShare, IconMoreVertical, IconEdit, IconTrash } from '../Icons';
 import { imagenDe } from '../miniaturas';
@@ -25,14 +27,20 @@ function useAspecto(uri, porDefecto = 4 / 3) {
       vivo = false;
     };
   }, [uri]);
-  return Math.min(Math.max(aspecto, 0.6), 1.8);
+  return aspecto;
 }
 
 export default function DetailScreen({ medicion, puntoNombre, empresa, obs, puedeGestionar, onBack, onShare, onRename, onDelete }) {
   const [menu, setMenu] = useState(false);
+  const [vista, setVista] = useState('original'); // 'original' | 'corrosion'
   const { width } = useWindowDimensions();
   const uri = imagenDe(medicion);
   const aspecto = useAspecto(uri);
+  // Foto a todo el ancho (con un margen pequeño y esquinas redondeadas); el alto sigue su proporción real,
+  // acotado para que la lectura de abajo siempre se vea. Con tope, la foto se recorta (cover), nunca hay franjas.
+  const anchoFoto = width - 24;
+  const altoFoto = Math.round(Math.min(Math.max(anchoFoto / aspecto, anchoFoto * 0.62), anchoFoto * 1.12));
+  const conMascara = hayMascara(medicion);
   const lat = medicion.latitud_real ?? medicion.punto_info?.coordenadas?.lat;
   const lng = medicion.longitud_real ?? medicion.punto_info?.coordenadas?.lng;
   const clima = medicion.clima || {};
@@ -49,7 +57,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
     fecha ? { label: 'Fecha', value: fecha } : null,
     medicion.creado_por_nombre ? { label: 'Tomada por', value: medicion.creado_por_nombre } : null,
     ciudad || coords ? { label: 'Ubicación', value: [ciudad, coords].filter(Boolean).join(' · ') } : null,
-    Array.isArray(medicion.detecciones) ? { label: 'Zonas', value: plural(medicion.detecciones.length, 'zona detectada', 'zonas detectadas') } : null,
+    Array.isArray(medicion.detecciones) ? { label: 'Manchas', value: plural(medicion.detecciones.length, 'mancha detectada', 'manchas detectadas') } : null,
     clima.temperatura_c != null ? { label: 'Clima', value: `${clima.temperatura_c} °C · ${clima.humedad_pct} % de humedad` } : null,
     obs?.espesor ? { label: 'Espesor', value: `${obs.espesor} mm` } : null,
     obs?.descripcion ? { label: 'Observaciones', value: obs.descripcion } : null,
@@ -57,7 +65,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
 
   const acciones = (
     <View style={{ flexDirection: 'row' }}>
-      <IconButton onPress={onShare} label="Compartir inspección">
+      <IconButton onPress={onShare} label="Compartir resultado">
         <IconShare size={22} color={TOKENS.colors.text} />
       </IconButton>
       {puedeGestionar && (
@@ -70,18 +78,29 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
 
   return (
     <Screen>
-      <Header title={titulo} subtitle={subtitulo} onBack={onBack} right={acciones} lines={2} />
+      <Header title={titulo} subtitle={subtitulo} onBack={onBack} right={acciones} />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Foto completa (sin recortar la placa), a todo el ancho y con tope de alto para ver la lectura debajo. */}
-        <Foto
-          uri={uri}
-          style={{ width, height: Math.min(width / aspecto, width * 1.1), backgroundColor: '#26211c' }}
-          resizeMode="contain"
-          iconSize={48}
-        />
+        <View style={{ paddingHorizontal: 12, gap: 10 }}>
+          <FotoConMascara uri={uri} medicion={medicion} ancho={anchoFoto} alto={altoFoto} aspecto={aspecto} mostrarMascara={conMascara && vista === 'corrosion'} />
+          {conMascara && (
+            <View accessibilityLabel="Vista de la foto">
+              <Segmented
+                options={[
+                  { value: 'original', label: 'Original' },
+                  { value: 'corrosion', label: 'Corrosión detectada' },
+                ]}
+                value={vista}
+                onChange={setVista}
+              />
+            </View>
+          )}
+        </View>
 
         <View style={{ padding: PAD, gap: 20 }}>
-          <LecturaNivel medicion={medicion} />
+          <LecturaNivel medicion={medicion} compacta />
+          <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: -8 }}>
+            Depende del encuadre y no reemplaza una inspección en sitio.
+          </Text>
           <View>
             <SectionTitle title="Detalles" />
             <View style={{ gap: 14, paddingTop: 4 }}>
@@ -97,7 +116,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
         onCerrar={() => setMenu(false)}
         items={[
           { label: 'Renombrar foto', icon: <IconEdit size={22} color={TOKENS.colors.text} />, onPress: onRename },
-          { label: 'Eliminar medición', icon: <IconTrash size={22} color={TOKENS.colors.danger} />, onPress: onDelete, destructive: true },
+          { label: 'Eliminar foto', icon: <IconTrash size={22} color={TOKENS.colors.danger} />, onPress: onDelete, destructive: true },
         ]}
       />
     </Screen>

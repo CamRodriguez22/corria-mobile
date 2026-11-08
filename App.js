@@ -1092,7 +1092,7 @@ function Root() {
       .then((completa) => {
         if (!completa || sesion !== sesionRef.current) return;
         // Conserva lo local (_localUri, nombre renombrado, etc.) y evita pisar otra pantalla.
-        setDetalle((prev) => (prev && prev.id_medicion === m.id_medicion ? { ...completa, ...prev, detecciones: completa.detecciones, clima: completa.clima } : prev));
+        setDetalle((prev) => (prev && prev.id_medicion === m.id_medicion ? { ...completa, ...prev, detecciones: completa.detecciones, clima: completa.clima, mascaras: completa.mascaras, contorno_placa: completa.contorno_placa } : prev));
       })
       .catch((e) => {
         if (esSesionVencida(e)) avisarSesionVencida();
@@ -1151,7 +1151,7 @@ function Root() {
     if (!puedeGestionarMedicion(perfil, m)) return;
     setConfirmModal({
       visible: true,
-      title: 'Eliminar medición',
+      title: 'Eliminar foto',
       message: 'Esta acción no se puede deshacer. Se borrará la foto y su resultado.',
       confirmLabel: 'Eliminar',
       variant: 'danger',
@@ -1370,6 +1370,10 @@ function Root() {
             onOpen={abrirDetalle}
             onVerTodas={() => setTabAndScreen('activity')}
             onSettings={abrirAjustes}
+            onAbrirPunto={(clave) => {
+              setFolderClave(clave);
+              setScreen('folder');
+            }}
           />
         )}
         {tab === 'lotes' && (

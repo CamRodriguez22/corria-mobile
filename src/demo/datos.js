@@ -99,6 +99,29 @@ function idDemo(rng) {
   return `${h()}-${h().slice(0, 4)}-4${h().slice(0, 3)}-a${h().slice(0, 3)}-${h()}${h().slice(0, 4)}`;
 }
 
+// Polígonos SINTÉTICOS de corrosión (solo demo): manchas alrededor del centro de la foto, con tamaño según el %.
+// Sin generador aleatorio compartido para no cambiar el resto de los datos de ejemplo. No reflejan la foto real.
+export function mascarasDemo(pct, semilla = 0) {
+  if (!(pct >= 0.05)) return [];
+  const n = Math.min(4, 1 + Math.floor(pct / 9));
+  const radio = Math.min(0.3, 0.05 + pct / 180);
+  return Array.from({ length: n }, (_, k) => {
+    const a = Math.sin((semilla + 1) * 12.9898 + k * 78.233) * 43758.5453;
+    const f = a - Math.floor(a);
+    const cx = 0.3 + 0.4 * ((k * 0.37 + f) % 1);
+    const cy = 0.3 + 0.4 * ((k * 0.61 + f * 1.7) % 1);
+    const rr = radio * (0.6 + 0.4 * ((f * 3.1 + k * 0.5) % 1));
+    return {
+      puntos: Array.from({ length: 9 }, (_, i) => {
+        const t = (i / 9) * Math.PI * 2;
+        const k2 = 0.75 + 0.25 * Math.sin(t * 3 + f * 6);
+        return { x: Math.round((cx + Math.cos(t) * rr * k2) * 1e4) / 1e4, y: Math.round((cy + Math.sin(t) * rr * 0.8 * k2) * 1e4) / 1e4 };
+      }),
+    };
+  });
+}
+export const CONTORNO_PLACA_DEMO = { puntos: [{ x: 0.12, y: 0.18 }, { x: 0.88, y: 0.16 }, { x: 0.9, y: 0.84 }, { x: 0.1, y: 0.82 }] };
+
 // Sesiones: [díasAtrás, índicePunto, tamañoLote (0 = foto suelta), ajena]
 const SESIONES = [
   [0, 0, 4, false], [1, 3, 0, false], [2, 1, 0, true], [4, 2, 5, false], [6, 0, 0, false],
@@ -160,6 +183,8 @@ export function generarMediciones(ahoraMs, base) {
         s3_key_thumbnail: `empresas/${EMPRESA_ID}/${punto.id_bloque}/${idMed}_thumb.jpg`,
         s3_key_resultado: `empresas/${EMPRESA_ID}/${punto.id_bloque}/${idMed}.json`,
         ...urlsFoto(foto, base),
+        mascaras: mascarasDemo(pct, fotoN),
+        contorno_placa: CONTORNO_PLACA_DEMO,
         detecciones: pct < 0.05 ? [] : Array.from({ length: 1 + Math.floor(pct / 6) }, (_, d) => ({
           clase: 'corrosion',
           confianza: Math.round((0.7 + rng() * 0.28) * 100) / 100,
@@ -314,7 +339,8 @@ export function nuevaMedicion({ ahoraMs, base, bloque, foto, loteId, loteNombre,
     area_base: 'placa',
     confianza_promedio: 0.91,
     detecciones: pct < 0.05 ? [] : [{ clase: 'corrosion', confianza: 0.9, area_px: 2400 }, { clase: 'corrosion', confianza: 0.84, area_px: 1100 }],
-    mascaras: [],
+    mascaras: mascarasDemo(pct, foto.n),
+    contorno_placa: CONTORNO_PLACA_DEMO,
     modelo: 'unet-demo',
     latitud_real: lat ?? bloque.coordenadas.lat,
     longitud_real: lng ?? bloque.coordenadas.lng,

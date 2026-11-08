@@ -106,13 +106,6 @@ export function formatoPct(v, decimales = 1) {
   return `${n.toFixed(decimales).replace('.', ',')}${NBSP}%`;
 }
 
-// Para cifras en fuente monoespaciada: sin el espacio antes del % (en mono ocuparía una celda entera).
-export function formatoPctMono(v, decimales = 1) {
-  const n = aNumero(v);
-  if (!Number.isFinite(n)) return '—';
-  return `${n.toFixed(decimales).replace('.', ',')}%`;
-}
-
 // Para fichas pequeñas: sin decimales salvo por debajo de 1 (para no mostrar "0 %" en 0,4).
 export function pctCorto(v) {
   const n = aNumero(v);

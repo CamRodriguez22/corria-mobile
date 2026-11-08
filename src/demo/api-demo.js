@@ -76,8 +76,7 @@ export async function getMedicionCompleta(id_punto, id_medicion) {
   await red(250);
   const lista = obtenerMedicion(meds(), id_punto, id_medicion);
   if (!lista.length) return null;
-  const { mascaras, ...resto } = lista[0];
-  return clonar(resto);
+  return clonar(lista[0]);
 }
 
 export async function renombrarMedicion(id_punto, id_medicion, nuevoNombre) {

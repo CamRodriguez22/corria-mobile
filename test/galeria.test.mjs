@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { diaLocal, fechaLarga, fechaCorta, horaLocal, sumarDias, diaSemana, rotuloDia, formatoPct, pctCorto, fechaHoraLarga, fechaHoraCorta } from '../src/fechas.js';
 import {
-  construirMosaico, agruparPorDia, dividirEnFilas, filasDeGaleria, etiquetaFoto, etiquetaLote, tituloPunto, estadoPunto, claveLote, agruparLotes, indicadoresLocales, tituloMes, agruparPorMes,
+  construirMosaico, agruparPorDia, dividirEnFilas, filasDeGaleria, etiquetaFoto, etiquetaLote, tituloPunto, estadoPunto, claveLote, agruparLotes, indicadoresLocales, tituloMes, agruparPorMes, puntoDeAtencion, ordenarPuntosPorGravedad,
 } from '../src/galeria.js';
 import { nombreNivel, nivelDeMedicion, NOMBRES_NIVEL } from '../src/niveles.js';
 import {
@@ -257,4 +257,24 @@ test('filasDeGaleria: el total del mes sale del servidor y no cambia al paginar'
   assert.deepEqual(enc(pag2, totales), [['Noviembre de 2026', 2, 2], ['Octubre de 2026', 3, 3]]); // mismo total
   assert.deepEqual(enc(pag1, null), [['Noviembre de 2026', 2, 2], ['Octubre de 2026', 1, 1]]); // sin resumen: lo cargado
   assert.deepEqual(enc(pag1, { '2026-11': 1 }), [['Noviembre de 2026', 2, 2], ['Octubre de 2026', 1, 1]]); // nunca menos de lo cargado
+});
+
+test('puntoDeAtencion: usa mas_critico del servidor y, sin él, el peor punto cargado', () => {
+  const srv = { mas_critico: { id_punto: 'BLQ-E', nombre: 'Bloque E · Muelle', promedio_pct: 37.3, nivel: 3, fecha: '2026-11-07' } };
+  assert.deepEqual(puntoDeAtencion(srv, []), { clave: 'BLQ-E', nombre: 'Punto E · Muelle', nivel: 3, pct: 37.3, dia: '2026-11-07', urgente: true });
+  assert.equal(puntoDeAtencion({ mas_critico: { id_punto: 'B', nombre: 'B', promedio_pct: 3, nivel: 1, fecha: 'x' } }, []).urgente, false);
+  const grupos = [
+    { clave: 'A', bloque: { nombre: 'Bloque A' }, estado: { nivel: 1, promedio: 4, dia: '2026-11-01' } },
+    { clave: 'B', bloque: { nombre: 'Bloque B' }, estado: { nivel: 2, promedio: 18, dia: '2026-11-05' } },
+    { clave: 'C', bloque: { nombre: 'Bloque C' }, estado: null },
+  ];
+  assert.deepEqual(puntoDeAtencion(null, grupos), { clave: 'B', nombre: 'Punto B', nivel: 2, pct: 18, dia: '2026-11-05', urgente: true });
+  assert.equal(puntoDeAtencion(null, []), null);
+  assert.equal(puntoDeAtencion({ mas_critico: null }, [grupos[2]]), null);
+});
+
+test('ordenarPuntosPorGravedad: más grave primero y sin estado al final', () => {
+  const g = (clave, nivel, promedio) => ({ clave, estado: nivel === null ? null : { nivel, promedio } });
+  const orden = ordenarPuntosPorGravedad([g('A', 1, 4), g('S', null), g('B', 3, 30), g('C', 3, 41), g('D', 2, 15)]);
+  assert.deepEqual(orden.map((x) => x.clave), ['C', 'B', 'D', 'A', 'S']);
 });

@@ -145,7 +145,8 @@ export async function getResumenDiario(anio, idPunto, token) {
 
 // Una medición con TODOS sus campos (detecciones, clima, ...), aunque sea antigua: el
 // backend filtra por id_medicion y pagina hasta hallarla. Devuelve null si no existe.
-// Las máscaras se descartan: la app móvil no las usa y pesan cientos de KB.
+// Trae también `mascaras` y `contorno_placa` (polígonos normalizados [0,1]) para la vista "Corrosión detectada";
+// solo se piden aquí, de una en una, porque en las listas pesan cientos de KB.
 export async function getMedicionCompleta(id_punto, id_medicion, token) {
   if (!id_punto || !id_medicion) return null;
   const data = await req(
@@ -156,8 +157,7 @@ export async function getMedicionCompleta(id_punto, id_medicion, token) {
   const lista = Array.isArray(data) ? data : data?.mediciones || data?.items || [];
   const encontrada = lista.find((m) => m.id_medicion === id_medicion);
   if (!encontrada) return null;
-  const { mascaras, ...resto } = encontrada;
-  return resto;
+  return encontrada;
 }
 
 // PATCH /mediciones/{id_punto}?id_medicion={id_medicion} (renombrar foto)

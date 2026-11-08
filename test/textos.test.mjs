@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { plural, formatoPct, formatoPctMono, pctCorto } from '../src/fechas.js';
+import { plural, formatoPct, pctCorto } from '../src/fechas.js';
 import { pesoNumerico, familiaPara, FAMILIAS } from '../src/tipografia.js';
 
 test('plural: singular solo con 1 (nunca "1 puntos" ni "0 punto")', () => {
@@ -11,11 +11,10 @@ test('plural: singular solo con 1 (nunca "1 puntos" ni "0 punto")', () => {
   assert.equal(plural(1, 'foto cargada', 'fotos cargadas'), '1 foto cargada');
 });
 
-test('porcentajes con coma decimal; en mono sin espacio antes del %', () => {
+test('porcentajes con coma decimal y espacio duro antes del %', () => {
   assert.equal(formatoPct(20.04), '20,0\u00a0%');
-  assert.equal(formatoPctMono(20.04), '20,0%');
-  assert.equal(formatoPctMono('7.25', 2), '7,25%');
-  assert.equal(formatoPctMono(null), '—');
+  assert.equal(formatoPct('7.25', 2), '7,25\u00a0%');
+  assert.equal(formatoPct(null), '—');
   assert.equal(pctCorto(0.4), '0,4\u00a0%');
 });
 

@@ -12,10 +12,10 @@ import { Text } from './Typography';
 import Svg, { Line, Polyline, Polygon, Circle, Rect, Text as SvgText } from 'react-native-svg';
 import { TOKENS, NIVELES } from './DesignTokens';
 import { IconTrend } from './Icons';
-import { NivelBadge, SwatchNivel } from './DesignComponents';
+import { NivelBadge, SwatchNivel, PctMono } from './DesignComponents';
 import { escalaTendencia, resumenTendencia, lineasAccesibles, rotuloPeriodo, MIN_DIAS_TENDENCIA } from './tendencia';
 import { familiaPara } from './tipografia';
-import { formatoPct, formatoPctMono, plural } from './fechas';
+import { formatoPct, plural } from './fechas';
 
 const ALTO_LINEA = 150;
 const ALTO_BARRAS = 46;
@@ -128,9 +128,7 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
       {actual && (
         <View accessibilityLiveRegion="polite" style={{ gap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 26, lineHeight: 32, fontWeight: '700', color: TOKENS.colors.text }}>
-              {formatoPctMono(actual.promedio)}
-            </Text>
+            <PctMono value={actual.promedio} size={26} />
             <NivelBadge nivel={actual.nivel} compacto />
           </View>
           <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>
