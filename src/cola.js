@@ -46,3 +46,16 @@ export function indiceActivo(cola = []) {
   if (i >= 0) return i;
   return cola.findIndex((f) => f.status === 'esperando' || !f.status);
 }
+
+// Cola sin la foto `i` (nunca muta la original). Índice fuera de rango: la misma cola.
+export function quitarDeCola(cola = [], i) {
+  if (!Number.isInteger(i) || i < 0 || i >= cola.length) return cola;
+  return cola.filter((_, idx) => idx !== i);
+}
+
+// Foto que no se alcanzó a enviar porque el usuario canceló el análisis: queda como fallida y reintentable
+// (así reutiliza "Reintentar las fallidas") con un mensaje que lo aclara.
+export const MENSAJE_CANCELADA = 'Análisis cancelado. Puedes reintentarla.';
+export function marcarCanceladas(cola = []) {
+  return cola.map((f) => (f.status === 'esperando' || !f.status ? { ...f, status: 'error', error: MENSAJE_CANCELADA, definitivo: false } : f));
+}

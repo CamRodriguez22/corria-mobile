@@ -45,7 +45,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
   const lng = medicion.longitud_real ?? medicion.punto_info?.coordenadas?.lng;
   const clima = medicion.clima || {};
   const fecha = fechaHoraLarga(medicion.timestamp);
-  const titulo = medicion.nombre || puntoNombre || 'Medición';
+  const titulo = medicion.nombre || puntoNombre || 'Foto';
   const subtitulo = medicion.nombre ? [puntoNombre, fechaHoraCorta(medicion.timestamp)].filter(Boolean).join(' · ') : fechaHoraCorta(medicion.timestamp);
   const ciudad = medicion.ciudad || medicion.punto_info?.ciudad || empresa?.ciudad || '';
   const coords = lat != null && lng != null ? `${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}` : '';

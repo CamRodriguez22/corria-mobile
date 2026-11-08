@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Pressable, RefreshControl, FlatList } from 'react-native';
 import { Text } from '../Typography';
-import { EmptyState, Foto, NivelBadge, ScreenTitle, AvatarButton } from '../DesignComponents';
+import { EmptyState, Foto, NivelBadge, ScreenTitle, AvatarButton, AvisoSinConexion } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconChevronRight } from '../Icons';
 import { agruparPorBloque } from '../utils';
@@ -10,7 +10,7 @@ import { formatoPct, fechaCorta, plural } from '../fechas';
 
 const PAD = TOKENS.spacing.lg;
 
-export default function FoldersScreen({ iniciales, onSettings, mediciones, bloqueMap, listaBloques, empresaLinea, refreshing, onRefresh, onOpen }) {
+export default function FoldersScreen({ offline, iniciales, onSettings, mediciones, bloqueMap, listaBloques, empresaLinea, refreshing, onRefresh, onOpen }) {
   // Del punto más grave al menos grave (nivel del promedio del día más reciente, luego su %).
   const grupos = useMemo(
     () =>
@@ -31,6 +31,7 @@ export default function FoldersScreen({ iniciales, onSettings, mediciones, bloqu
         right={<AvatarButton iniciales={iniciales} onPress={onSettings} />}
         subtitle={[empresaLinea, plural(mediciones.length, 'foto cargada', 'fotos cargadas'), 'del más grave al menos grave'].filter(Boolean).join(' · ')}
       />
+      {offline && <View style={{ marginTop: 10 }}><AvisoSinConexion /></View>}
     </View>
   );
 
@@ -62,6 +63,7 @@ export default function FoldersScreen({ iniciales, onSettings, mediciones, bloqu
               opacity: pressed ? 0.85 : 1,
               borderWidth: 1,
               borderColor: TOKENS.colors.border,
+              ...TOKENS.shadow.card,
             })}
           >
             <Foto uri={g.ultima ? miniaturaDe(g.ultima) : null} style={{ width: 72, height: 72, borderRadius: 14 }} />

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Pressable, RefreshControl, FlatList } from 'react-native';
 import { Text } from '../Typography';
-import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton, AvatarButton } from '../DesignComponents';
+import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton, AvatarButton, PctMono, AvisoSinConexion } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconChevronRight, IconEdit, IconNivel } from '../Icons';
@@ -12,6 +12,7 @@ import { formatoPct, fechaCorta, diaLocal, plural } from '../fechas';
 const PAD = TOKENS.spacing.lg;
 
 export default function LotesScreen({
+  offline,
   iniciales,
   onSettings,
   mediciones,
@@ -76,7 +77,6 @@ export default function LotesScreen({
           title={lote.nombre}
           subtitle={`${lote.puntoTitulo} · ${plural(lote.items.length, 'foto', 'fotos')}`}
           onBack={() => setLoteSeleccionado(null)}
-          lines={2}
           right={
             puedeRenombrar ? (
               <IconButton onPress={() => setRenombrandoLote(lote)} label="Renombrar lote">
@@ -86,15 +86,15 @@ export default function LotesScreen({
           }
         />
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 6 }}>
-          <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
+          <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border, ...TOKENS.shadow.card }}>
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Promedio del lote</Text>
-            <Text style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text, marginTop: 2 }}>{formatoPct(lote.avgPct)}</Text>
+            <PctMono value={lote.avgPct} size={24} style={{ marginTop: 2 }} />
           </View>
-          <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border }}>
+          <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border, ...TOKENS.shadow.card }}>
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Peor foto</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
               <IconNivel nivel={lote.peorNivel} size={18} color={lote.maxNivel.texto} />
-              <Text style={{ ...TOKENS.type.titleLarge, color: lote.maxNivel.texto }}>{formatoPct(lote.maxPct)}</Text>
+              <PctMono value={lote.maxPct} size={24} color={lote.maxNivel.texto} />
             </View>
           </View>
         </View>
@@ -121,6 +121,7 @@ export default function LotesScreen({
   const cabecera = (
     <View style={{ gap: 4, marginBottom: 14 }}>
       <ScreenTitle title="Lotes" subtitle="Fotos que subiste juntas en una misma inspección" right={<AvatarButton iniciales={iniciales} onPress={onSettings} />} />
+      {offline && <View style={{ marginTop: 10 }}><AvisoSinConexion /></View>}
     </View>
   );
 
@@ -147,30 +148,36 @@ export default function LotesScreen({
             borderRadius: TOKENS.radius.lg,
             padding: 12,
             marginBottom: 12,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 14,
+            gap: 10,
             opacity: pressed ? 0.85 : 1,
             borderWidth: 1,
             borderColor: TOKENS.colors.border,
+            ...TOKENS.shadow.card,
           })}
         >
-          <Foto uri={miniaturaDe(lote.portada)} style={{ width: 80, height: 80, borderRadius: 14 }} />
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text numberOfLines={2} style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text }}>
-              {lote.nombre}
-            </Text>
-            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
-              {plural(lote.items.length, 'foto', 'fotos')}
-              {lote.fechaReciente ? ` · ${fechaCorta(diaLocal(lote.fechaReciente))}` : ''}
-            </Text>
-            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{lote.puntoTitulo}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <NivelBadge nivel={lote.peorNivel} compacto />
-              <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>hasta {formatoPct(lote.maxPct)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Foto uri={miniaturaDe(lote.portada)} style={{ width: 64, height: 64, borderRadius: 14 }} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text numberOfLines={1} style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text }}>
+                {lote.nombre}
+              </Text>
+              <Text numberOfLines={1} style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+                {plural(lote.items.length, 'foto', 'fotos')}
+                {lote.fechaReciente ? ` · ${fechaCorta(diaLocal(lote.fechaReciente))}` : ''}
+              </Text>
+              <Text numberOfLines={1} style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+                {lote.puntoTitulo}
+              </Text>
             </View>
+            <IconChevronRight size={20} color={TOKENS.colors.neutral500} />
           </View>
-          <IconChevronRight size={20} color={TOKENS.colors.neutral500} />
+          {/* Nivel y peor foto en la misma fila, con todo el ancho de la tarjeta. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <NivelBadge nivel={lote.peorNivel} compacto />
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>
+              Peor foto <Text style={{ fontWeight: '700', color: TOKENS.colors.text }}>{formatoPct(lote.maxPct)}</Text>
+            </Text>
+          </View>
         </Pressable>
       )}
       ListFooterComponent={

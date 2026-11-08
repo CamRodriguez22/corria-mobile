@@ -8,7 +8,7 @@ import {
 import {
   puntosTendencia, rotuloPeriodo, techoEjeY, marcasEjeY, escalaTendencia, puntoMasCercano, resumenTendencia, lineasAccesibles,
 } from '../src/tendencia.js';
-import { estadoFotoCola, resumenAvance, indiceActivo, textoEtapa } from '../src/cola.js';
+import { estadoFotoCola, resumenAvance, indiceActivo, textoEtapa, quitarDeCola, marcarCanceladas, MENSAJE_CANCELADA } from '../src/cola.js';
 
 const dia = (fecha, total, peor, extra = {}) => ({ fecha, total, por_nivel: [0, 0, 0, 0], peor_nivel: peor, max_pct: 10, promedio_pct: 5, ...extra });
 
@@ -229,3 +229,22 @@ test('estadoFotoCola y avance de la cola', () => {
   assert.equal(indiceActivo([{ status: 'lista' }]), -1);
 });
 
+
+test('quitarDeCola: quita solo la foto indicada y no muta', () => {
+  const cola = [{ uri: 'a' }, { uri: 'b' }, { uri: 'c' }];
+  assert.deepEqual(quitarDeCola(cola, 1).map((f) => f.uri), ['a', 'c']);
+  assert.equal(cola.length, 3);
+  assert.equal(quitarDeCola(cola, 7), cola);
+  assert.equal(quitarDeCola(cola, -1), cola);
+  assert.deepEqual(quitarDeCola([{ uri: 'a' }], 0), []);
+});
+
+test('marcarCanceladas: lo que no se envió queda fallido y reintentable; lo ya hecho no se toca', () => {
+  const cola = [{ status: 'lista', medicion: { id_medicion: 'm' } }, { status: 'subiendo' }, { status: 'esperando' }, { status: 'error', error: 'x', definitivo: true }];
+  const r = marcarCanceladas(cola);
+  assert.equal(r[0].status, 'lista');
+  assert.equal(r[1].status, 'subiendo'); // la foto en curso termina por su cuenta
+  assert.deepEqual([r[2].status, r[2].error, r[2].definitivo], ['error', MENSAJE_CANCELADA, false]);
+  assert.equal(r[3].definitivo, true);
+  assert.equal(resumenAvance(marcarCanceladas([{ status: 'lista' }, { status: 'esperando' }])).fallidas, 1);
+});

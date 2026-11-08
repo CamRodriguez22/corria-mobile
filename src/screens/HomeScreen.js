@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
-import { Fab, Spinner, EmptyState, Banner, SectionTitle, SwatchNivel, AvatarButton } from '../DesignComponents';
+import { Fab, Spinner, EmptyState, AvisoSinConexion, SectionTitle, SwatchNivel, AvatarButton } from '../DesignComponents';
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
 import { IconPlus, IconWifiOff, IconNivel, IconChevronRight } from '../Icons';
@@ -81,7 +81,7 @@ export default function HomeScreen({
 
         {offline && (
           <View style={{ marginTop: 16 }}>
-            <Banner icon={<IconWifiOff size={22} color={TOKENS.colors.warning} />} text="Sin conexión. Ves los datos guardados en este teléfono." />
+            <AvisoSinConexion />
           </View>
         )}
 
@@ -179,7 +179,7 @@ export default function HomeScreen({
           </View>
         ) : (
           <EmptyState
-            title="Aún no hay mediciones"
+            title="Aún no hay fotos"
             subtitle={esCliente ? 'Cuando tu equipo suba fotos, las verás aquí.' : 'Toca “Nueva medición” para analizar tu primera foto de corrosión.'}
           />
         )}

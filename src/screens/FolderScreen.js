@@ -159,7 +159,7 @@ export default function FolderScreen({
         ListFooterComponent={pie}
         ListEmptyComponent={
           cargando || !historial ? null : (
-            <EmptyState title="Punto sin mediciones" subtitle="Todavía no se han subido inspecciones asociadas a este punto." />
+            <EmptyState title="Punto sin fotos" subtitle="Todavía no se han subido fotos de este punto." />
           )
         }
         contentContainerStyle={{ paddingBottom: 36 }}

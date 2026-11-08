@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, RefreshControl, ScrollView, Pressable } from 'react-native';
 import { Text } from '../Typography';
-import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle, AvatarButton } from '../DesignComponents';
+import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle, AvatarButton, AvisoSinConexion } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import CalendarioMes from '../CalendarioMes';
 import { TOKENS, NIVELES } from '../DesignTokens';
@@ -20,6 +20,7 @@ import { bloqueDeMedicion } from '../utils';
 const PAD = TOKENS.spacing.lg;
 
 export default function ActivityScreen({
+  offline,
   iniciales,
   onSettings,
   mediciones,
@@ -104,6 +105,7 @@ export default function ActivityScreen({
       <View style={{ paddingHorizontal: PAD }}>
         <View style={{ marginBottom: 14 }}>
           <ScreenTitle title="Actividad" subtitle="Todas las fotos, día por día" right={<AvatarButton iniciales={iniciales} onPress={onSettings} />} />
+          {offline && <View style={{ marginTop: 10 }}><AvisoSinConexion /></View>}
         </View>
         <CalendarioMes
           dias={diasFiltrados}
@@ -219,7 +221,7 @@ export default function ActivityScreen({
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
       >
         <ScreenTitle title="Actividad" subtitle="Todas las fotos, día por día" right={<AvatarButton iniciales={iniciales} onPress={onSettings} />} />
-        <EmptyState title="Aún no hay fotos" subtitle="Cuando subas tus primeras mediciones, las verás aquí día por día." />
+        <EmptyState title="Aún no hay fotos" subtitle="Cuando subas tus primeras fotos, las verás aquí día por día." />
       </ScrollView>
     );
   }

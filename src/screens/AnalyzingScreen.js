@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
-import { Screen, Spinner, ProgressBar, Foto } from '../DesignComponents';
+import { Screen, Spinner, ProgressBar, Foto, Button } from '../DesignComponents';
 import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconCheck, IconAlertTriangle, IconNivel } from '../Icons';
 import { estadoFotoCola, resumenAvance, indiceActivo, textoEtapa } from '../cola';
@@ -16,7 +16,7 @@ function IconoEstado({ estado, item }) {
   return <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: TOKENS.colors.neutral400 }} />;
 }
 
-export default function AnalyzingScreen({ etapa, colaFotos, bloqueSel }) {
+export default function AnalyzingScreen({ etapa, colaFotos, bloqueSel, onCancelar }) {
   const { width } = useWindowDimensions();
   const avance = resumenAvance(colaFotos);
   const idx = indiceActivo(colaFotos);
@@ -90,6 +90,11 @@ export default function AnalyzingScreen({ etapa, colaFotos, bloqueSel }) {
           </View>
         )}
       </ScrollView>
+      {!terminado && !!onCancelar && (
+        <View style={{ padding: PAD }}>
+          <Button variant="outlined" label="Cancelar análisis" onPress={onCancelar} />
+        </View>
+      )}
     </Screen>
   );
 }

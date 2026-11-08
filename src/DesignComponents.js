@@ -847,6 +847,11 @@ export const Banner = ({ text, tone = 'warning', icon, action, onAction }) => {
   );
 };
 
+// Aviso de "sin conexión" igual en todas las pestañas.
+export const AvisoSinConexion = () => (
+  <Banner icon={<IconWifiOff size={22} color={TOKENS.colors.warning} />} text="Sin conexión. Ves los datos guardados en este teléfono." />
+);
+
 // Botón de acción flotante extendido (Material 3): una sola acción principal por pantalla.
 export const Fab = ({ label, icon, onPress, style }) => (
   <Pressable
@@ -1120,7 +1125,7 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
 export const ResultCard = ({ medicion, ubicacion, loteNombre, nivel, percentage, confidence }) => {
   const m = medicion || { nivel_corrosion: nivel, area_corroida_pct: percentage, confianza_promedio: confidence };
   return (
-    <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, borderWidth: 1, borderColor: TOKENS.colors.border, marginBottom: TOKENS.spacing.base }}>
+    <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, borderWidth: 1, borderColor: TOKENS.colors.border, marginBottom: TOKENS.spacing.base, ...TOKENS.shadow.card }}>
       <LecturaNivel medicion={m} />
       {!!(ubicacion || loteNombre || m.lote_nombre) && (
         <View style={{ marginTop: 14, gap: 8, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200, paddingTop: 14 }}>

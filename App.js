@@ -70,6 +70,8 @@ import {
   clasificarErrorSubida,
 } from './src/helpers';
 import { tituloPunto } from './src/galeria';
+import { quitarDeCola, marcarCanceladas } from './src/cola';
+import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
 import {
   AWS_CONFIG,
@@ -210,6 +212,7 @@ function Root() {
   const colaRef = useRef([]); // copia síncrona de colaFotos para el bucle de subida
   const loteIdRef = useRef('');
   const analizandoRef = useRef(false);
+  const cancelarRef = useRef(false); // el usuario pidió cancelar: el bucle se detiene al terminar la foto en curso
   const sesionRef = useRef(0); // sube al cerrar sesión: descarta respuestas tardías de la sesión anterior
   const [lugar, setLugar] = useState(null); // { ciudad, barrio, direccion } del reverse-geocode
   const [etapaSubida, setEtapaSubida] = useState(''); // preparando_subida | subiendo_s3 | analizando_ia | completado
@@ -269,6 +272,28 @@ function Root() {
   const avisarError = (titulo, e, porDefecto = 'Error del servidor.') => {
     if (esSesionVencida(e)) avisarSesionVencida();
     else avisar(titulo, e?.message || porDefecto);
+  };
+
+  // Cancelar el análisis: las fotos ya analizadas se conservan; el bucle se detiene al terminar la foto en curso.
+  const pedirCancelarAnalisis = () =>
+    setConfirmModal({
+      visible: true,
+      title: '¿Cancelar el análisis?',
+      message: 'Las fotos que ya se analizaron se conservan. Las que faltan no se enviarán, y la foto en curso termina antes de detenerse.',
+      confirmLabel: 'Cancelar análisis',
+      variant: 'danger',
+      cancelLabel: 'Seguir analizando',
+      onConfirm: () => {
+        cerrarConfirm();
+        cancelarRef.current = true;
+      },
+    });
+
+  const quitarFotoDeCola = (i) => {
+    const nueva = quitarDeCola(colaRef.current, i);
+    fijarCola(nueva);
+    if (!nueva.length) setScreen('camera');
+    else setFoto(nueva[0]);
   };
 
   const fijarCola = (cola) => {
@@ -378,9 +403,9 @@ function Root() {
         setPromptModal((prev) => ({ ...prev, visible: false }));
         return true;
       }
-      // Durante el análisis no se puede cancelar la subida: atrás no debe sacar de la app.
+      // Durante el análisis atrás no saca de la app: ofrece cancelarlo.
       if (screen === 'analyzing') {
-        avisar('Análisis en curso', 'Espera a que termine el análisis de las fotos.');
+        pedirCancelarAnalisis();
         return true;
       }
       if (screen === 'preview') {
@@ -525,7 +550,7 @@ function Root() {
     } catch (e) {
       console.log('cargarMasMediciones', e?.message);
       // La lista ya cargada no se toca: solo se avisa.
-      avisarError('No se pudieron cargar más mediciones', e, 'Revisa tu conexión e intenta de nuevo.');
+      avisarError('No se pudieron cargar más fotos', e, 'Revisa tu conexión e intenta de nuevo.');
     } finally {
       setCargandoMas(false);
     }
@@ -860,28 +885,37 @@ function Root() {
 
   // Salir del resultado descartaría las fotos fallidas y las observaciones sin guardar:
   // se pregunta antes. "Quedarme aquí" es la opción segura (también la del botón atrás).
+  // ¿Las observaciones escritas difieren de lo guardado en el teléfono? (autoguardado)
+  const guardadaObs = resultado ? obsMap[resultado.id_medicion] : null;
+  const obsCambiaron =
+    Boolean(resultado) &&
+    (String(guardadaObs?.espesor || '') !== espesor || String(guardadaObs?.descripcion || '') !== descripcion) &&
+    Boolean(espesor.trim() || descripcion.trim() || guardadaObs);
+  useEffect(() => {
+    if (!obsCambiaron) return undefined;
+    const t = setTimeout(() => guardarObs(), 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [espesor, descripcion, resultado?.id_medicion, obsCambiaron]);
+
   const salirDelResultado = (continuar) => {
-    const pend = pendientesAlSalir({
-      cola: colaRef.current,
-      espesor,
-      descripcion,
-      guardada: obsMap[resultado?.id_medicion],
-    });
+    // Las observaciones se autoguardan: se guardan ya (si cambiaron) y no frenan la salida.
+    if (resultado && obsCambiaron) guardarObs();
+    const pend = pendientesAlSalir({ cola: colaRef.current });
     if (!pend.hay) {
       continuar();
       return;
     }
     const partes = [];
     if (pend.fallidas) partes.push(`${pend.fallidas} ${pend.fallidas === 1 ? 'foto no se analizó' : 'fotos no se analizaron'}`);
-    if (pend.obsSinGuardar) partes.push('tienes observaciones sin guardar');
     const mensaje = `${partes.join(' y ')}. Si continúas, se perderán.`;
     // Solo fallidas definitivas (410) y sin notas: no hay nada que reintentar ni guardar.
-    const soloDescartar = !pend.reintentables && !pend.obsSinGuardar;
+    const soloDescartar = !pend.reintentables;
     setConfirmModal({
       visible: true,
       title: 'Hay cambios sin resolver',
       message: mensaje.charAt(0).toUpperCase() + mensaje.slice(1),
-      confirmLabel: soloDescartar ? 'Descartar y continuar' : pend.reintentables ? 'Reintentar las fallidas' : 'Guardar notas y continuar',
+      confirmLabel: soloDescartar ? 'Descartar y continuar' : 'Reintentar las fallidas',
       variant: soloDescartar ? 'danger' : 'primary',
       extraLabel: soloDescartar ? '' : 'Descartar y continuar',
       cancelLabel: 'Quedarme aquí',
@@ -889,11 +923,8 @@ function Root() {
         cerrarConfirm();
         if (soloDescartar) {
           continuar();
-        } else if (pend.reintentables) {
-          analizar();
         } else {
-          await guardarObs();
-          continuar();
+          analizar();
         }
       },
       onExtra: () => {
@@ -965,6 +996,7 @@ function Root() {
   const analizar = async () => {
     if (analizandoRef.current || !colaRef.current.length || !bloqueSel) return;
     analizandoRef.current = true;
+    cancelarRef.current = false;
     const sesion = sesionRef.current;
     const vigente = () => sesion === sesionRef.current;
     setScreen('analyzing');
@@ -983,6 +1015,7 @@ function Root() {
 
       for (let i = 0; i < colaRef.current.length; i++) {
         if (!vigente()) return;
+        if (cancelarRef.current) break;
         const itemFoto = colaRef.current[i];
         if (itemFoto.status === 'lista' || itemFoto.definitivo) continue;
         actualizarFoto(i, { status: 'subiendo', error: undefined });
@@ -1036,11 +1069,18 @@ function Root() {
         await saveLocal(APP_CONFIG.storageKeys.bloquePorMedicion, { ...guardado, ...bloquesNuevos });
       }
 
+      const cancelada = cancelarRef.current;
+      if (cancelada) fijarCola(marcarCanceladas(colaRef.current));
       setEtapaSubida('completado');
       if (Object.keys(bloquesNuevos).length) refrescarIndicadores();
 
       // La imagen y el análisis que se muestran salen del MISMO ítem de la cola.
       const { ultimaLista } = resumirCola(colaRef.current);
+      if (!ultimaLista && cancelada) {
+        // Se canceló antes de terminar ninguna: se vuelve a revisar las fotos, sin error.
+        setScreen('preview');
+        return;
+      }
       if (!ultimaLista) {
         throw new Error(resumirCola(colaRef.current).primerError || 'No se pudo procesar ninguna foto.');
       }
@@ -1115,8 +1155,8 @@ function Root() {
       const nombrePunto = claveBloque ? nombreCortoBloque(bloquesMap[claveBloque], '') : '';
       await Share.share({
         message:
-          `PIXELRUST — ${nombrePunto ? 'Punto ' + nombrePunto : 'Medición'}\n` +
-          `Corrosión: ${s.label} (${num(m.area_corroida_pct, 0).toFixed(1)}%)\n` +
+          `PIXELRUST — ${nombrePunto ? 'Punto ' + nombrePunto : 'Foto'}\n` +
+          `Corrosión: ${s.label} (${formatoPct(m.area_corroida_pct)})\n` +
           `Confianza: ${confianzaPct(m.confianza_promedio)}%\n` +
           `Fecha: ${formatDateTime(m.timestamp)}`,
       });
@@ -1128,7 +1168,7 @@ function Root() {
     setPromptModal({
       visible: true,
       title: 'Renombrar foto',
-      message: 'Ingresa el nuevo nombre descriptivo para esta medición:',
+      message: 'Ingresa el nuevo nombre descriptivo para esta foto:',
       initialValue: m.nombre || '',
       placeholder: 'Ej. Cara norte, Viga 4B',
       onConfirm: async (nuevoNombre) => {
@@ -1266,12 +1306,13 @@ function Root() {
           cola={colaFotos}
           bloqueSel={bloqueSelLabel}
           onBack={() => setScreen('camera')}
+          onQuitar={quitarFotoDeCola}
           onConfirm={analizar}
         />
       );
 
     if (screen === 'analyzing')
-      return <AnalyzingScreen etapa={etapaSubida} colaFotos={colaFotos} bloqueSel={bloqueSelLabel} />;
+      return <AnalyzingScreen etapa={etapaSubida} colaFotos={colaFotos} bloqueSel={bloqueSelLabel} onCancelar={pedirCancelarAnalisis} />;
 
     if (screen === 'result' && resultado)
       return (
@@ -1287,7 +1328,7 @@ function Root() {
           setDescripcion={setDescripcion}
           obsOpen={obsOpen}
           setObsOpen={setObsOpen}
-          obsSaved={obsSaved}
+          obsSaved={Boolean(guardadaObs) && !obsCambiaron}
           onSaveObs={guardarObs}
           onNext={() => salirDelResultado(() => irANuevaMedicion({ mantenerLote: true }))}
           onTerminarLote={() => salirDelResultado(terminarLote)}
@@ -1378,6 +1419,7 @@ function Root() {
         )}
         {tab === 'lotes' && (
           <LotesScreen
+            offline={offline}
             iniciales={iniciales}
             onSettings={abrirAjustes}
             mediciones={mediciones}
@@ -1409,6 +1451,7 @@ function Root() {
         )}
         {tab === 'folders' && (
           <FoldersScreen
+            offline={offline}
             iniciales={iniciales}
             onSettings={abrirAjustes}
             mediciones={mediciones}
@@ -1425,6 +1468,7 @@ function Root() {
         )}
         {tab === 'activity' && (
           <ActivityScreen
+            offline={offline}
             iniciales={iniciales}
             onSettings={abrirAjustes}
             mediciones={medicionesTodas}

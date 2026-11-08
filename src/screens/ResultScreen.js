@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
-import { Screen, Header, ResultCard, Field, Button, Banner, Foto, SectionTitle, useReducedMotion } from '../DesignComponents';
+import { Screen, Header, ResultCard, Field, Button, Banner, Foto, SectionTitle, IconButton, useReducedMotion } from '../DesignComponents';
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
-import { IconCheck, IconPlus, IconMinus } from '../Icons';
+import { IconCheck, IconPlus, IconMinus, IconHome } from '../Icons';
 import { textoResumenCola } from '../logic';
 import { construirMosaico, dividirEnFilas } from '../galeria';
 import { imagenDe } from '../miniaturas';
@@ -59,7 +59,16 @@ export default function ResultScreen({
 
   return (
     <Screen>
-      <Header title="Resultado" subtitle={resumen || `Punto ${bloqueSel}`} onBack={onBack || onHome} />
+      <Header
+        title="Resultado"
+        subtitle={resumen || `Punto ${bloqueSel}`}
+        onBack={onBack || onHome}
+        right={
+          <IconButton onPress={onHome} label="Volver al inicio">
+            <IconHome size={24} color={TOKENS.colors.text} />
+          </IconButton>
+        }
+      />
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
           <ScrollView contentContainerStyle={{ padding: PAD, paddingBottom: 24, gap: 16 }} keyboardShouldPersistTaps="handled">
@@ -138,32 +147,21 @@ export default function ResultScreen({
                   multiline
                   autoCapitalize="sentences"
                 />
-                <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginBottom: 12 }}>
-                  El espesor y las notas se guardan solo en este teléfono.
-                </Text>
-                <Button
-                  variant="outlined"
-                  label={obsSaved ? 'Guardado en este teléfono' : 'Guardar notas en este teléfono'}
-                  left={obsSaved ? <IconCheck size={18} color={TOKENS.colors.piedra_700} /> : null}
-                  onPress={onSaveObs}
-                />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessibilityLiveRegion="polite">
+                  {obsSaved && <IconCheck size={16} color={TOKENS.colors.piedra_700} />}
+                  <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, flex: 1 }}>
+                    {obsSaved ? 'Guardado solo en este teléfono.' : 'Se guarda solo en este teléfono, automáticamente.'}
+                  </Text>
+                </View>
               </View>
             )}
           </ScrollView>
         </KeyboardAvoidingView>
 
         <View style={{ padding: PAD, gap: 8, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral300, backgroundColor: TOKENS.colors.surfaceAlt }}>
+          {/* Una sola acción principal; terminar el lote es secundaria y neutral (no compite con ella). */}
           <Button label={loteNombre ? 'Siguiente foto en este lote' : 'Siguiente foto en este punto'} onPress={onNext} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {!!loteNombre && (
-              <View style={{ flex: 1 }}>
-                <Button variant="tonal" compact label="Terminar lote" onPress={onTerminarLote} />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Button variant={loteNombre ? 'text' : 'tonal'} compact label="Volver al inicio" onPress={onHome} />
-            </View>
-          </View>
+          {!!loteNombre && <Button variant="outlined" compact label="Terminar lote" onPress={onTerminarLote} />}
         </View>
       </Animated.View>
     </Screen>
