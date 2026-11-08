@@ -135,6 +135,9 @@ test('estadoPunto: promedio del día más reciente', () => {
   assert.equal(e.promedio, 17);
   assert.equal(e.nivel, 2);
   assert.equal(e.fotos, 2);
+  // la insignia muestra el promedio (Moderada) y la peor foto del día es otra cosa (Severa, 30 %)
+  assert.equal(e.peor, 3);
+  assert.equal(e.peorPct, 30);
 });
 
 test('vigencia de miniaturas: la URL firmada dura 1 h', () => {

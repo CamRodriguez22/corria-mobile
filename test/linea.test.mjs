@@ -6,7 +6,7 @@ import {
   textoResultados, FILTROS_VACIOS,
 } from '../src/linea.js';
 import {
-  puntosTendencia, ubicarRotulo, techoEjeY, marcasEjeY, escalaTendencia, puntoMasCercano, resumenTendencia, lineasAccesibles,
+  puntosTendencia, rotuloPeriodo, techoEjeY, marcasEjeY, escalaTendencia, puntoMasCercano, resumenTendencia, lineasAccesibles,
 } from '../src/tendencia.js';
 import { estadoFotoCola, resumenAvance, indiceActivo, textoEtapa } from '../src/cola.js';
 
@@ -110,7 +110,7 @@ test('puntosTendencia: ordena, omite días sin promedio y calcula el nivel del p
   assert.equal(puntosTendencia([dia('2026-12-31', 1, 1), dia('2027-01-02', 1, 1)])[0].etiqueta, '31 dic 2026');
 });
 
-test('techo y marcas del eje Y: siempre muestra el umbral de 10 %', () => {
+test('techo y marcas del eje Y: mínimo 15 %', () => {
   assert.equal(techoEjeY(0), 15);
   assert.equal(techoEjeY(4), 15);
   assert.equal(techoEjeY(18), 25);
@@ -120,21 +120,51 @@ test('techo y marcas del eje Y: siempre muestra el umbral de 10 %', () => {
   assert.deepEqual(marcasEjeY(40), [0, 10, 20, 30, 40]);
 });
 
-test('escalaTendencia: X por tiempo real, Y invertida, umbrales solo si caben', () => {
+test('escalaTendencia: X por tiempo real, Y invertida, sin líneas de umbral', () => {
   const p = puntosTendencia(dias);
   const e = escalaTendencia(p, { ancho: 300, alto: 100 });
-  assert.equal(e.techo, 40);
+  assert.equal(e.techo, 50);
   assert.equal(e.puntos[0].x, 0);
   assert.equal(e.puntos[2].x, 300);
   // 30 oct -> 3 nov son 4 de 8 días: mitad exacta
   assert.equal(e.puntos[1].x, 150);
   assert.equal(e.puntos[0].y > e.puntos[2].y, true);
-  assert.deepEqual(e.umbrales.map((u) => u.valor), [10, 25]);
-  assert.equal(e.umbrales[0].etiqueta, 'Moderada desde 10 %');
-  assert.equal(e.umbrales[1].etiqueta, 'Severa desde 25 %');
-  const bajo = escalaTendencia(puntosTendencia([dia('2026-11-01', 1, 1, { promedio_pct: 2 }), dia('2026-11-02', 1, 1, { promedio_pct: 3 })]), { ancho: 100, alto: 50 });
-  assert.deepEqual(bajo.umbrales.map((u) => u.valor), [10]);
+  assert.equal('umbrales' in e, false); // decisión del dueño: sin líneas de 10 % / 25 %
   assert.equal(escalaTendencia([], { ancho: 100, alto: 50 }).puntos.length, 0);
+});
+
+test('puntosTendencia: conserva mínimo, máximo y fotos por nivel del día', () => {
+  const [p] = puntosTendencia([dia('2026-11-03', 3, 2, { promedio_pct: 12, min_pct: 4.5, max_pct: 20, por_nivel: [0, 1, 2, 0] })]);
+  assert.equal(p.minPct, 4.5);
+  assert.equal(p.maxPct, 20);
+  assert.deepEqual(p.porNivel, [0, 1, 2, 0]);
+  const [q] = puntosTendencia([dia('2026-11-03', 1, 1, { promedio_pct: 3, por_nivel: undefined })]);
+  assert.equal(q.minPct, null);
+  assert.equal(q.porNivel, null);
+});
+
+test('escalaTendencia: banda mín-máx y barras apiladas por nivel', () => {
+  const p = puntosTendencia([
+    dia('2026-11-01', 4, 2, { promedio_pct: 10, min_pct: 5, max_pct: 20, por_nivel: [0, 1, 3, 0] }),
+    dia('2026-11-02', 2, 1, { promedio_pct: 5, min_pct: 5, max_pct: 5, por_nivel: [0, 2, 0, 0] }),
+  ]);
+  const e = escalaTendencia(p, { ancho: 100, alto: 100, altoBarras: 40 });
+  const [a, b] = e.puntos;
+  assert.equal(a.yMax < a.y && a.y < a.yMin, true); // más corrosión = más arriba (y menor)
+  assert.equal(b.yMin, b.yMax);
+  assert.equal(e.maxFotos, 4);
+  // el día con 4 fotos llena el panel: 1 + 3 fotos, apiladas de abajo hacia arriba
+  assert.deepEqual(a.segmentos.map((s) => [s.nivel, s.n]), [[1, 1], [2, 3]]);
+  assert.equal(Math.round(a.segmentos.reduce((t, s) => t + s.h, 0)), 40);
+  assert.equal(Math.round(b.segmentos[0].h), 20);
+  assert.equal(e.anchoBarra, 14); // con 2 días el paso (100) permite el máximo
+});
+
+test('rotuloPeriodo: días con fotos frente al período que cubre el eje', () => {
+  assert.equal(rotuloPeriodo([]), '');
+  assert.equal(rotuloPeriodo(puntosTendencia([dia('2026-11-01', 1, 1)])), '1 día con fotos');
+  const largo = puntosTendencia([dia('2026-08-07', 1, 1), dia('2026-09-20', 1, 1), dia('2026-11-07', 1, 1)]);
+  assert.equal(rotuloPeriodo(largo), '3 días con fotos en 93 días (7 ago a 7 nov)');
 });
 
 test('puntoMasCercano elige el punto más próximo en X', () => {
@@ -169,19 +199,3 @@ test('estadoFotoCola y avance de la cola', () => {
   assert.equal(indiceActivo([{ status: 'lista' }]), -1);
 });
 
-test('ubicarRotulo evita tapar puntos: prueba arriba-derecha, luego arriba-izquierda, luego abajo', () => {
-  const area = { ancho: 300, alto: 100 };
-  const u = { etiqueta: 'Moderada desde 10 %', y: 60 };
-  assert.deepEqual(ubicarRotulo(u, [], area).x, 300 - (u.etiqueta.length * 7.8 + 10)); // libre: arriba-derecha
-  const w = u.etiqueta.length * 7.8 + 10;
-  const punto = (x, y) => ({ x, y });
-  // un punto justo donde iría el rótulo arriba-derecha -> se va a la izquierda
-  const izq = ubicarRotulo(u, [punto(300 - w / 2, 50)], area);
-  assert.equal(izq.x, 0);
-  assert.ok(izq.y < u.y);
-  // puntos arriba a ambos lados -> abajo
-  const abajo = ubicarRotulo(u, [punto(300 - w / 2, 50), punto(w / 2, 50)], area);
-  assert.ok(abajo.y > u.y);
-  // una línea pegada al borde superior no se sale del área
-  assert.ok(ubicarRotulo({ etiqueta: 'Severa desde 25 %', y: 2 }, [], area).y >= 2);
-});

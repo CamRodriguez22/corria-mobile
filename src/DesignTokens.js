@@ -113,6 +113,14 @@ export const TOKENS = {
   tapTarget: 48,
 
   shadow: {
+    // Sombra suave de tarjeta (superficie casi blanca sobre fondo cálido).
+    card: {
+      shadowColor: '#3b2f1d',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      elevation: 1,
+    },
     sm: {
       shadowColor: '#2e2b25',
       shadowOffset: { width: 0, height: 2 },

@@ -165,7 +165,8 @@ export function estadoPunto(items = []) {
   const pcts = delDia.map((m) => parseFloat(m.area_corroida_pct)).filter(Number.isFinite);
   const promedio = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
   const nivel = promedio === null ? peorNivel(delDia) : nivelDeMedicion({ area_corroida_pct: promedio });
-  return { dia: ultimo, nivel, promedio, fotos: delDia.length };
+  // `peor`/`peorPct`: la peor foto de ese día (la que muestran las fichas), distinta del promedio.
+  return { dia: ultimo, nivel, promedio, fotos: delDia.length, peor: peorNivel(delDia), peorPct: maxPct(delDia) };
 }
 
 // Lotes a partir de una lista de mediciones (misma clave que `claveLote`). Las fotos sin lote NO

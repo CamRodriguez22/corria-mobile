@@ -8,7 +8,8 @@ import { TOKENS } from '../DesignTokens';
 import { agruparPorBloque } from '../utils';
 import { mezclarMediciones } from '../logic';
 import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
-import { fechaLarga, formatoPct, plural, hoyLocal } from '../fechas';
+import { fechaLarga, fechaMedia, formatoPct, formatoPctMono, plural, hoyLocal } from '../fechas';
+import { nombreNivel } from '../niveles';
 import { aniosDisponibles } from '../linea';
 import { puntosTendencia } from '../tendencia';
 
@@ -66,20 +67,44 @@ export default function FolderScreen({
       {estado ? (
         <View
           accessible
-          accessibilityLabel={`Estado actual: ${estado.promedio === null ? '' : formatoPct(estado.promedio) + ', '}${fechaLarga(estado.dia)}`}
-          style={{ gap: 8 }}
+          accessibilityLabel={`Estado del punto el ${fechaLarga(estado.dia)}. Promedio del día: ${estado.promedio === null ? 'sin porcentaje' : formatoPct(estado.promedio)}, ${nombreNivel(estado.nivel)}. Peor foto del día: ${estado.peorPct === null ? '' : formatoPct(estado.peorPct) + ', '}${nombreNivel(estado.peor)}.`}
+          style={{
+            gap: 12,
+            backgroundColor: TOKENS.colors.surfaceAlt,
+            borderRadius: TOKENS.radius.lg,
+            borderWidth: 1,
+            borderColor: TOKENS.colors.border,
+            padding: 16,
+            ...TOKENS.shadow.card,
+          }}
         >
-          <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.neutral600 }}>Estado actual</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <NivelBadge nivel={estado.nivel} />
-            {estado.promedio !== null && (
-              <Text style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text, fontVariant: ['tabular-nums'] }}>
-                {formatoPct(estado.promedio)}
-              </Text>
-            )}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.neutral600 }}>Estado del punto</Text>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{fechaMedia(estado.dia)}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={{ ...TOKENS.type.labelSmall, color: TOKENS.colors.neutral600 }}>PROMEDIO DEL DÍA</Text>
+              {estado.promedio !== null && (
+                <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 24, lineHeight: 30, fontWeight: '700', color: TOKENS.colors.text }}>
+                  {formatoPctMono(estado.promedio)}
+                </Text>
+              )}
+              <NivelBadge nivel={estado.nivel} compacto />
+            </View>
+            <View style={{ width: 1, backgroundColor: TOKENS.colors.neutral200 }} />
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={{ ...TOKENS.type.labelSmall, color: TOKENS.colors.neutral600 }}>PEOR FOTO DEL DÍA</Text>
+              {estado.peorPct !== null && (
+                <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 24, lineHeight: 30, fontWeight: '700', color: TOKENS.colors.text }}>
+                  {formatoPctMono(estado.peorPct)}
+                </Text>
+              )}
+              <NivelBadge nivel={estado.peor} compacto />
+            </View>
           </View>
           <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
-            Promedio del {fechaLarga(estado.dia)} · {plural(lista.length, 'foto cargada', 'fotos cargadas')}
+            {plural(estado.fotos, 'foto', 'fotos')} ese día · {plural(lista.length, 'foto cargada', 'fotos cargadas')} en total
           </Text>
         </View>
       ) : null}

@@ -154,8 +154,9 @@ test('resumenDiario agrega por día local UTC-5 con la forma del backend', () =>
     assert.equal(d.por_nivel.reduce((x, y) => x + y, 0), d.total);
     assert.equal(d.peor_nivel, Math.max(...d.por_nivel.map((n, i) => (n ? i : -1))));
     assert.ok(d.max_pct >= d.promedio_pct);
+    assert.ok(d.min_pct <= d.promedio_pct); // min_pct existe en el handler real (api_mediciones)
     assert.ok(d.nivel_ponderado >= 0 && d.nivel_ponderado <= 3);
-    assert.deepEqual(Object.keys(d).sort(), ['fecha', 'lotes', 'max_pct', 'nivel_ponderado', 'nivel_promedio', 'peor_nivel', 'por_nivel', 'promedio_pct', 'total']);
+    assert.deepEqual(Object.keys(d).sort(), ['fecha', 'lotes', 'max_pct', 'min_pct', 'nivel_ponderado', 'nivel_promedio', 'peor_nivel', 'por_nivel', 'promedio_pct', 'total']);
   }
   const unPunto = resumenDiario(a, 2026, BLOQUES[1].id_bloque);
   assert.equal(unPunto.id_punto, BLOQUES[1].id_bloque);

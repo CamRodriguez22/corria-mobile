@@ -1,6 +1,6 @@
 // src/tendencia.js — Puntos y escala de la gráfica de tendencia por punto. Sin React Native.
 // Espejo de lib/tendenciaDiaria.js de la web: un punto por día local con el promedio del % corroído.
-import { UMBRAL_MODERADA, UMBRAL_SEVERA, nombreNivel, nivelDePct } from './niveles.js';
+import { UMBRAL_MODERADA, nombreNivel, nivelDePct } from './niveles.js';
 import { fechaCorta, formatoPct, plural, partesDia } from './fechas.js';
 
 export const DIAS_TENDENCIA_MAX = 90;
@@ -29,12 +29,16 @@ export function puntosTendencia(dias = [], max = DIAS_TENDENCIA_MAX) {
     nivel: nivelDePct(d.promedio_pct),
     peorNivel: Number.isInteger(d.peor_nivel) ? d.peor_nivel : null,
     peorPct: esNumero(d.max_pct) ? d.max_pct : null,
+    minPct: esNumero(d.min_pct) ? d.min_pct : null,
+    maxPct: esNumero(d.max_pct) ? d.max_pct : null,
+    // Fotos del día por nivel (0..3), tal como las agrega el backend en resumen-diario (por_nivel).
+    porNivel: Array.isArray(d.por_nivel) && d.por_nivel.length === 4 ? d.por_nivel.map((n) => Math.max(0, Number(n) || 0)) : null,
   }));
 }
 
 const PASOS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100];
 
-// Techo del eje Y: el menor paso >= máximo con aire; siempre alcanza el umbral de 10 %.
+// Techo del eje Y: el menor paso >= máximo con aire (mínimo 15 %, para que unas décimas no llenen el eje).
 export function techoEjeY(maximo) {
   const objetivo = Math.max((maximo || 0) * 1.15, UMBRAL_MODERADA + 2);
   return PASOS.find((p) => p >= objetivo) ?? 100;
@@ -50,24 +54,50 @@ export function marcasEjeY(techo) {
 // Geometría de la gráfica dentro de un área `ancho`x`alto` (ya sin márgenes).
 // El eje X es el tiempo real (días entre medidas), no el índice: 2 días seguidos y 2 separados por
 // un mes no se ven igual. Devuelve coordenadas listas para dibujar.
-export function escalaTendencia(puntos = [], { ancho, alto } = {}) {
-  const techo = techoEjeY(Math.max(0, ...puntos.map((p) => p.promedio)));
+export function escalaTendencia(puntos = [], { ancho, alto, altoBarras = 0 } = {}) {
+  const maximo = Math.max(0, ...puntos.map((p) => Math.max(p.promedio, p.maxPct ?? 0)));
+  const techo = techoEjeY(maximo);
   const y = (v) => alto - (Math.min(Math.max(v, 0), techo) / techo) * alto;
   const t0 = puntos.length ? msDia(puntos[0].fecha) : 0;
   const t1 = puntos.length ? msDia(puntos[puntos.length - 1].fecha) : 0;
   const span = Math.max(t1 - t0, MS_DIA);
   const x = (fecha) => (puntos.length < 2 ? ancho / 2 : ((msDia(fecha) - t0) / span) * ancho);
-  const umbrales = [
-    { valor: UMBRAL_MODERADA, nivel: 2 },
-    { valor: UMBRAL_SEVERA, nivel: 3 },
-  ]
-    .filter((u) => u.valor <= techo)
-    .map((u) => ({ ...u, y: y(u.valor), etiqueta: `${nombreNivel(u.nivel)} desde ${u.valor} %` }));
+  // Barras de fotos por nivel (panel inferior): altura proporcional al día con más fotos.
+  const maxFotos = Math.max(1, ...puntos.map((p) => p.total));
+  const unidad = altoBarras / maxFotos;
+  const salida = puntos.map((p, i) => {
+    const px = x(p.fecha);
+    let acum = 0;
+    const segmentos = (p.porNivel || [])
+      .map((n, nivel) => ({ nivel, n }))
+      .filter((s) => s.n > 0)
+      .map((s) => {
+        const h = s.n * unidad;
+        const seg = { nivel: s.nivel, n: s.n, y: altoBarras - acum - h, h };
+        acum += h;
+        return seg;
+      });
+    return {
+      ...p,
+      x: px,
+      y: y(p.promedio),
+      yMin: p.minPct == null ? null : y(p.minPct),
+      yMax: p.maxPct == null ? null : y(p.maxPct),
+      // Días desde el punto anterior (null en el primero): la banda solo une días cercanos.
+      gapDias: i === 0 ? null : Math.round((msDia(p.fecha) - msDia(puntos[i - 1].fecha)) / MS_DIA),
+      segmentos,
+    };
+  });
+  // Ancho de barra: un 70 % del paso mínimo entre días, entre 4 y 14 (el eje X es tiempo real).
+  let pasoMin = Infinity;
+  for (let i = 1; i < salida.length; i++) pasoMin = Math.min(pasoMin, salida[i].x - salida[i - 1].x);
+  const anchoBarra = Number.isFinite(pasoMin) ? Math.max(4, Math.min(14, pasoMin * 0.7)) : 14;
   return {
     techo,
     marcas: marcasEjeY(techo).map((v) => ({ valor: v, y: y(v) })),
-    umbrales,
-    puntos: puntos.map((p) => ({ ...p, x: x(p.fecha), y: y(p.promedio) })),
+    puntos: salida,
+    anchoBarra,
+    maxFotos,
   };
 }
 
@@ -108,20 +138,13 @@ export function textoDia(p) {
   return `${p.etiqueta}: ${formatoPct(p.promedio)} (${nombreNivel(p.nivel)}) · ${plural(p.total, 'foto', 'fotos')}${peor}`;
 }
 
-// Rótulo de una línea de referencia (p. ej. "Severa desde 25 %"): se prueba arriba-derecha, arriba-izquierda,
-// abajo-derecha y abajo-izquierda de la línea y se elige la primera posición que no tape ningún punto.
-// Coordenadas relativas al área de dibujo (sin márgenes). `radio` = radio del punto + aire.
-export function ubicarRotulo(umbral, puntos = [], { ancho, alto }, { anchoCaracter = 7.8, relleno = 10, altoRotulo = 18, radio = 9 } = {}) {
-  const w = umbral.etiqueta.length * anchoCaracter + relleno;
-  const h = altoRotulo;
-  const candidatos = [
-    { x: ancho - w, y: umbral.y - h - 2 },
-    { x: 0, y: umbral.y - h - 2 },
-    { x: ancho - w, y: umbral.y + 3 },
-    { x: 0, y: umbral.y + 3 },
-  ].filter((c) => c.y >= -4 && c.y + h <= alto + 4);
-  const choca = (c) =>
-    puntos.some((p) => p.x + radio > c.x && p.x - radio < c.x + w && p.y + radio > c.y && p.y - radio < c.y + h);
-  const elegido = candidatos.find((c) => !choca(c)) || candidatos[0] || { x: ancho - w, y: umbral.y - h - 2 };
-  return { ...elegido, w, h };
+// "7 días con fotos en 92 días (7 ago a 7 nov)": el eje cubre todo el período, no solo los días con datos.
+export function rotuloPeriodo(puntos = []) {
+  if (!puntos.length) return '';
+  const primero = puntos[0];
+  const ultimo = puntos[puntos.length - 1];
+  const dias = Math.round((msDia(ultimo.fecha) - msDia(primero.fecha)) / MS_DIA) + 1;
+  const base = plural(puntos.length, 'día con fotos', 'días con fotos');
+  if (puntos.length < 2) return base;
+  return `${base} en ${dias} días (${primero.etiqueta} a ${ultimo.etiqueta})`;
 }

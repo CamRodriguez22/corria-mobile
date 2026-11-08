@@ -227,7 +227,7 @@ export function resumenDiario(mediciones, anio, id_punto = null) {
     if (id_punto && m.id_punto !== id_punto) continue;
     const dia = diaLocal(m.timestamp);
     if (!dia || !dia.startsWith(`${anio}-`)) continue;
-    const d = (dias[dia] ||= { fecha: dia, total: 0, por_nivel: [0, 0, 0, 0], peor_nivel: null, max_pct: null, sumPct: 0, nPct: 0, sumNiv: 0, nNiv: 0, lotes: {} });
+    const d = (dias[dia] ||= { fecha: dia, total: 0, por_nivel: [0, 0, 0, 0], peor_nivel: null, max_pct: null, min_pct: null, sumPct: 0, nPct: 0, sumNiv: 0, nNiv: 0, lotes: {} });
     d.total++;
     imagenes++;
     const nivel = m.nivel_corrosion;
@@ -240,6 +240,7 @@ export function resumenDiario(mediciones, anio, id_punto = null) {
     const pct = parseFloat(m.area_corroida_pct);
     if (Number.isFinite(pct)) {
       d.max_pct = d.max_pct === null ? pct : Math.max(d.max_pct, pct);
+      d.min_pct = d.min_pct === null ? pct : Math.min(d.min_pct, pct);
       d.sumPct += pct;
       d.nPct++;
     }
@@ -257,6 +258,7 @@ export function resumenDiario(mediciones, anio, id_punto = null) {
       por_nivel: d.por_nivel,
       peor_nivel: d.peor_nivel,
       max_pct: d.max_pct,
+      min_pct: d.min_pct,
       promedio_pct: d.nPct ? d.sumPct / d.nPct : null,
       nivel_promedio: d.nNiv ? Math.round((d.sumNiv / d.nNiv) * 100) / 100 : null,
       nivel_ponderado: d.nNiv ? Math.floor(d.sumNiv / d.nNiv + 0.5) : null,
