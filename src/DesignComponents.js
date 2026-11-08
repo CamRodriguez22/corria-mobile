@@ -21,7 +21,7 @@ import { TOKENS, NIVELES, severidad, confianzaPct, num } from './DesignTokens';
 import { nivelDeMedicion } from './niveles';
 import { miniaturaDe } from './miniaturas';
 import { formatoPct } from './fechas';
-import { COLORES_SOBRE_NIVEL } from './paleta';
+import { ICONO_SOBRE_NIVEL } from './paleta';
 import {
   IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot, IconNivel, IconImageOff,
   IconChevronDown, IconClose, IconCheck, IconArrowLeft, IconAlertTriangle, IconWifiOff,
@@ -311,7 +311,7 @@ export const SwatchNivel = ({ nivel = 0, size = 18 }) => {
   const s = NIVELES[Math.max(0, Math.min(3, nivel))];
   return (
     <View style={{ width: size, height: size, borderRadius: 4, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
-      <IconNivel nivel={s.i} size={size - 6} color={COLORES_SOBRE_NIVEL[s.i]} />
+      <IconNivel nivel={s.i} size={size - 6} color={ICONO_SOBRE_NIVEL[s.i]} />
     </View>
   );
 };
@@ -1070,7 +1070,7 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
-            <IconNivel nivel={s.i} size={28} color={COLORES_SOBRE_NIVEL[s.i]} />
+            <IconNivel nivel={s.i} size={28} color={ICONO_SOBRE_NIVEL[s.i]} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ ...TOKENS.type.titleMedium, color: s.texto }}>{s.label}</Text>
@@ -1098,7 +1098,7 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
         <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
-          <IconNivel nivel={s.i} size={32} color={COLORES_SOBRE_NIVEL[s.i]} />
+          <IconNivel nivel={s.i} size={32} color={ICONO_SOBRE_NIVEL[s.i]} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ ...TOKENS.type.titleLarge, color: s.texto }}>{s.label}</Text>

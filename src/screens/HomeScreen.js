@@ -5,7 +5,7 @@ import { Fab, Spinner, EmptyState, AvisoSinConexion, SectionTitle, SwatchNivel, 
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
 import { IconPlus, IconWifiOff, IconNivel, IconChevronRight } from '../Icons';
-import { COLORES_SOBRE_NIVEL } from '../paleta';
+import { ICONO_SOBRE_NIVEL } from '../paleta';
 import { nombreNivel } from '../niveles';
 import { formatoPct, fechaCorta, plural } from '../fechas';
 import { nombrePuntoDe } from '../helpers';
@@ -107,7 +107,7 @@ export default function HomeScreen({
             })}
           >
             <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: NIVELES[atencion.nivel].color, alignItems: 'center', justifyContent: 'center' }}>
-              <IconNivel nivel={atencion.nivel} size={30} color={COLORES_SOBRE_NIVEL[atencion.nivel]} />
+              <IconNivel nivel={atencion.nivel} size={30} color={ICONO_SOBRE_NIVEL[atencion.nivel]} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ ...TOKENS.type.labelSmall, letterSpacing: 0.8, color: NIVELES[atencion.nivel].texto }}>

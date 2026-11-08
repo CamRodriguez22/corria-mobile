@@ -20,6 +20,10 @@ export const COLORES_TEXTO_NIVEL = ['#166534', '#92400e', '#9a3412', '#a51a1a'];
 
 // Texto/ícono SOBRE el relleno del nivel (>= 4,5:1): tinta sobre verde, ámbar y naranja; blanco sobre rojo.
 export const COLORES_SOBRE_NIVEL = [TINTA, TINTA, TINTA, '#ffffff'];
+// Level ICON on the level fill: always ink, so the same figure keeps the same color on every
+// level (owner's choice). Ink on red is 3.4:1, above the 3:1 required for graphics (WCAG 1.4.11);
+// TEXT on red keeps COLORES_SOBRE_NIVEL (white) because text needs 4.5:1.
+export const ICONO_SOBRE_NIVEL = [TINTA, TINTA, TINTA, TINTA];
 
 // Tinte translúcido (fondo de insignias): el relleno del nivel al 14 %.
 export function tinteNivel(i) {

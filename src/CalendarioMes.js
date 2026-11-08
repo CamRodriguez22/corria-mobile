@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Pressable, useWindowDimensions } from 'react-native';
 import { Text } from './Typography';
 import { TOKENS, NIVELES } from './DesignTokens';
-import { COLORES_SOBRE_NIVEL } from './paleta';
+import { COLORES_SOBRE_NIVEL, ICONO_SOBRE_NIVEL } from './paleta';
 import { Button, Spinner, IconButton, SwatchNivel } from './DesignComponents';
 import { IconNivel, IconClose, IconChevronLeft, IconChevronRight } from './Icons';
 import { calendarioMes, mesDe, mesAnterior, mesSiguiente, limitesMes, etiquetaCelda, NOMBRES_DIA_SEMANA } from './linea';
@@ -46,7 +46,7 @@ export function Celda({ celda, ancho, seleccionada, onPress }) {
         <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 14, lineHeight: 17, fontWeight: celda.conFotos || celda.esHoy ? '700' : '400', color: sobre }}>
           {celda.dia}
         </Text>
-        {celda.conFotos && nivel !== null ? <IconNivel nivel={nivel} size={12} color={sobre} strokeWidth={2.4} /> : null}
+        {celda.conFotos && nivel !== null ? <IconNivel nivel={nivel} size={12} color={ICONO_SOBRE_NIVEL[nivel]} strokeWidth={2.4} /> : null}
       </Pressable>
     </View>
   );
