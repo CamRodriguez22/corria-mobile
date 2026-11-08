@@ -5,19 +5,22 @@ import { EmptyState, Foto, NivelBadge, ScreenTitle, AvatarButton } from '../Desi
 import { TOKENS } from '../DesignTokens';
 import { IconChevronRight } from '../Icons';
 import { agruparPorBloque } from '../utils';
-import { miniaturaDe, estadoPunto, tituloPunto } from '../galeria';
+import { miniaturaDe, estadoPunto, tituloPunto, ordenarPuntosPorGravedad } from '../galeria';
 import { formatoPct, fechaCorta, plural } from '../fechas';
 
 const PAD = TOKENS.spacing.lg;
 
 export default function FoldersScreen({ iniciales, onSettings, mediciones, bloqueMap, listaBloques, empresaLinea, refreshing, onRefresh, onOpen }) {
+  // Del punto más grave al menos grave (nivel del promedio del día más reciente, luego su %).
   const grupos = useMemo(
     () =>
-      agruparPorBloque(mediciones, bloqueMap, listaBloques).map((g) => ({
-        ...g,
-        estado: estadoPunto(g.items),
-        ultima: g.items[0], // agruparPorBloque ya ordena de la más reciente a la más antigua
-      })),
+      ordenarPuntosPorGravedad(
+        agruparPorBloque(mediciones, bloqueMap, listaBloques).map((g) => ({
+          ...g,
+          estado: estadoPunto(g.items),
+          ultima: g.items[0], // agruparPorBloque ya ordena de la más reciente a la más antigua
+        }))
+      ),
     [mediciones, bloqueMap, listaBloques]
   );
 
@@ -26,7 +29,7 @@ export default function FoldersScreen({ iniciales, onSettings, mediciones, bloqu
       <ScreenTitle
         title="Puntos"
         right={<AvatarButton iniciales={iniciales} onPress={onSettings} />}
-        subtitle={[empresaLinea, plural(mediciones.length, 'foto cargada', 'fotos cargadas')].filter(Boolean).join(' · ')}
+        subtitle={[empresaLinea, plural(mediciones.length, 'foto cargada', 'fotos cargadas'), 'del más grave al menos grave'].filter(Boolean).join(' · ')}
       />
     </View>
   );
@@ -71,7 +74,9 @@ export default function FoldersScreen({ iniciales, onSettings, mediciones, bloqu
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <NivelBadge nivel={g.estado.nivel} compacto />
                     {g.estado.promedio !== null && (
-                      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>{formatoPct(g.estado.promedio)}</Text>
+                      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>
+                        promedio <Text style={{ fontWeight: '700', color: TOKENS.colors.text }}>{formatoPct(g.estado.promedio)}</Text>
+                      </Text>
                     )}
                   </View>
                   <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>

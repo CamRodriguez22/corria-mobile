@@ -338,8 +338,8 @@ export const NivelChip = ({ nivel = 0, texto, style }) => {
     >
       <IconNivel nivel={s.i} size={14} color={s.color} />
       {!!texto && (
-        <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color: '#fff', fontVariant: ['tabular-nums'] }}>
-          {texto}
+        <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: TOKENS.fontSizes.xs, fontWeight: '600', color: '#fff' }}>
+          {String(texto).replace(/\u00a0/g, '')}
         </Text>
       )}
     </View>

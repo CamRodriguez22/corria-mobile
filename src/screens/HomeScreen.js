@@ -4,25 +4,16 @@ import { Text } from '../Typography';
 import { Fab, Spinner, EmptyState, Banner, SectionTitle, SwatchNivel, AvatarButton } from '../DesignComponents';
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
-import { IconPlus, IconWifiOff, IconNivel } from '../Icons';
+import { IconPlus, IconWifiOff, IconNivel, IconChevronRight } from '../Icons';
+import { COLORES_SOBRE_NIVEL } from '../paleta';
+import { nombreNivel } from '../niveles';
+import { formatoPct, fechaCorta, plural } from '../fechas';
 import { nombrePuntoDe } from '../helpers';
-import { construirMosaico, dividirEnFilas, indicadoresLocales } from '../galeria';
+import { construirMosaico, dividirEnFilas, indicadoresLocales, estadoPunto, puntoDeAtencion } from '../galeria';
 import { agruparPorBloque } from '../utils';
 import { NIVELES } from '../DesignTokens';
 
 const PAD = TOKENS.spacing.lg;
-
-function Kpi({ valor, etiqueta, color = TOKENS.colors.text, icono }) {
-  return (
-    <View accessible accessibilityLabel={`${valor} ${etiqueta}`} style={{ flex: 1, alignItems: 'center', paddingHorizontal: 6 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {icono}
-        <Text style={{ fontSize: 30, lineHeight: 36, fontWeight: '800', color }}>{valor}</Text>
-      </View>
-      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700, textAlign: 'center', marginTop: 2 }}>{etiqueta}</Text>
-    </View>
-  );
-}
 
 export default function HomeScreen({
   nombre,
@@ -41,6 +32,7 @@ export default function HomeScreen({
   onOpen,
   onVerTodas,
   onSettings,
+  onAbrirPunto,
 }) {
   const { width } = useWindowDimensions();
   const lado = anchoFicha(width, 3, PAD);
@@ -61,8 +53,14 @@ export default function HomeScreen({
   const totalMediciones = indicadoresServidor?.mediciones_30d ?? locales?.fotos30 ?? 0;
   const totalPuntos = indicadoresServidor?.total_puntos ?? Object.keys(bloquesMap).length;
   const porNivel = indicadoresServidor?.por_nivel || locales?.porNivel || [0, 0, 0, 0];
-  const puntosSeveros = porNivel[3] ?? 0;
   const totalConEstado = porNivel.reduce((a, b) => a + b, 0);
+  // Punto que más atención pide: el `mas_critico` del servidor o, sin él, el peor de los cargados.
+  const grupos = useMemo(
+    () => agruparPorBloque(mediciones, bloqueMap, Object.values(bloquesMap)).map((g) => ({ ...g, estado: estadoPunto(g.items) })),
+    [mediciones, bloqueMap, bloquesMap]
+  );
+  const atencion = useMemo(() => puntoDeAtencion(indicadoresServidor, grupos), [indicadoresServidor, grupos]);
+  const puedeAbrirAtencion = Boolean(atencion && bloquesMap[atencion.clave]);
   const primerNombre = String(nombre || '').split(' ')[0] || nombre;
 
   return (
@@ -87,32 +85,53 @@ export default function HomeScreen({
           </View>
         )}
 
-        <View
-          style={{
-            flexDirection: 'row',
-            marginTop: 20,
-            paddingVertical: 18,
-            backgroundColor: TOKENS.colors.surfaceAlt,
-            borderRadius: TOKENS.radius.lg,
-            borderWidth: 1,
-            borderColor: TOKENS.colors.border,
-          }}
-        >
-          <Kpi valor={totalMediciones} etiqueta="fotos en 30 días" />
-          <View style={{ width: 1, backgroundColor: TOKENS.colors.neutral200 }} />
-          <Kpi
-            valor={puntosSeveros}
-            etiqueta="puntos severos"
-            color={TOKENS.colors.danger}
-            icono={<IconNivel nivel={3} size={22} color={TOKENS.colors.danger} />}
-          />
-          <View style={{ width: 1, backgroundColor: TOKENS.colors.neutral200 }} />
-          <Kpi valor={totalPuntos} etiqueta="puntos activos" color={TOKENS.colors.piedra_800} />
-        </View>
+        {atencion && (
+          <Pressable
+            onPress={puedeAbrirAtencion ? () => onAbrirPunto?.(atencion.clave) : undefined}
+            disabled={!puedeAbrirAtencion}
+            accessibilityRole="button"
+            accessibilityLabel={`${atencion.urgente ? 'Requiere atención' : 'Punto con más corrosión'}: ${atencion.nombre}, ${nombreNivel(atencion.nivel)}${atencion.pct == null ? '' : ', ' + formatoPct(atencion.pct)}`}
+            accessibilityHint="Abre el punto"
+            style={({ pressed }) => ({
+              marginTop: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 14,
+              padding: 14,
+              backgroundColor: TOKENS.colors.surfaceAlt,
+              borderRadius: TOKENS.radius.lg,
+              borderWidth: 1,
+              borderColor: TOKENS.colors.border,
+              opacity: pressed ? 0.85 : 1,
+              ...TOKENS.shadow.card,
+            })}
+          >
+            <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: NIVELES[atencion.nivel].color, alignItems: 'center', justifyContent: 'center' }}>
+              <IconNivel nivel={atencion.nivel} size={30} color={COLORES_SOBRE_NIVEL[atencion.nivel]} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ ...TOKENS.type.labelSmall, letterSpacing: 0.8, color: NIVELES[atencion.nivel].texto }}>
+                {atencion.urgente ? 'REQUIERE ATENCIÓN' : 'PUNTO CON MÁS CORROSIÓN'}
+              </Text>
+              <Text numberOfLines={2} style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text }}>
+                {atencion.nombre}
+              </Text>
+              <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text }}>
+                {nombreNivel(atencion.nivel)}
+                {atencion.pct == null ? '' : ` · ${formatoPct(atencion.pct)}`}
+              </Text>
+              {!!atencion.dia && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Promedio del {fechaCorta(atencion.dia)}</Text>}
+            </View>
+            {puedeAbrirAtencion && <IconChevronRight size={20} color={TOKENS.colors.neutral500} />}
+          </Pressable>
+        )}
 
         {totalConEstado > 0 && (
           <View style={{ marginTop: 20 }}>
             <SectionTitle title="Estado de los puntos" />
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: -6, marginBottom: 6 }}>
+              {plural(totalPuntos, 'punto activo', 'puntos activos')} · {plural(totalMediciones, 'foto', 'fotos')} en 30 días
+            </Text>
             <View
               accessible
               accessibilityLabel={`Puntos por estado: ${NIVELES.map((n) => `${porNivel[n.i]} ${n.label}`).join(', ')}`}

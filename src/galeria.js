@@ -219,3 +219,38 @@ export function indicadoresLocales(mediciones = [], puntosItems = [], hoy = hoyL
   }
   return { fotos30, porNivel, severos: porNivel[3] };
 }
+
+// Punto que más atención pide (Inicio). Con indicadores del servidor se usa su `mas_critico` (promedio del
+// día más reciente, como la web); sin ellos, el peor de los puntos cargados en el teléfono.
+// `grupos` = [{ clave, bloque: { nombre }, estado: estadoPunto(items) }]. `urgente`: Moderada o peor.
+export function puntoDeAtencion(indicadores, grupos = []) {
+  const mc = indicadores?.mas_critico;
+  if (mc && mc.id_punto && mc.nivel != null) {
+    return { clave: mc.id_punto, nombre: tituloPunto(mc.nombre), nivel: mc.nivel, pct: mc.promedio_pct ?? null, dia: mc.fecha || null, urgente: mc.nivel >= 2 };
+  }
+  let mejor = null;
+  for (const g of grupos) {
+    const e = g.estado;
+    if (!e || e.promedio === null) continue;
+    if (!mejor || e.promedio > mejor.estado.promedio) mejor = g;
+  }
+  if (!mejor) return null;
+  const e = mejor.estado;
+  return { clave: mejor.clave, nombre: tituloPunto(mejor.bloque?.nombre), nivel: e.nivel, pct: e.promedio, dia: e.dia, urgente: e.nivel >= 2 };
+}
+
+// Puntos de más a menos grave (nivel del promedio del día, luego % promedio); los que no tienen
+// estado van al final, en su orden original.
+export function ordenarPuntosPorGravedad(grupos = []) {
+  return grupos
+    .map((g, i) => ({ g, i }))
+    .sort((a, b) => {
+      const ea = a.g.estado;
+      const eb = b.g.estado;
+      if (!ea && !eb) return a.i - b.i;
+      if (!ea) return 1;
+      if (!eb) return -1;
+      return eb.nivel - ea.nivel || (eb.promedio ?? -1) - (ea.promedio ?? -1) || a.i - b.i;
+    })
+    .map((x) => x.g);
+}
