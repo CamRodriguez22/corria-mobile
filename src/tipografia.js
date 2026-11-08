@@ -25,5 +25,28 @@ export function familiaPara(familia, fontWeight) {
   return OUTFIT[p];
 }
 
+// ¿Cargaron las fuentes personalizadas? Root lo fija antes de pintar la app. Si fallan (o tardan más que
+// el tiempo de espera del arranque), el texto usa la fuente del sistema pero conserva su `fontWeight`.
+let fuentesOk = true;
+export function marcarFuentes(ok) {
+  fuentesOk = !!ok;
+}
+export function hayFuentes() {
+  return fuentesOk;
+}
+
+// Estilo final de un Text/TextInput. `plano` = estilo ya aplanado; `anidado`/`heredada` = el Text está dentro de
+// otro y `heredada` es la familia ('mono' o undefined) de ese padre. Devuelve { estilo, familia }: `familia` es lo
+// que heredan los Text hijos, para que un hijo solo con peso dentro de un texto mono siga siendo mono.
+export function resolverEstilo(plano = {}, { anidado = false, heredada, fuentes = true } = {}) {
+  if (anidado && plano.fontFamily == null && plano.fontWeight == null) return { estilo: plano, familia: heredada };
+  const familia = plano.fontFamily != null ? plano.fontFamily : anidado ? heredada : undefined;
+  if (!fuentes) {
+    // Sin fuentes personalizadas RN sí respeta `fontWeight`: se deja intacto y 'mono' pasa a la monoespaciada del sistema.
+    return { estilo: { ...plano, fontFamily: familia === 'mono' ? 'monospace' : plano.fontFamily }, familia };
+  }
+  return { estilo: { ...plano, fontFamily: familiaPara(familia, plano.fontWeight), fontWeight: 'normal' }, familia };
+}
+
 // Lista para `useFonts`: nombres de familia que deben estar cargados.
 export const FAMILIAS = [...Object.values(OUTFIT), ...Object.values(PLEX)];
