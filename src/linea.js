@@ -1,6 +1,6 @@
 // src/linea.js — Línea de tiempo: mapa de calor anual y filtros del historial. Sin React Native.
 // Espejo de lib/lineaTiempo.js de la web (barra anual por día local UTC-5).
-import { diaLocal, hoyLocal, partesDia, sumarDias, diaSemana, MESES_CORTOS, fechaLarga, plural } from './fechas.js';
+import { diaLocal, hoyLocal, partesDia, sumarDias, diaSemana, MESES, fechaLarga, plural } from './fechas.js';
 import { nivelDeMedicion, nombreNivel } from './niveles.js';
 
 export const ANIO_MINIMO = 2026; // el backend rechaza años anteriores
@@ -15,31 +15,67 @@ export function aniosDisponibles(hoy = hoyLocal()) {
   return anios;
 }
 
-// Cuadrícula tipo calendario anual: columnas = semanas (lunes a domingo), 7 filas por columna.
-// `dias` = lista `dias` de GET /mediciones/resumen-diario. Los días futuros no se dibujan.
-// Celda: { fecha, dia, total, nivel (peor nivel o null), conFotos }; hueco = null.
-export function mapaCalor(dias = [], anio, hoy = hoyLocal()) {
-  const porFecha = new Map((dias || []).map((d) => [d.fecha, d]));
-  const inicio = `${anio}-01-01`;
-  const finAnio = `${anio}-12-31`;
-  if (hoy < inicio) return { semanas: [], meses: [], diasConFotos: 0, totalFotos: 0 };
-  const fin = hoy < finAnio ? hoy : finAnio;
+// ───────────────────────── Calendario mensual ─────────────────────────
+export const NOMBRES_DIA_SEMANA = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 
+// Mes { anio, mes (1..12) } de un día "YYYY-MM-DD".
+export function mesDe(ymd) {
+  const p = partesDia(ymd);
+  return p ? { anio: p.anio, mes: p.mes } : null;
+}
+
+export function mesAnterior({ anio, mes }) {
+  return mes === 1 ? { anio: anio - 1, mes: 12 } : { anio, mes: mes - 1 };
+}
+
+export function mesSiguiente({ anio, mes }) {
+  return mes === 12 ? { anio: anio + 1, mes: 1 } : { anio, mes: mes + 1 };
+}
+
+const claveMes = ({ anio, mes }) => anio * 12 + (mes - 1);
+
+// Se puede ir al mes anterior hasta enero de ANIO_MINIMO y al siguiente hasta el mes de `hoy`.
+export function limitesMes(mes, hoy = hoyLocal()) {
+  const actual = mesDe(hoy) || { anio: ANIO_MINIMO, mes: 1 };
+  return {
+    puedeAnterior: claveMes(mes) > claveMes({ anio: ANIO_MINIMO, mes: 1 }),
+    puedeSiguiente: claveMes(mes) < claveMes(actual),
+  };
+}
+
+// "noviembre de 2026"
+export function nombreMes({ anio, mes }) {
+  return `${MESES[mes - 1]} de ${anio}`;
+}
+
+// Calendario de un mes: filas de 7 (lunes a domingo); fuera del mes = null. Celda:
+// { fecha, dia, total, nivel (peor nivel o null), conFotos, futuro, esHoy }.
+// `dias` = lista `dias` de GET /mediciones/resumen-diario (ya filtrada con aplicarFiltrosADias si hay filtros).
+export function calendarioMes(dias = [], { anio, mes }, hoy = hoyLocal()) {
+  const porFecha = new Map((dias || []).map((d) => [d.fecha, d]));
+  const primero = `${String(anio).padStart(4, '0')}-${String(mes).padStart(2, '0')}-01`;
+  const siguiente = mesSiguiente({ anio, mes });
+  const ultimo = sumarDias(`${String(siguiente.anio).padStart(4, '0')}-${String(siguiente.mes).padStart(2, '0')}-01`, -1);
   const semanas = [];
-  let semana = new Array(diaSemana(inicio)).fill(null);
-  const meses = [];
+  let semana = new Array(diaSemana(primero)).fill(null);
   let diasConFotos = 0;
   let totalFotos = 0;
-  for (let f = inicio; f <= fin; f = sumarDias(f, 1)) {
-    const p = partesDia(f);
+  for (let f = primero; f <= ultimo; f = sumarDias(f, 1)) {
     const d = porFecha.get(f);
     const total = d ? Number(d.total) || 0 : 0;
     if (total > 0) {
       diasConFotos += 1;
       totalFotos += total;
     }
-    if (p.dia === 1) meses.push({ semana: semanas.length, nombre: MESES_CORTOS[p.mes - 1] });
-    semana.push({ fecha: f, dia: p.dia, total, nivel: total > 0 ? nivelValido(d.peor_nivel) : null, conFotos: total > 0 });
+    semana.push({
+      fecha: f,
+      dia: partesDia(f).dia,
+      total,
+      nivel: total > 0 ? nivelValido(d.peor_nivel) : null,
+      conFotos: total > 0,
+      futuro: f > hoy,
+      esHoy: f === hoy,
+    });
     if (semana.length === 7) {
       semanas.push(semana);
       semana = [];
@@ -49,7 +85,35 @@ export function mapaCalor(dias = [], anio, hoy = hoyLocal()) {
     while (semana.length < 7) semana.push(null);
     semanas.push(semana);
   }
-  return { semanas, meses, diasConFotos, totalFotos };
+  return { anio, mes, nombre: nombreMes({ anio, mes }), semanas, diasConFotos, totalFotos };
+}
+
+// El calendario sigue los filtros activos (nivel y rango de fechas; el punto se resuelve pidiendo el
+// resumen de ese punto). Con niveles elegidos, cada día cuenta solo las fotos de esos niveles
+// (por_nivel del backend) y su peor nivel es el peor entre ellos; fuera del rango, el día queda vacío.
+// El día elegido (filtros.dia) no atenúa nada: se resalta en el calendario.
+export function aplicarFiltrosADias(dias = [], filtros = FILTROS_VACIOS, hoy = hoyLocal()) {
+  const niveles = filtros.niveles || [];
+  const { desde, hasta } = rangoDePreset(filtros.preset || 'todo', hoy);
+  if (!niveles.length && !desde && !hasta) return dias || [];
+  return (dias || []).map((d) => {
+    if ((desde && d.fecha < desde) || (hasta && d.fecha > hasta)) return { ...d, total: 0, peor_nivel: null };
+    if (!niveles.length || !Array.isArray(d.por_nivel)) return d;
+    const vistos = niveles.filter((n) => (d.por_nivel[n] || 0) > 0);
+    return { ...d, total: vistos.reduce((t, n) => t + d.por_nivel[n], 0), peor_nivel: vistos.length ? Math.max(...vistos) : null };
+  });
+}
+
+// Fotos por mes ("2026-11" -> n) desde el resumen diario: totales reales del servidor, que no cambian
+// al paginar el historial. Con un resumen truncado los totales serían parciales: devuelve null.
+export function totalesPorMes(dias = [], { truncado = false } = {}) {
+  if (truncado) return null;
+  const totales = {};
+  for (const d of dias || []) {
+    const n = Number(d.total) || 0;
+    if (n > 0 && d.fecha) totales[d.fecha.slice(0, 7)] = (totales[d.fecha.slice(0, 7)] || 0) + n;
+  }
+  return totales;
 }
 
 // "7 de noviembre de 2026: 4 fotos, peor nivel Severa" (lector de pantalla y leyenda del día).

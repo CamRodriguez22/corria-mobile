@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  mapaCalor, etiquetaCelda, aniosDisponibles, rangoDePreset, rangoEfectivo, filtrarMediciones, hayFiltros, alternarNivel,
+  calendarioMes, mesAnterior, mesSiguiente, mesDe, limitesMes, nombreMes, aplicarFiltrosADias, totalesPorMes, etiquetaCelda, aniosDisponibles, rangoDePreset, rangoEfectivo, filtrarMediciones, hayFiltros, alternarNivel,
   textoResultados, FILTROS_VACIOS,
 } from '../src/linea.js';
 import {
@@ -12,37 +12,67 @@ import { estadoFotoCola, resumenAvance, indiceActivo, textoEtapa } from '../src/
 
 const dia = (fecha, total, peor, extra = {}) => ({ fecha, total, por_nivel: [0, 0, 0, 0], peor_nivel: peor, max_pct: 10, promedio_pct: 5, ...extra });
 
-test('mapaCalor: semanas de lunes a domingo, huecos al inicio y sin días futuros', () => {
-  // 2026-01-01 es jueves -> 3 huecos (lun, mar, mié) en la primera semana.
-  const m = mapaCalor([dia('2026-01-01', 2, 1), dia('2026-01-05', 1, 3)], 2026, '2026-01-10');
-  assert.equal(m.semanas[0].slice(0, 3).every((c) => c === null), true);
-  assert.equal(m.semanas[0][3].fecha, '2026-01-01');
-  assert.equal(m.semanas[0][3].nivel, 1);
-  assert.equal(m.semanas[1][0].fecha, '2026-01-05'); // lunes
-  assert.equal(m.semanas[1][0].nivel, 3);
-  assert.ok(m.semanas.every((s) => s.length === 7));
-  const ultima = m.semanas[m.semanas.length - 1].filter(Boolean).pop();
-  assert.equal(ultima.fecha, '2026-01-10'); // hoy es el último día dibujado
-  assert.equal(m.diasConFotos, 2);
-  assert.equal(m.totalFotos, 3);
-  assert.deepEqual(m.meses, [{ semana: 0, nombre: 'ene' }]);
+test('calendarioMes: filas de lunes a domingo, huecos fuera del mes, días con fotos y futuros', () => {
+  // Noviembre de 2026 empieza en domingo (6 huecos) y tiene 30 días: 6 filas.
+  const c = calendarioMes([dia('2026-11-02', 2, 1), dia('2026-11-07', 3, 3)], { anio: 2026, mes: 11 }, '2026-11-09');
+  assert.equal(c.nombre, 'noviembre de 2026');
+  assert.ok(c.semanas.every((s) => s.length === 7));
+  assert.equal(c.semanas.length, 6);
+  assert.equal(c.semanas[0].slice(0, 6).every((x) => x === null), true);
+  assert.equal(c.semanas[0][6].fecha, '2026-11-01');
+  assert.equal(c.semanas[1][0].fecha, '2026-11-02'); // lunes
+  assert.equal(c.semanas[1][0].nivel, 1);
+  const todas = c.semanas.flat().filter(Boolean);
+  assert.equal(todas.length, 30);
+  assert.equal(todas.find((x) => x.fecha === '2026-11-07').nivel, 3);
+  assert.equal(todas.find((x) => x.fecha === '2026-11-09').esHoy, true);
+  assert.equal(todas.find((x) => x.fecha === '2026-11-10').futuro, true);
+  assert.equal(todas.find((x) => x.fecha === '2026-11-08').conFotos, false);
+  assert.equal(c.diasConFotos, 2);
+  assert.equal(c.totalFotos, 5);
 });
 
-test('mapaCalor: años pasados llegan al 31 dic; un año futuro queda vacío; días sin fotos son neutros', () => {
-  const pasado = mapaCalor([], 2026, '2027-03-01');
-  const celdas = pasado.semanas.flat().filter(Boolean);
-  assert.equal(celdas.length, 365);
-  assert.equal(celdas[celdas.length - 1].fecha, '2026-12-31');
-  assert.equal(celdas.every((c) => c.nivel === null && !c.conFotos), true);
-  assert.equal(pasado.meses.length, 12);
-  assert.deepEqual(mapaCalor([], 2027, '2026-11-07').semanas, []);
-});
-
-test('mapaCalor: un día con fotos pero sin nivel válido queda con nivel null', () => {
-  const m = mapaCalor([dia('2026-02-02', 3, null)], 2026, '2026-02-10');
-  const c = m.semanas.flat().find((x) => x && x.fecha === '2026-02-02');
+test('calendarioMes: febrero de 28 días puede caber en 4 filas y un día sin nivel válido queda null', () => {
+  const feb = calendarioMes([dia('2027-02-02', 3, null)], { anio: 2027, mes: 2 }, '2027-03-01'); // feb 2027 empieza lunes
+  assert.equal(feb.semanas.length, 4);
+  assert.equal(feb.semanas.flat().filter(Boolean).length, 28);
+  const c = feb.semanas.flat().find((x) => x && x.fecha === '2027-02-02');
   assert.equal(c.conFotos, true);
   assert.equal(c.nivel, null);
+});
+
+test('navegación de meses: cruza de año y se detiene en enero de 2026 y en el mes actual', () => {
+  assert.deepEqual(mesAnterior({ anio: 2027, mes: 1 }), { anio: 2026, mes: 12 });
+  assert.deepEqual(mesSiguiente({ anio: 2026, mes: 12 }), { anio: 2027, mes: 1 });
+  assert.deepEqual(mesDe('2026-11-07'), { anio: 2026, mes: 11 });
+  assert.deepEqual(limitesMes({ anio: 2026, mes: 11 }, '2026-11-07'), { puedeAnterior: true, puedeSiguiente: false });
+  assert.deepEqual(limitesMes({ anio: 2026, mes: 1 }, '2026-11-07'), { puedeAnterior: false, puedeSiguiente: true });
+  assert.deepEqual(limitesMes({ anio: 2026, mes: 12 }, '2027-01-05'), { puedeAnterior: true, puedeSiguiente: true });
+  assert.equal(nombreMes({ anio: 2026, mes: 3 }), 'marzo de 2026');
+});
+
+test('aplicarFiltrosADias: el calendario sigue nivel y rango de fechas', () => {
+  const d = [
+    dia('2026-11-01', 5, 3, { por_nivel: [1, 2, 1, 1] }),
+    dia('2026-11-06', 2, 1, { por_nivel: [0, 2, 0, 0] }),
+    dia('2026-10-01', 1, 2, { por_nivel: [0, 0, 1, 0] }),
+  ];
+  assert.equal(aplicarFiltrosADias(d, FILTROS_VACIOS, '2026-11-07'), d); // sin filtros, los mismos días
+  const sev = aplicarFiltrosADias(d, { ...FILTROS_VACIOS, niveles: [3] }, '2026-11-07');
+  assert.deepEqual(sev.map((x) => [x.total, x.peor_nivel]), [[1, 3], [0, null], [0, null]]);
+  const leveMod = aplicarFiltrosADias(d, { ...FILTROS_VACIOS, niveles: [1, 2] }, '2026-11-07');
+  assert.deepEqual(leveMod.map((x) => [x.total, x.peor_nivel]), [[3, 2], [2, 1], [1, 2]]);
+  const sieteDias = aplicarFiltrosADias(d, { ...FILTROS_VACIOS, preset: '7' }, '2026-11-07');
+  assert.deepEqual(sieteDias.map((x) => x.total), [5, 2, 0]);
+  const dia1 = aplicarFiltrosADias(d, { ...FILTROS_VACIOS, dia: '2026-11-06' }, '2026-11-07');
+  assert.equal(dia1, d); // el día elegido se resalta, no atenúa
+});
+
+test('totalesPorMes: totales reales por mes (estables al paginar) y nada si el resumen es parcial', () => {
+  const d = [dia('2026-11-01', 5, 3), dia('2026-11-06', 2, 1), dia('2026-10-01', 1, 2), dia('2026-10-02', 0, null)];
+  assert.deepEqual(totalesPorMes(d), { '2026-11': 7, '2026-10': 1 });
+  assert.equal(totalesPorMes(d, { truncado: true }), null);
+  assert.deepEqual(totalesPorMes([]), {});
 });
 
 test('etiquetaCelda en español natural', () => {

@@ -108,7 +108,7 @@ export function FilaGaleria({ fichas, lado, columnas = COLUMNAS_GALERIA, nombreP
   );
 }
 
-export function EncabezadoDia({ titulo, total, margen = TOKENS.spacing.lg }) {
+export function EncabezadoDia({ titulo, total, cargadas = total, margen = TOKENS.spacing.lg }) {
   return (
     <View
       accessibilityRole="header"
@@ -123,7 +123,9 @@ export function EncabezadoDia({ titulo, total, margen = TOKENS.spacing.lg }) {
       }}
     >
       <Text style={{ flex: 1, ...TOKENS.type.titleMedium, color: TOKENS.colors.text }}>{titulo}</Text>
-      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{plural(total, 'foto', 'fotos')}</Text>
+      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+        {cargadas < total ? `${cargadas} de ${plural(total, 'foto', 'fotos')}` : plural(total, 'foto', 'fotos')}
+      </Text>
     </View>
   );
 }
@@ -151,7 +153,7 @@ export default function GaleriaFotos({
       keyExtractor={(f) => f.clave}
       renderItem={({ item }) =>
         item.tipo === 'dia' ? (
-          <EncabezadoDia titulo={item.titulo} total={item.total} />
+          <EncabezadoDia titulo={item.titulo} total={item.total} cargadas={item.cargadas} />
         ) : (
           <FilaGaleria
             fichas={item.fichas}

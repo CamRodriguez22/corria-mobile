@@ -109,8 +109,8 @@ export function tituloMes(ym) {
 
 // Filas planas para una FlatList virtualizada. `por`: 'mes' (por defecto: rejilla continua con un
 // encabezado por mes, el día va en cada ficha), 'dia' (un encabezado por día) o 'ninguno'.
-//   { tipo: 'dia', clave, dia, titulo, total }  ·  { tipo: 'fila', clave, fichas }
-export function filasDeGaleria(mediciones = [], { columnas = COLUMNAS_GALERIA, agrupar = true, por = 'mes', porDia, hoy = hoyLocal() } = {}) {
+//   { tipo: 'dia', clave, dia, titulo, total, cargadas }  ·  { tipo: 'fila', clave, fichas }
+export function filasDeGaleria(mediciones = [], { columnas = COLUMNAS_GALERIA, agrupar = true, por = 'mes', porDia, hoy = hoyLocal(), totalesMes = null } = {}) {
   const modo = porDia === false ? 'ninguno' : por;
   const grupos =
     modo === 'dia' ? agruparPorDia(mediciones) : modo === 'mes' ? agruparPorMes(mediciones) : [{ dia: null, items: mediciones }];
@@ -123,7 +123,9 @@ export function filasDeGaleria(mediciones = [], { columnas = COLUMNAS_GALERIA, a
         clave: `d:${g.dia}`,
         dia: g.dia,
         titulo: sinFecha ? 'Sin fecha' : modo === 'mes' ? tituloMes(g.dia) : rotuloDia(g.dia, hoy),
-        total: g.items.length,
+        // `total` = fotos del mes según el servidor (no cambia al paginar); `cargadas` = las que ya están aquí.
+        total: modo === 'mes' && totalesMes && totalesMes[g.dia] != null ? Math.max(totalesMes[g.dia], g.items.length) : g.items.length,
+        cargadas: g.items.length,
       });
     }
     dividirEnFilas(construirMosaico(g.items, { agrupar }), columnas).forEach((fichas, i) => {

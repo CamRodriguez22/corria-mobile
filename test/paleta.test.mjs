@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COLORES_NIVEL, COLORES_TEXTO_NIVEL, SUPERFICIES, TINTA, contraste, componer } from '../src/paleta.js';
+import { COLORES_SOBRE_NIVEL, COLORES_NIVEL, COLORES_TEXTO_NIVEL, SUPERFICIES, TINTA, contraste, componer } from '../src/paleta.js';
 
 // Los rellenos son los de la web (frontend/src/lib/statusUtils.js: COLORES_NIVEL).
 test('rellenos de nivel idénticos a la web', () => {
@@ -29,4 +29,8 @@ test('íconos sobre el relleno del nivel con tinta: >= 3:1 (gráficos)', () => {
 test('la tarjeta se distingue del fondo y la tinta lee sobre todo', () => {
   assert.ok(contraste(SUPERFICIES.surfaceAlt, SUPERFICIES.bg) > 1.05);
   for (const f of Object.values(SUPERFICIES)) assert.ok(contraste(TINTA, f) >= 12);
+});
+
+test('texto sobre el relleno de cada nivel (números del calendario): >= 4,5:1', () => {
+  COLORES_NIVEL.forEach((c, i) => assert.ok(contraste(COLORES_SOBRE_NIVEL[i], c) >= 4.5, `nivel ${i}: ${contraste(COLORES_SOBRE_NIVEL[i], c).toFixed(2)}`));
 });

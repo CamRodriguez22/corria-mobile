@@ -10,7 +10,7 @@ import { mezclarMediciones } from '../logic';
 import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
 import { fechaLarga, fechaMedia, formatoPct, formatoPctMono, plural, hoyLocal } from '../fechas';
 import { nombreNivel } from '../niveles';
-import { aniosDisponibles } from '../linea';
+import { aniosDisponibles, totalesPorMes } from '../linea';
 import { puntosTendencia } from '../tendencia';
 
 const PAD = TOKENS.spacing.lg;
@@ -39,7 +39,6 @@ export default function FolderScreen({
     [mediciones, bloqueMap, listaBloques, clave]
   );
   const lista = useMemo(() => mezclarMediciones(locales, historial?.lista || []).lista, [locales, historial]);
-  const filas = useMemo(() => filasDeGaleria(lista), [lista]);
   const estado = useMemo(() => estadoPunto(lista), [lista]);
 
   useEffect(() => {
@@ -58,6 +57,10 @@ export default function FolderScreen({
   const diasPunto = resumenesPunto.flatMap((r) => r?.dias || []);
   const puntosGrafica = useMemo(() => puntosTendencia(diasPunto), [resumenes, clave]); // eslint-disable-line react-hooks/exhaustive-deps
   const estadoGrafica = resumenesPunto.some((r) => r?.estado === 'cargando') ? 'cargando' : resumenesPunto.some((r) => r?.estado === 'error') ? 'error' : 'ok';
+
+  // Total de cada mes según el servidor (no cambia al cargar más fotos).
+  const totalesMes = useMemo(() => totalesPorMes(diasPunto, { truncado: resumenesPunto.some((r) => r?.truncado) }), [resumenes, clave]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filas = useMemo(() => filasDeGaleria(lista, { totalesMes }), [lista, totalesMes]);
 
   const cargando = historial?.estado === 'cargando';
   const cargandoMas = historial?.estado === 'mas';

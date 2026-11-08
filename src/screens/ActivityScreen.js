@@ -4,15 +4,16 @@ import { View, RefreshControl, ScrollView, Pressable } from 'react-native';
 import { Text } from '../Typography';
 import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
-import MapaCalor from '../MapaCalor';
+import CalendarioMes from '../CalendarioMes';
 import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconNivel } from '../Icons';
 import { nombrePuntoDe } from '../helpers';
 import { filasDeGaleria } from '../galeria';
 import {
   filtrarMediciones, FILTROS_VACIOS, hayFiltros, textoResultados, alternarNivel, rangoEfectivo, PRESETS_RANGO,
+  aplicarFiltrosADias, totalesPorMes, aniosDisponibles,
 } from '../linea';
-import { hoyLocal, partesDia, fechaMedia } from '../fechas';
+import { hoyLocal, fechaMedia } from '../fechas';
 import { tituloPunto } from '../galeria';
 import { bloqueDeMedicion } from '../utils';
 
@@ -34,17 +35,22 @@ export default function ActivityScreen({
   onCargarRango,
 }) {
   const hoy = hoyLocal();
-  const [anio, setAnio] = useState(partesDia(hoy)?.anio || 2026);
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
-  const resumen = resumenes[anio];
   const [hoja, setHoja] = useState(null); // 'punto' | 'fechas' | null
   const [parcial, setParcial] = useState(false);
 
-  // Mapa de días del año elegido (se guarda por año en App).
+  // Resumen por día de cada año disponible (del punto elegido, si hay filtro de punto): alimenta el calendario
+  // y los totales reales por mes de la galería. Se pide una vez por año y se guarda en App.
+  const anios = useMemo(() => aniosDisponibles(hoy), [hoy]);
   useEffect(() => {
-    onCargarResumen?.(anio);
+    anios.forEach((a) => onCargarResumen?.(a, { idPunto: filtros.idPunto || null }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anio, refreshing]);
+  }, [anios, filtros.idPunto, refreshing]);
+  const resumenesAnio = anios.map((a) => resumenes[filtros.idPunto ? `${filtros.idPunto}|${a}` : a]);
+  const diasAnios = resumenesAnio.flatMap((r) => r?.dias || []);
+  const estadoResumen = resumenesAnio.some((r) => r?.estado === 'cargando') ? 'cargando' : resumenesAnio.some((r) => r?.estado === 'error') ? 'error' : 'ok';
+  const resumenTruncado = resumenesAnio.some((r) => r?.truncado);
+  const resumenVacio = resumenesAnio.every((r) => r?.estado === 'ok' && !r.dias.length);
 
   // Con un día o un rango de fechas se traen TODAS sus fotos (pueden ser más antiguas que las
   // ya cargadas). El rango sale de los filtros; el servidor avisa si hubo más de las que caben.
@@ -71,8 +77,14 @@ export default function ActivityScreen({
       }),
     [mediciones, filtros, hoy, bloqueMap, listaPuntos]
   );
-  const filas = useMemo(() => filasDeGaleria(filtradas, { hoy }), [filtradas, hoy]);
   const filtrado = hayFiltros(filtros);
+  // El calendario y los totales por mes siguen los mismos filtros que la galería.
+  const diasFiltrados = useMemo(() => aplicarFiltrosADias(diasAnios, filtros, hoy), [diasAnios, filtros, hoy]);
+  const totalesMes = useMemo(
+    () => totalesPorMes(filtros.dia ? diasFiltrados.filter((d) => d.fecha === filtros.dia) : diasFiltrados, { truncado: resumenTruncado }),
+    [diasFiltrados, filtros.dia, resumenTruncado]
+  );
+  const filas = useMemo(() => filasDeGaleria(filtradas, { hoy, totalesMes }), [filtradas, hoy, totalesMes]);
 
   const puntoSel = filtros.idPunto ? bloquesMap?.[filtros.idPunto] : null;
   const presetSel = PRESETS_RANGO.find((p) => p.id === filtros.preset) || PRESETS_RANGO[0];
@@ -92,13 +104,15 @@ export default function ActivityScreen({
         <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4, marginBottom: 18 }}>
           Todas las fotos, día por día
         </Text>
-        <MapaCalor
-          anio={anio}
-          setAnio={setAnio}
-          resumen={resumen}
+        <CalendarioMes
+          dias={diasFiltrados}
+          estado={estadoResumen}
+          truncado={resumenTruncado}
+          error={resumenesAnio.find((r) => r?.estado === 'error')?.error}
+          filtrado={filtros.niveles.length > 0 || filtros.preset !== 'todo' || Boolean(filtros.idPunto)}
           diaSel={filtros.dia}
           onSelDia={(dia) => setFiltros((f) => ({ ...f, dia }))}
-          onReintentar={() => onCargarResumen?.(anio, { forzar: true })}
+          onReintentar={() => anios.forEach((a) => onCargarResumen?.(a, { idPunto: filtros.idPunto || null, forzar: true }))}
           hoy={hoy}
         />
       </View>
@@ -197,7 +211,7 @@ export default function ActivityScreen({
   );
 
   // Sin ninguna foto cargada y sin filtros, el mapa de días y los filtros no sirven: estado vacío simple.
-  if (!mediciones.length && !filtrado && resumen?.estado === 'ok' && !resumen.dias.length) {
+  if (!mediciones.length && !filtrado && resumenVacio) {
     return (
       <ScrollView
         contentContainerStyle={{ padding: PAD, paddingBottom: 36 }}

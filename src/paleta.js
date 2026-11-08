@@ -18,6 +18,9 @@ export const TINTA = '#201e1d';
 export const COLORES_NIVEL = ['#16a34a', '#f59e0b', '#ea580c', '#dc2626'];
 export const COLORES_TEXTO_NIVEL = ['#166534', '#92400e', '#9a3412', '#a51a1a'];
 
+// Texto/ícono SOBRE el relleno del nivel (>= 4,5:1): tinta sobre verde, ámbar y naranja; blanco sobre rojo.
+export const COLORES_SOBRE_NIVEL = [TINTA, TINTA, TINTA, '#ffffff'];
+
 // Tinte translúcido (fondo de insignias): el relleno del nivel al 14 %.
 export function tinteNivel(i) {
   const h = COLORES_NIVEL[i];

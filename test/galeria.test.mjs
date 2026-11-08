@@ -246,3 +246,15 @@ test('tituloMes y agruparPorMes usan el mes local UTC-5', () => {
   const g = agruparPorMes([med('a', '2026-12-01T03:00:00Z', 1), med('b', '2026-12-01T06:00:00Z', 1)]); // a: 30 nov local
   assert.deepEqual(g.map((x) => x.dia), ['2026-12', '2026-11']);
 });
+
+test('filasDeGaleria: el total del mes sale del servidor y no cambia al paginar', () => {
+  const m = (id, ts) => ({ id_medicion: id, timestamp: ts, nivel_corrosion: 1, area_corroida_pct: '5' });
+  const pag1 = [m('a', '2026-11-07T15:00:00Z'), m('b', '2026-11-06T15:00:00Z'), m('c', '2026-10-05T15:00:00Z')];
+  const pag2 = [...pag1, m('d', '2026-10-04T15:00:00Z'), m('e', '2026-10-03T15:00:00Z')];
+  const totales = { '2026-11': 2, '2026-10': 3 };
+  const enc = (lista, tot) => filasDeGaleria(lista, { totalesMes: tot }).filter((f) => f.tipo === 'dia').map((f) => [f.titulo, f.total, f.cargadas]);
+  assert.deepEqual(enc(pag1, totales), [['Noviembre de 2026', 2, 2], ['Octubre de 2026', 3, 1]]);
+  assert.deepEqual(enc(pag2, totales), [['Noviembre de 2026', 2, 2], ['Octubre de 2026', 3, 3]]); // mismo total
+  assert.deepEqual(enc(pag1, null), [['Noviembre de 2026', 2, 2], ['Octubre de 2026', 1, 1]]); // sin resumen: lo cargado
+  assert.deepEqual(enc(pag1, { '2026-11': 1 }), [['Noviembre de 2026', 2, 2], ['Octubre de 2026', 1, 1]]); // nunca menos de lo cargado
+});
