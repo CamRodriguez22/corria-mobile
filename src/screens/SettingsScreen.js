@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
+import { View, ScrollView } from 'react-native';
+import { Text } from '../Typography';
 import { Button, FilaDato, ScreenTitle } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconLogout } from '../Icons';

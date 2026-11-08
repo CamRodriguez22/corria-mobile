@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, KeyboardAvoidingView, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Animated, Easing, useWindowDimensions } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Header, ResultCard, Field, Button, Banner, Foto, SectionTitle, useReducedMotion } from '../DesignComponents';
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
@@ -98,8 +99,8 @@ export default function ResultScreen({
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 }}>
               <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Estado de sincronización</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <IconCheck size={16} color={TOKENS.colors.accent2_800} />
-                <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.accent2_800 }}>En la nube</Text>
+                <IconCheck size={16} color={TOKENS.colors.piedra_800} />
+                <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.piedra_800 }}>En la nube</Text>
               </View>
             </View>
 
@@ -143,7 +144,7 @@ export default function ResultScreen({
                 <Button
                   variant="outlined"
                   label={obsSaved ? 'Guardado en este teléfono' : 'Guardar notas en este teléfono'}
-                  left={obsSaved ? <IconCheck size={18} color={TOKENS.colors.accent2_700} /> : null}
+                  left={obsSaved ? <IconCheck size={18} color={TOKENS.colors.piedra_700} /> : null}
                   onPress={onSaveObs}
                 />
               </View>

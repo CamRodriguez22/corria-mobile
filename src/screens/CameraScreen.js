@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Header, Button } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconCamera, IconImages } from '../Icons';
@@ -33,7 +34,7 @@ export default function CameraScreen({ bloqueSel, onBack, onPick }) {
       </View>
       <View style={{ padding: PAD, gap: 12 }}>
         <Button label="Tomar foto con la cámara" left={<IconCamera size={20} color="#fff" />} onPress={() => onPick(true)} />
-        <Button variant="tonal" label="Elegir fotos de la galería" left={<IconImages size={20} color={TOKENS.colors.accent2_900} />} onPress={() => onPick(false)} />
+        <Button variant="tonal" label="Elegir fotos de la galería" left={<IconImages size={20} color={TOKENS.colors.piedra_900} />} onPress={() => onPick(false)} />
       </View>
     </Screen>
   );

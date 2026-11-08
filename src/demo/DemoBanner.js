@@ -1,5 +1,6 @@
 // src/demo/DemoBanner.js — Aviso permanente de que los datos son sintéticos (solo modo demo).
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../Typography';
 
 export default function DemoBanner() {
   return (

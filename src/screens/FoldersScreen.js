@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, RefreshControl, FlatList } from 'react-native';
+import { View, Pressable, RefreshControl, FlatList } from 'react-native';
+import { Text } from '../Typography';
 import { EmptyState, Foto, NivelBadge, ScreenTitle } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconChevronRight } from '../Icons';

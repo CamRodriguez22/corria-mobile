@@ -5,7 +5,8 @@
 // Tocar un tramo del gráfico elige el día más cercano; siempre hay un día elegido (el último).
 // Alternativa accesible: resumen en texto y "Ver como lista".
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, useWindowDimensions } from 'react-native';
+import { View, Pressable, useWindowDimensions } from 'react-native';
+import { Text } from './Typography';
 import Svg, { Line, Polyline, Circle, Text as SvgText, Rect } from 'react-native-svg';
 import { TOKENS, NIVELES } from './DesignTokens';
 import { IconTrend, IconNivel } from './Icons';
@@ -16,7 +17,7 @@ const ALTO = 232;
 const M = { izq: 40, der: 10, arr: 56, abajo: 26 }; // banda superior de 56 para el tooltip
 const TINTA = TOKENS.colors.neutral700;
 const REJILLA = 'rgba(32,30,29,0.10)';
-const LINEA = TOKENS.colors.accent2_700; // un solo color de serie; el nivel va en los puntos
+const LINEA = TOKENS.colors.piedra_700; // un solo color de serie; el nivel va en los puntos
 
 export default function GraficaTendencia({ puntos = [], estado, truncado = false, error = '', onReintentar, margen = TOKENS.spacing.lg }) {
   const { width } = useWindowDimensions();
@@ -42,7 +43,7 @@ export default function GraficaTendencia({ puntos = [], estado, truncado = false
 
   const encabezado = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <IconTrend size={20} color={TOKENS.colors.accent2_800} />
+      <IconTrend size={20} color={TOKENS.colors.piedra_800} />
       <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, flex: 1 }}>
         Tendencia del punto
       </Text>

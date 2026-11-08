@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Image, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Image, useWindowDimensions } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Header, Foto, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconShare, IconMoreVertical, IconEdit, IconTrash } from '../Icons';

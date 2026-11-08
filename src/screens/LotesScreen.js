@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, Pressable, RefreshControl, FlatList } from 'react-native';
+import { View, Pressable, RefreshControl, FlatList } from 'react-native';
+import { Text } from '../Typography';
 import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import { TOKENS, NIVELES } from '../DesignTokens';

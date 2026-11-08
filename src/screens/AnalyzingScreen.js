@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, useWindowDimensions } from 'react-native';
+import { View, ScrollView, useWindowDimensions } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Spinner, ProgressBar, Foto } from '../DesignComponents';
 import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconCheck, IconAlertTriangle, IconNivel } from '../Icons';

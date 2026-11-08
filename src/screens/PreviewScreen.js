@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, useWindowDimensions } from 'react-native';
+import { View, ScrollView, useWindowDimensions } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Header, Button, Foto } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconCheck } from '../Icons';
@@ -28,13 +29,13 @@ export default function PreviewScreen({ foto, cola = [], bloqueSel, onBack, onCo
         )}
         <View style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <IconCheck size={18} color={TOKENS.colors.accent2_700} />
+            <IconCheck size={18} color={TOKENS.colors.piedra_700} />
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.text }}>
               {foto?.width && foto?.height ? `Resolución ${foto.width} × ${foto.height} px` : 'Resolución válida'}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <IconCheck size={18} color={TOKENS.colors.accent2_700} />
+            <IconCheck size={18} color={TOKENS.colors.piedra_700} />
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.text }}>Se asociará al punto {bloqueSel}</Text>
           </View>
         </View>

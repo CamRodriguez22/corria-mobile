@@ -13,6 +13,17 @@ import 'react-native-url-polyfill/auto';
 import { Amplify } from 'aws-amplify';
 import { signIn, signOut, confirmSignIn, getCurrentUser } from 'aws-amplify/auth';
 
+import { useFonts } from 'expo-font';
+import { Outfit_400Regular } from '@expo-google-fonts/outfit/400Regular';
+import { Outfit_500Medium } from '@expo-google-fonts/outfit/500Medium';
+import { Outfit_600SemiBold } from '@expo-google-fonts/outfit/600SemiBold';
+import { Outfit_700Bold } from '@expo-google-fonts/outfit/700Bold';
+import { Outfit_800ExtraBold } from '@expo-google-fonts/outfit/800ExtraBold';
+import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono/400Regular';
+import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono/500Medium';
+import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600SemiBold';
+import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
+
 import { TOKENS, num, severidad, confianzaPct } from './src/DesignTokens';
 import {
   Screen,
@@ -130,6 +141,18 @@ export default function App() {
 }
 
 function Root() {
+  // Outfit (interfaz) e IBM Plex Mono (cifras): si no cargan, la app sigue con la fuente del sistema.
+  const [fuentesListas, errorFuentes] = useFonts({
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+    Outfit_800ExtraBold,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
+    IBMPlexMono_600SemiBold,
+    IBMPlexMono_700Bold,
+  });
   // auth
   const [booting, setBooting] = useState(true);
   const [logged, setLogged] = useState(false);
@@ -1179,7 +1202,7 @@ function Root() {
   );
 
   const renderPantalla = () => {
-    if (booting) {
+    if (booting || !(fuentesListas || errorFuentes)) {
       return (
         <Screen center style={{ gap: 18 }}>
           <Logo size={16} />

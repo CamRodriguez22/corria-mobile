@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView, Pressable } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Header, Field, Button, Banner, SectionTitle } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconGps, IconAlertTriangle, IconCheck } from '../Icons';
@@ -107,7 +108,7 @@ export default function ContextScreen({
         />
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 }}>
-          {gpsError ? <IconAlertTriangle size={20} color={TOKENS.colors.warning} /> : <IconGps size={20} color={TOKENS.colors.accent2_800} />}
+          {gpsError ? <IconAlertTriangle size={20} color={TOKENS.colors.warning} /> : <IconGps size={20} color={TOKENS.colors.piedra_800} />}
           <Text style={{ ...TOKENS.type.bodyMedium, color: gpsError ? TOKENS.colors.warningText : TOKENS.colors.neutral700, flex: 1 }}>
             {gpsError
               ? gpsError

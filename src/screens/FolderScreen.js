@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Header, EmptyState, Button, NivelBadge, Spinner } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import GraficaTendencia from '../GraficaTendencia';

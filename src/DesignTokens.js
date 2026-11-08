@@ -3,22 +3,22 @@
 
 import { StyleSheet } from 'react-native';
 import { num, nivelDePct, nivelDeMedicion, NOMBRES_NIVEL } from './niveles';
+import { SUPERFICIES, TINTA, COLORES_NIVEL, COLORES_TEXTO_NIVEL, tinteNivel } from './paleta';
 
 // ─────────────────────────────────────────────────────────────
 // Tokens
 // ─────────────────────────────────────────────────────────────
 export const TOKENS = {
   colors: {
-    bg: '#f5ead8', // fondo crema
-    surface: '#ebddc5', // superficie un paso más oscura
-    surfaceAlt: '#f9f4ed', // tarjetas claras (neutral-100 del mockup)
-    text: '#201e1d', // marrón muy oscuro
+    bg: SUPERFICIES.bg, // fondo crema cálido
+    surface: SUPERFICIES.surface, // superficie un paso más oscura
+    surfaceAlt: SUPERFICIES.surfaceAlt, // tarjetas casi blancas: destacan sobre el fondo
+    text: TINTA, // marrón muy oscuro
     textOnAccent: '#ffffff',
     accent: '#C1460B', // terracota de marca (= --accent-amber de la web): fondos con texto blanco (5.06:1)
     accentText: '#9a4a1e', // acento como TEXTO sobre bg/surface/surfaceAlt (≥ 4.65:1)
-    accent2: '#7a8a5e', // sage: solo rellenos/barras (no texto ni fondo de texto blanco)
     divider: 'rgba(32,30,29,0.16)',
-    border: '#dcd3c4', // borde sutil de tarjetas y campos (= neutral300)
+    border: '#e3d8c6', // borde sutil de tarjetas y campos
 
     // Neutrales cálidos ajustados para garantizar contraste WCAG AA (≥ 4.5:1)
     neutral100: '#f9f4ed',
@@ -42,20 +42,21 @@ export const TOKENS = {
     accent800: '#643312',
     accent900: '#402310',
 
-    // Rampa sage
-    accent2_100: '#f0fae1',
-    accent2_200: '#e1eecc',
-    accent2_300: '#ccdbb2',
-    accent2_400: '#aebf92',
-    accent2_500: '#8fa073',
-    accent2_600: '#728157',
-    accent2_700: '#56633f',
-    accent2_800: '#3d472b',
-    accent2_900: '#272e1b',
+    // Rampa piedra (gris cálido): estados seleccionados, botones tonales y controles neutros.
+    // Antes era un verde salvia que chocaba con "Sin corrosión"; el verde queda solo para ese nivel.
+    piedra_100: '#f1ece3',
+    piedra_200: '#e6ded0',
+    piedra_300: '#d6ccba',
+    piedra_400: '#b3a893',
+    piedra_500: '#8c8270',
+    piedra_600: '#6c6354',
+    piedra_700: '#4f483c',
+    piedra_800: '#383229',
+    piedra_900: '#221e18',
 
     // Semánticos
-    success: '#5f6d47',
-    successTint: 'rgba(122,138,94,0.16)',
+    success: COLORES_TEXTO_NIVEL[0],
+    successTint: tinteNivel(0),
     warning: '#c25f2a', // solo rellenos/íconos (3.55:1 como texto)
     warningText: '#9a4516', // advertencia como TEXTO (≥ 4.84:1 sobre bg/surface/surfaceAlt)
     warningTint: 'rgba(194,95,42,0.14)',
@@ -72,7 +73,9 @@ export const TOKENS = {
 
   radius: { sm: 8, md: 16, lg: 28, pill: 999 },
 
-  fonts: { heading: 'System', body: 'System' },
+  // Outfit para la interfaz e IBM Plex Mono para cifras (igual que la web: --font-ui / --font-data).
+  // El componente Text (src/Typography.js) elige la variante según fontWeight; 'mono' = IBM Plex Mono.
+  fonts: { ui: 'Outfit', mono: 'mono' },
 
   // Escala accesible: cuerpo 16, mínimos legibles (≥14pt), jerarquía clara.
   fontSizes: {
@@ -137,17 +140,17 @@ export const TOKENS = {
 // ─────────────────────────────────────────────────────────────
 // Severidad de corrosión
 // El backend devuelve nivel_corrosion como NÚMERO: 0=ninguna 1=leve 2=moderada 3=severa.
-// `color` = relleno/punto (brillante); `texto` = variante oscura para usar COMO TEXTO
-// (≥ 4.5:1 sobre bg, surface, surfaceAlt y la tinta); parte de --nivel-N-texto de la web, oscurecida
-// porque el fondo de la app es crema y no blanco.
+// `color` = relleno/punto (el de la web, src/paleta.js); `texto` = variante oscura para usar COMO TEXTO
+// (>= 4,5:1 sobre bg, surface, surfaceAlt y el tinte; lo verifica test/paleta.test.mjs).
 // area_corroida_pct y confianza_promedio llegan como string en los GET y como number en el POST.
 // ─────────────────────────────────────────────────────────────
-export const NIVELES = [
-  { i: 0, label: NOMBRES_NIVEL[0], color: '#10b981', texto: '#126d34', tint: 'rgba(16, 185, 129, 0.12)' },
-  { i: 1, label: NOMBRES_NIVEL[1], color: '#0ea5e9', texto: '#994708', tint: 'rgba(14, 165, 233, 0.12)' },
-  { i: 2, label: NOMBRES_NIVEL[2], color: '#f59e0b', texto: '#af3a0b', tint: 'rgba(245, 158, 11, 0.12)' },
-  { i: 3, label: NOMBRES_NIVEL[3], color: '#ef4444', texto: '#b91c1c', tint: 'rgba(239, 68, 68, 0.12)' },
-];
+export const NIVELES = [0, 1, 2, 3].map((i) => ({
+  i,
+  label: NOMBRES_NIVEL[i],
+  color: COLORES_NIVEL[i],
+  texto: COLORES_TEXTO_NIVEL[i],
+  tint: tinteNivel(i),
+}));
 
 export { num };
 
@@ -178,7 +181,7 @@ export const colorUtils = {
   confidenceColor: (c) => {
     const n = num(c, 0);
     const p = n <= 1 ? n : n / 100;
-    if (p >= 0.75) return TOKENS.colors.accent2_600;
+    if (p >= 0.75) return TOKENS.colors.success;
     if (p >= 0.5) return TOKENS.colors.accent500;
     return TOKENS.colors.danger;
   },

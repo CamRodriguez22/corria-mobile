@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
+import { Text } from '../Typography';
 import { Fab, Spinner, EmptyState, Banner, SectionTitle, SwatchNivel } from '../DesignComponents';
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
@@ -122,7 +123,7 @@ export default function HomeScreen({
             icono={<IconNivel nivel={3} size={22} color={TOKENS.colors.danger} />}
           />
           <View style={{ width: 1, backgroundColor: TOKENS.colors.neutral200 }} />
-          <Kpi valor={totalPuntos} etiqueta="puntos activos" color={TOKENS.colors.accent2_800} />
+          <Kpi valor={totalPuntos} etiqueta="puntos activos" color={TOKENS.colors.piedra_800} />
         </View>
 
         {totalConEstado > 0 && (

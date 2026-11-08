@@ -1,11 +1,11 @@
 import React from 'react';
 import {
   View,
-  Text,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Text } from '../Typography';
 import { Screen, Logo, Field, Button } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { ErrorText } from '../helpers';

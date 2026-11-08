@@ -4,9 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
   Pressable,
-  TextInput as RNTextInput,
   Animated,
   Easing,
   Image,
@@ -18,6 +16,7 @@ import {
   StyleSheet,
   AccessibilityInfo,
 } from 'react-native';
+import { Text, TextInput as RNTextInput } from './Typography';
 import { TOKENS, NIVELES, severidad, confianzaPct, num } from './DesignTokens';
 import { nivelDeMedicion } from './niveles';
 import { miniaturaDe } from './miniaturas';
@@ -96,7 +95,7 @@ export const Logo = ({ size = 14, gap = 3 }) => {
 const VARIANTS = {
   primary: { bg: TOKENS.colors.accent, bgPressed: TOKENS.colors.accent700, fg: '#fff', border: 'transparent' },
   // Tonal (Material 3 "filled tonal"): salvia suave con texto oscuro (>= 10:1).
-  tonal: { bg: TOKENS.colors.accent2_200, bgPressed: TOKENS.colors.accent2_300, fg: TOKENS.colors.accent2_900, border: 'transparent' },
+  tonal: { bg: TOKENS.colors.piedra_200, bgPressed: TOKENS.colors.piedra_300, fg: TOKENS.colors.piedra_900, border: 'transparent' },
   // Outlined y texto: acciones secundarias y de bajo énfasis.
   outlined: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.neutral700, border: TOKENS.colors.neutral400 },
   text: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.accentText, border: 'transparent' },
@@ -588,16 +587,16 @@ export const Chip = ({ label, selected = false, onPress, icon = null, menu = fal
         paddingRight: menu || onQuitar ? 8 : 14,
         borderRadius: 10,
         borderWidth: 1.5,
-        borderColor: selected ? TOKENS.colors.accent2_700 : TOKENS.colors.neutral400,
-        backgroundColor: selected ? TOKENS.colors.accent2_200 : 'transparent',
+        borderColor: selected ? TOKENS.colors.piedra_700 : TOKENS.colors.neutral400,
+        backgroundColor: selected ? TOKENS.colors.piedra_200 : 'transparent',
       }}
     >
-      {selected && !icon && <IconCheck size={16} color={TOKENS.colors.accent2_900} />}
+      {selected && !icon && <IconCheck size={16} color={TOKENS.colors.piedra_900} />}
       {icon}
-      <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '600', color: selected ? TOKENS.colors.accent2_900 : TOKENS.colors.neutral700 }}>
+      <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '600', color: selected ? TOKENS.colors.piedra_900 : TOKENS.colors.neutral700 }}>
         {label}
       </Text>
-      {menu && <IconChevronDown size={16} color={selected ? TOKENS.colors.accent2_900 : TOKENS.colors.neutral700} />}
+      {menu && <IconChevronDown size={16} color={selected ? TOKENS.colors.piedra_900 : TOKENS.colors.neutral700} />}
     </Pressable>
     {!!onQuitar && (
       <Pressable
@@ -1042,7 +1041,7 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Confianza del modelo</Text>
             <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text }}>{confianzaPct(conf)} %</Text>
           </View>
-          <ProgressBar value={confianzaPct(conf)} color={TOKENS.colors.accent2_600} />
+          <ProgressBar value={confianzaPct(conf)} color={TOKENS.colors.piedra_600} />
         </View>
       )}
     </View>

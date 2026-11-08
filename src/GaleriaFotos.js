@@ -2,7 +2,8 @@
 // Filas planas de `filasDeGaleria` (src/galeria.js): un encabezado por día y filas de fichas
 // cuadradas. Una ficha es una foto (miniatura + nivel + %) o un lote (portada + cantidad + peor nivel).
 import React from 'react';
-import { View, Text, Pressable, FlatList, useWindowDimensions } from 'react-native';
+import { View, Pressable, FlatList, useWindowDimensions } from 'react-native';
+import { Text } from './Typography';
 import { TOKENS } from './DesignTokens';
 import { Foto, NivelChip } from './DesignComponents';
 import { IconLotes } from './Icons';

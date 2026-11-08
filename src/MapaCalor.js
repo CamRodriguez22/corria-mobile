@@ -2,7 +2,8 @@
 // por el peor nivel de ese día y marcada con su ícono (el color nunca va solo). Toca un día para filtrar.
 // Espejo móvil de la barra anual de la web (lineaTiempo.js), con datos de GET /mediciones/resumen-diario.
 import React, { useMemo, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Pressable, useWindowDimensions } from 'react-native';
+import { Text } from './Typography';
 import { TOKENS, NIVELES } from './DesignTokens';
 import { Segmented, Button, Spinner, SwatchNivel } from './DesignComponents';
 import { IconNivel, IconClose } from './Icons';

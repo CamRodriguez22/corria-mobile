@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text, RefreshControl, ScrollView, Pressable } from 'react-native';
+import { View, RefreshControl, ScrollView, Pressable } from 'react-native';
+import { Text } from '../Typography';
 import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import MapaCalor from '../MapaCalor';
@@ -118,7 +119,7 @@ export default function ActivityScreen({
               key={n.i}
               label={n.label}
               selected={activo}
-              icon={<IconNivel nivel={n.i} size={16} color={activo ? TOKENS.colors.accent2_900 : n.texto} />}
+              icon={<IconNivel nivel={n.i} size={16} color={activo ? TOKENS.colors.piedra_900 : n.texto} />}
               onPress={() => setFiltros((f) => ({ ...f, niveles: alternarNivel(f.niveles, n.i) }))}
             />
           );
