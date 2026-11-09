@@ -239,6 +239,16 @@ export function IconShare(p) {
   );
 }
 
+export function IconDownload(p) {
+  return (
+    <Base {...p}>
+      <Path d="M12 3v12" />
+      <Polyline points="7 10 12 15 17 10" />
+      <Path d="M5 20h14" />
+    </Base>
+  );
+}
+
 export function IconEdit(p) {
   return (
     <Base {...p}>

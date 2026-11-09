@@ -24,6 +24,7 @@
     "expo-image-picker": "~57.0.16",
     "expo-linear-gradient": "~57.0.1",
     "expo-location": "~57.0.16",
+    "expo-sharing": "~57.0.25",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -31,6 +32,7 @@
     "react-native-get-random-values": "~1.11.0",
     "react-native-svg": "15.15.4",
     "react-native-url-polyfill": "^4.0.0",
+    "react-native-view-shot": "5.1.0",
     "react-native-web": "^0.21.2"
   },
   "private": true,

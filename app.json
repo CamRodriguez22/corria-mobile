@@ -45,7 +45,8 @@
           "locationWhenInUsePermission": "PIXELRUST usa tu ubicación para georreferenciar cada medición de corrosión."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-sharing"
     ],
     "extra": {
       "eas": {

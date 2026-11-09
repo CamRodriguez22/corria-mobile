@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { View, ScrollView, Image, useWindowDimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, ScrollView, Image, Platform, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
-import { Screen, Header, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle, Segmented } from '../DesignComponents';
+import { Screen, Header, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle, Segmented, Button } from '../DesignComponents';
+import { descargarOriginal, descargarSegmentacion } from '../descargas';
 import FotoConMascara from '../FotoConMascara';
 import { hayMascara, aspectoParaMascara, uriParaMedirAspecto } from '../mascara';
 import { TOKENS } from '../DesignTokens';
-import { IconShare, IconMoreVertical, IconEdit, IconTrash } from '../Icons';
+import { IconShare, IconMoreVertical, IconEdit, IconTrash, IconDownload } from '../Icons';
 import { imagenDe, miniaturaDe } from '../miniaturas';
 import { fechaHoraLarga, fechaHoraCorta } from '../fechas';
 import { plural } from '../fechas';
@@ -50,6 +51,33 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
   const anchoFoto = width - 24;
   const altoFoto = Math.round(Math.min(Math.max(anchoFoto / aspecto, anchoFoto * 0.62), anchoFoto * 1.12));
   const conMascara = hayMascara(medicion) && aspectoReal != null;
+
+  // Descargas: la foto original y la imagen con la corrosión detectada (máscara + contorno de la placa).
+  const [descargando, setDescargando] = useState(null); // null | 'original' | 'corrosion'
+  const [avisoDescarga, setAvisoDescarga] = useState({ texto: '', error: false });
+  const vistaCaptura = useRef(null); // nativo: vista fuera de pantalla con la foto completa y la máscara dibujada
+  const descargar = async (tipo) => {
+    if (descargando) return;
+    setDescargando(tipo);
+    setAvisoDescarga({ texto: '', error: false });
+    try {
+      let r;
+      if (tipo === 'original') r = await descargarOriginal(medicion, uri);
+      else {
+        // Nativo: asegura que la foto completa ya esté en caché antes de capturar la vista.
+        if (Platform.OS !== 'web' && uri) {
+          await Image.prefetch(uri).catch(() => {});
+          await new Promise((ok) => setTimeout(ok, 300));
+        }
+        r = await descargarSegmentacion(medicion, { uri, vista: vistaCaptura });
+      }
+      setAvisoDescarga({ texto: r.mensaje, error: false });
+    } catch (e) {
+      setAvisoDescarga({ texto: e?.message || 'No se pudo descargar la imagen.', error: true });
+    } finally {
+      setDescargando(null);
+    }
+  };
   const lat = medicion.latitud_real ?? medicion.punto_info?.coordenadas?.lat;
   const lng = medicion.longitud_real ?? medicion.punto_info?.coordenadas?.lng;
   const clima = medicion.clima || {};
@@ -105,6 +133,38 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
           )}
         </View>
 
+        <View style={{ paddingHorizontal: 12, paddingTop: 12, gap: 8 }}>
+          <Button
+            variant="tonal"
+            label="Descargar original"
+            left={<IconDownload size={20} color={TOKENS.colors.text} />}
+            onPress={() => descargar('original')}
+            loading={descargando === 'original'}
+            disabled={!uri || descargando === 'corrosion'}
+            accessibilityHint="Guarda la foto tal como se tomó"
+          />
+          {conMascara && (
+            <Button
+              variant="tonal"
+              label="Descargar con corrosión detectada"
+              left={<IconDownload size={20} color={TOKENS.colors.text} />}
+              onPress={() => descargar('corrosion')}
+              loading={descargando === 'corrosion'}
+              disabled={!uri || descargando === 'original'}
+              accessibilityHint="Guarda la foto con las manchas y el contorno de la placa dibujados"
+            />
+          )}
+          {!!avisoDescarga.texto && (
+            <Text
+              accessibilityLiveRegion="polite"
+              accessibilityRole={avisoDescarga.error ? 'alert' : undefined}
+              style={{ ...TOKENS.type.bodyMedium, color: avisoDescarga.error ? TOKENS.colors.danger : TOKENS.colors.neutral700 }}
+            >
+              {avisoDescarga.texto}
+            </Text>
+          )}
+        </View>
+
         <View style={{ padding: PAD, gap: 20 }}>
           <LecturaNivel medicion={medicion} compacta />
           <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: -8 }}>
@@ -120,6 +180,19 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
           </View>
         </View>
       </ScrollView>
+      {/* Solo nativo: la imagen con la máscara a tamaño completo, fuera de pantalla, para capturarla al descargar. */}
+      {Platform.OS !== 'web' && conMascara && (
+        <View
+          ref={vistaCaptura}
+          collapsable={false}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ position: 'absolute', left: -anchoFoto * 2, top: 0, width: anchoFoto, height: Math.round(anchoFoto / aspectoReal) }}
+        >
+          <FotoConMascara uri={uri} medicion={medicion} ancho={anchoFoto} alto={Math.round(anchoFoto / aspectoReal)} aspecto={aspectoReal} mostrarMascara radio={0} />
+        </View>
+      )}
       <MenuAcciones
         visible={menu}
         onCerrar={() => setMenu(false)}
