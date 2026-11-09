@@ -76,7 +76,7 @@ import { quitarDeCola, marcarCanceladas, destinoTrasAnalisis } from './src/cola'
 import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranque';
 import { marcarFuentes } from './src/tipografia';
 import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs } from './src/detalle';
-import { notasCambiaron, guardarNota, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
+import { notasCambiaron, guardarNota, borradorDe, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
 import {
@@ -997,8 +997,9 @@ function Root() {
     if (!m || m.id_medicion === resultado?.id_medicion) return;
     if (resultado && (espesor.trim() || descripcion.trim())) await guardarObs();
     const guardada = obsMap[m.id_medicion];
-    setEspesor(guardada?.espesor || '');
-    setDescripcion(guardada?.descripcion || '');
+    const borrador = borradorDe(obsMap, m.id_medicion);
+    setEspesor(borrador.espesor);
+    setDescripcion(borrador.descripcion);
     setObsSaved(Boolean(guardada));
     const { mascaras, ...ligera } = m;
     setResultado(ligera);
@@ -1061,13 +1062,18 @@ function Root() {
     setScreen('analyzing');
     setResultado(null);
     setEtapaSubida('');
+    // Las notas son de la foto del resultado anterior (ya autoguardadas): no se arrastran a la siguiente.
+    setEspesor('');
+    setDescripcion('');
+    setObsSaved(false);
 
     const bloqueElegido = bloquesMap[bloqueSel];
     const gpsUsar = gps || { lat: bloqueElegido?.lat, lng: bloqueElegido?.lng };
     const bloquesNuevos = {};
 
     try {
-      const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), descripcion);
+      // La descripción del resultado anterior NO viaja como descripción de la subida.
+      const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), '');
       const bloqueIdReal = await resolverBloqueId({ bloque: bloqueElegido });
       if (!vigente()) return;
       if (modoSubida === MODO_LOTE && !loteIdRef.current && loteNombreInput.trim()) fijarLoteId(`lote_${Date.now()}`);
@@ -1142,6 +1148,11 @@ function Root() {
       }
       if (destino === 'error') throw new Error(mensaje);
       const { mascaras, ...ligera } = ultimaLista.medicion;
+      // El resultado nuevo parte de SUS notas guardadas (normalmente vacías), no de las de otra foto.
+      const borradorNuevo = borradorDe(obsMap, ultimaLista.medicion.id_medicion);
+      setEspesor(borradorNuevo.espesor);
+      setDescripcion(borradorNuevo.descripcion);
+      setObsSaved(false);
       setResultado({
         ...ligera,
         url_imagen: ultimaLista.medicion.url_imagen || ultimaLista.uri,

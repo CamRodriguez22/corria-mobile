@@ -24,3 +24,11 @@ export async function guardarNota({ obsMap = {}, id, espesor = '', descripcion =
     return { ok: false, obsMap, avisar: !avisoPendiente, avisoPendiente: true };
   }
 }
+
+// Borrador (espesor y descripción) que corresponde a la foto `id`: lo guardado para esa foto o vacío.
+// Las notas pertenecen a UNA medición: al cambiar de resultado o al empezar un análisis se vuelve a partir de aquí,
+// para que las notas de la foto A nunca se guarden bajo la foto B.
+export function borradorDe(obsMap = {}, id) {
+  const g = (id && obsMap && obsMap[id]) || null;
+  return { espesor: g?.espesor || '', descripcion: g?.descripcion || '' };
+}
