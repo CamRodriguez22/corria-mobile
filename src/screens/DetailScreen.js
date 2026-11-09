@@ -3,7 +3,7 @@ import { View, ScrollView, Image, Platform, useWindowDimensions } from 'react-na
 import { Text } from '../Typography';
 import { Screen, Header, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle, Segmented, Button } from '../DesignComponents';
 import { descargarOriginal, descargarSegmentacion } from '../descargas';
-import { esperarImagenLista, mensajeCaptura } from '../descarga';
+import { esperarImagenLista, mensajeCaptura, prepararIntentoCaptura } from '../descarga';
 import FotoConMascara from '../FotoConMascara';
 import { hayMascara, aspectoParaMascara, uriParaMedirAspecto } from '../mascara';
 import { TOKENS } from '../DesignTokens';
@@ -61,6 +61,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
   useMemo(() => {
     estadoCaptura.current = 'cargando';
   }, [uri]);
+  const [intentoCaptura, setIntentoCaptura] = useState(0); // sube para volver a montar la imagen de captura tras un fallo
   const vistaCaptura = useRef(null); // nativo: vista fuera de pantalla con la foto completa y la máscara dibujada
   const descargar = async (tipo) => {
     if (descargando) return;
@@ -73,6 +74,10 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
         // Nativo: solo se captura cuando ESTA foto disparó onLoad en la vista de captura; si falla se aborta
         // (nunca se comparte el marcador de posición).
         if (Platform.OS !== 'web') {
+          // Tras un fallo anterior, la imagen se vuelve a montar (nueva carga) y se espera su onLoad otra vez.
+          const prep = prepararIntentoCaptura(estadoCaptura.current);
+          estadoCaptura.current = prep.estado;
+          if (prep.remontar) setIntentoCaptura((n) => n + 1);
           const msg = mensajeCaptura(await esperarImagenLista(() => estadoCaptura.current));
           if (msg) throw new Error(msg);
         }
@@ -198,7 +203,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
           style={{ position: 'absolute', left: -anchoFoto * 2, top: 0, width: anchoFoto, height: Math.round(anchoFoto / aspectoReal) }}
         >
           <FotoConMascara
-            key={uri}
+            key={`${uri}|${intentoCaptura}`}
             uri={uri}
             medicion={medicion}
             ancho={anchoFoto}

@@ -59,3 +59,9 @@ export function mensajeCaptura(resultado) {
   if (resultado === 'lista') return '';
   return resultado === 'tiempo' ? MENSAJE_IMAGEN_TARDA : MENSAJE_IMAGEN_NO_CARGO;
 }
+
+// Antes de un nuevo intento de captura: si la imagen de la vista de captura había fallado, hay que volver a montarla
+// (si no, el nuevo intento leería el mismo error al instante). Devuelve { estado, remontar }.
+export function prepararIntentoCaptura(estado) {
+  return estado === 'error' ? { estado: 'cargando', remontar: true } : { estado, remontar: false };
+}

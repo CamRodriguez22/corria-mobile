@@ -37,3 +37,32 @@ test('I12: un fallo que llega durante la espera también aborta', async () => {
   let n = 0;
   assert.equal(await esperarImagenLista(() => estados[n++], { dormir: sinEspera }), 'error');
 });
+
+import { prepararIntentoCaptura } from '../src/descarga.js';
+
+test('I17: tras un fallo, el nuevo intento reinicia el estado y pide remontar la imagen', () => {
+  assert.deepEqual(prepararIntentoCaptura('error'), { estado: 'cargando', remontar: true });
+  assert.deepEqual(prepararIntentoCaptura('lista'), { estado: 'lista', remontar: false });
+  assert.deepEqual(prepararIntentoCaptura('cargando'), { estado: 'cargando', remontar: false });
+});
+
+test('I17: ciclo error -> reintento -> carga: el segundo intento espera el nuevo onLoad y captura', async () => {
+  // Simula DetailScreen: la imagen de captura falla, el usuario reintenta, se remonta y esta vez carga.
+  let estado = 'cargando';
+  const fallaPrimero = await esperarImagenLista(() => { estado = 'error'; return estado; }, { dormir: sinEspera });
+  assert.equal(fallaPrimero, 'error');
+  const prep = prepararIntentoCaptura(estado);
+  estado = prep.estado;
+  assert.equal(prep.remontar, true);
+  let ciclos = 0;
+  const r = await esperarImagenLista(() => {
+    if (++ciclos === 3) estado = 'lista'; // el nuevo <Image> dispara onLoad
+    return estado;
+  }, { dormir: sinEspera });
+  assert.equal(r, 'lista');
+  assert.ok(ciclos >= 3, 'esperó el nuevo onLoad en vez de leer el error anterior');
+});
+
+test('I17: sin reiniciar el estado, el reintento leería el mismo error al instante (el defecto)', async () => {
+  assert.equal(await esperarImagenLista(() => 'error', { dormir: sinEspera }), 'error');
+});
