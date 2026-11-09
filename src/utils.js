@@ -3,6 +3,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { necesitaConvertirAJpeg } from './subida';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchAuthSession } from 'aws-amplify/auth';
@@ -90,13 +91,31 @@ export async function pickPhotos({ fromCamera = false, allowsMultiple = true } =
     ? await ImagePicker.launchCameraAsync({ ...opts, allowsEditing: true })
     : await ImagePicker.launchImageLibraryAsync(opts);
   if (res.canceled || !res.assets?.length) return null;
-  return res.assets.map((a) => ({
-    uri: a.uri,
-    base64: a.base64 || null,
-    width: a.width,
-    height: a.height,
-    mimeType: a.mimeType,
-  }));
+  return Promise.all(
+    res.assets.map((a) =>
+      asegurarJpeg({
+        uri: a.uri,
+        base64: a.base64 || null,
+        width: a.width,
+        height: a.height,
+        mimeType: a.mimeType,
+        fileName: a.fileName,
+      })
+    )
+  );
+}
+
+// La subida declara image/jpeg: una foto HEIF/WebP (algunos Android) se convierte a JPEG en silencio.
+// Si la conversión falla se conserva la original (el backend decide por los bytes) y no se molesta al usuario.
+async function asegurarJpeg(foto) {
+  if (!necesitaConvertirAJpeg(foto)) return foto;
+  try {
+    const { manipulateAsync, SaveFormat } = require('expo-image-manipulator');
+    const r = await manipulateAsync(foto.uri, [], { compress: 0.9, format: SaveFormat.JPEG });
+    return { ...foto, uri: r.uri, width: r.width || foto.width, height: r.height || foto.height, mimeType: 'image/jpeg', base64: null };
+  } catch {
+    return foto;
+  }
 }
 
 // Devuelve { uri, base64, width, height } o null si se canceló (compatibilidad).
