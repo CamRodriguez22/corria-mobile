@@ -77,7 +77,8 @@ import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranq
 import { marcarFuentes } from './src/tipografia';
 import { resumenesAfectados, nuevoToken, tokenVigente, invalidarTokens } from './src/resumenes';
 import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs, esDetalleDe } from './src/detalle';
-import { notasCambiaron, guardarNota, borradorDe, decidirSalida, MENSAJE_NOTA_AL_SALIR, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
+import { crearSalidaResultado } from './src/salida';
+import { notasCambiaron, guardarNota, borradorDe, MENSAJE_NOTA_AL_SALIR, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
 import {
@@ -961,6 +962,9 @@ function Root() {
   // Salir del resultado descartaría las fotos fallidas y las observaciones sin guardar:
   // se pregunta antes. "Quedarme aquí" es la opción segura (también la del botón atrás).
   // ¿Las observaciones escritas difieren de lo guardado en el teléfono? (autoguardado)
+  // Valores más recientes de la nota (los guardados y las salidas son async: no pueden usar los de un render viejo).
+  const notasRef = useRef({});
+  notasRef.current = { resultado, espesor, descripcion, obsMap };
   const guardadaObs = resultado ? obsMap[resultado.id_medicion] : null;
   const obsCambiaron = notasCambiaron({ hayResultado: Boolean(resultado), guardada: guardadaObs, espesor, descripcion });
   useEffect(() => {
@@ -970,33 +974,40 @@ function Root() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [espesor, descripcion, resultado?.id_medicion, obsCambiaron]);
 
-  const salirDelResultado = async (continuar) => {
-    // Las observaciones se autoguardan: aquí se esperan. Si el guardado falla, la nota se conserva en pantalla
-    // (no se borra) y se pregunta: reintentar, quedarse o descartarla.
-    if (resultado && obsCambiaron) {
-      const guardadoOk = await guardarObs();
-      if (decidirSalida({ cambioNotas: true, guardadoOk }) === 'nota_fallida') {
-        setConfirmModal({
-          visible: true,
-          title: 'No se pudo guardar la nota',
-          message: MENSAJE_NOTA_AL_SALIR,
-          confirmLabel: 'Reintentar',
-          extraLabel: 'Descartar la nota y continuar',
-          cancelLabel: 'Quedarme aquí',
-          onConfirm: () => {
-            cerrarConfirm();
-            salirDelResultado(continuar);
-          },
-          onExtra: () => {
-            cerrarConfirm();
-            resolverSalida(continuar);
-          },
-        });
-        return;
-      }
-    }
-    resolverSalida(continuar);
-  };
+  // Salir del resultado: se espera a que la nota VIGENTE quede guardada (si cambió mientras se guardaba, se guarda otra vez).
+  // Si el guardado falla, la nota sigue en pantalla y se pregunta: reintentar, quedarse o descartarla. (src/salida.js)
+  const salida = crearSalidaResultado({
+    leer: () => {
+      const { resultado: r, espesor: e, descripcion: d, obsMap: o } = notasRef.current;
+      return {
+        hayResultado: Boolean(r),
+        id: r?.id_medicion,
+        espesor: e,
+        descripcion: d,
+        cambiaron: notasCambiaron({ hayResultado: Boolean(r), guardada: r ? o[r.id_medicion] : null, espesor: e, descripcion: d }),
+      };
+    },
+    guardar: (v) => guardarObs(v),
+    preguntarNotaFallida: ({ reintentar, descartar, descartarLabel }) =>
+      setConfirmModal({
+        visible: true,
+        title: 'No se pudo guardar la nota',
+        message: MENSAJE_NOTA_AL_SALIR,
+        confirmLabel: 'Reintentar',
+        extraLabel: descartarLabel,
+        cancelLabel: 'Quedarme aquí',
+        onConfirm: () => {
+          cerrarConfirm();
+          reintentar();
+        },
+        onExtra: () => {
+          cerrarConfirm();
+          descartar();
+        },
+      }),
+    resolverSalida: (continuar) => resolverSalida(continuar),
+  });
+  const salirDelResultado = (continuar) => salida.salir(continuar);
 
   // Salida del resultado: avisa de las fotos fallidas que se perderían (o sigue directo si no hay ninguna).
   const resolverSalida = (continuar) => {
@@ -1232,24 +1243,30 @@ function Root() {
   // Autoguardado: si el almacenamiento falla, el texto escrito se conserva en pantalla, se avisa una vez (sin
   // bloquear) y el siguiente cambio (o salir del resultado) lo reintenta.
   const avisoNotaPendiente = useRef(false);
-  const guardarObs = async () => {
-    if (!resultado) return true;
-    const r = await guardarNota({
-      obsMap,
-      id: resultado.id_medicion,
-      espesor,
-      descripcion,
+  // Guarda la versión `v` de la nota ({ id, espesor, descripcion }); sin `v`, la vigente del resultado abierto.
+  // Devuelve true si quedó guardada (false: sigue solo en pantalla).
+  const guardarObs = async (v) => {
+    const { resultado: r, espesor: e, descripcion: d, obsMap: o } = notasRef.current;
+    if (v && !('espesor' in v)) v = undefined; // p. ej. un evento de pulsación: se guarda la nota vigente
+    const id = v?.id ?? r?.id_medicion;
+    if (!id) return true;
+    const r2 = await guardarNota({
+      obsMap: o,
+      id,
+      espesor: v ? v.espesor : e,
+      descripcion: v ? v.descripcion : d,
       avisoPendiente: avisoNotaPendiente.current,
       guardar: (mapa) => saveLocal(APP_CONFIG.storageKeys.obsPorMedicion, mapa),
     });
-    avisoNotaPendiente.current = r.avisoPendiente;
-    if (r.ok) {
-      setObsMap(r.obsMap);
-      setObsSaved(true);
-    } else if (r.avisar) {
+    avisoNotaPendiente.current = r2.avisoPendiente;
+    if (r2.ok) {
+      // Se mezcla con lo más reciente (otro guardado pudo terminar entre tanto).
+      setObsMap((prev) => ({ ...prev, [id]: r2.obsMap[id] }));
+      if (notasRef.current.resultado?.id_medicion === id) setObsSaved(true);
+    } else if (r2.avisar) {
       setAviso(MENSAJE_NOTA_NO_GUARDADA);
     }
-    return r.ok; // false: la nota NO se guardó (sigue en pantalla)
+    return r2.ok; // false: la nota NO se guardó (sigue en pantalla)
   };
 
   // La lista viene en modo resumen (sin detecciones ni clima): se muestra el detalle de
