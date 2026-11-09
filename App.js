@@ -1547,14 +1547,15 @@ function Root() {
             puedeRenombrarLote={(items) => puedeGestionarLote(perfil, items)}
             onRenameLote={async (items, nuevo) => {
               // Se actualiza el estado local (sin recargar: cargarTodo reiniciaría las páginas ya cargadas).
-              const aplicar = (ids) =>
-                mapearTodo((lista) => lista.map((x) => (ids.includes(x.id_medicion) ? { ...x, lote_nombre: nuevo } : x)));
+              const aplicar = (ids, nombreFinal) =>
+                mapearTodo((lista) => lista.map((x) => (ids.includes(x.id_medicion) ? { ...x, lote_nombre: nombreFinal } : x)));
               try {
-                const { idsRenombrados } = await renombrarLote(items, nuevo);
-                aplicar(idsRenombrados);
-                setAviso('Lote renombrado');
+                const r = await renombrarLote(items, nuevo);
+                // Se usa el nombre que dejó el servidor (lo normaliza) y solo las fotos que de verdad se renombraron.
+                aplicar(r.idsRenombrados, r.nombre || nuevo);
+                setAviso(r.parcial ? r.mensaje : 'Lote renombrado');
               } catch (e) {
-                if (e.idsRenombrados?.length) aplicar(e.idsRenombrados);
+                if (e.idsRenombrados?.length) aplicar(e.idsRenombrados, nuevo);
                 avisarError('No se pudo renombrar el lote', e);
               }
             }}

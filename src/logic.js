@@ -97,14 +97,32 @@ export function dividirEnTandas(items = [], tam = LOTE_MAX_BACKEND) {
   return tandas;
 }
 
-// Envía un lote por tandas, en orden, con `enviarTanda(tanda)` (async). Si una tanda falla, las
-// anteriores ya quedaron aplicadas: el error trae `idsRenombrados` (solo esas) y un mensaje
-// "Se renombraron N de M fotos. ..." que lo aclara.
+// El backend responde 200 con { ok: [id...], error: [{ id_medicion, motivo }], nombre } (api_mediciones, renombrar lote):
+// una foto puede fallar sin que falle la solicitud. Se cuentan SOLO los ids en `ok`. Una respuesta sin `ok`
+// (formato anterior) se toma como "todas".
+export function leerRespuestaRenombrado(resp, tanda = []) {
+  const ids = tanda.map((t) => t.id_medicion);
+  if (!resp || !Array.isArray(resp.ok)) return { renombrados: ids, fallidos: [], nombre: null };
+  const ok = new Set(resp.ok);
+  return {
+    renombrados: ids.filter((id) => ok.has(id)),
+    fallidos: ids.filter((id) => !ok.has(id)),
+    nombre: typeof resp.nombre === 'string' && resp.nombre ? resp.nombre : null,
+  };
+}
+
+// Envía un lote por tandas, en orden, con `enviarTanda(tanda)` (async, devuelve el cuerpo de la respuesta).
+// Si una tanda falla, las anteriores ya quedaron aplicadas: el error trae `idsRenombrados` (solo esas) y un mensaje
+// "Se renombraron N de M fotos. ..." que lo aclara. Si el servidor responde 200 pero algunas fotos fallaron, el
+// resultado es parcial: { idsRenombrados, fallidos, nombre (el del servidor), parcial, mensaje }.
 export async function renombrarPorTandas(items, enviarTanda) {
   const idsRenombrados = [];
+  const fallidos = [];
+  let nombre = null;
   for (const tanda of dividirEnTandas(items)) {
+    let resp;
     try {
-      await enviarTanda(tanda);
+      resp = await enviarTanda(tanda);
     } catch (e) {
       if (idsRenombrados.length) {
         e.message = `Se renombraron ${idsRenombrados.length} de ${items.length} fotos. ${e.message}`;
@@ -112,9 +130,26 @@ export async function renombrarPorTandas(items, enviarTanda) {
       e.idsRenombrados = idsRenombrados;
       throw e;
     }
-    idsRenombrados.push(...tanda.map((t) => t.id_medicion));
+    const r = leerRespuestaRenombrado(resp, tanda);
+    idsRenombrados.push(...r.renombrados);
+    fallidos.push(...r.fallidos);
+    nombre = r.nombre || nombre;
   }
-  return { idsRenombrados };
+  if (fallidos.length && !idsRenombrados.length) {
+    const e = new Error('No se pudo renombrar ninguna foto del lote. Inténtalo de nuevo.');
+    e.idsRenombrados = [];
+    throw e;
+  }
+  const parcial = fallidos.length > 0;
+  return {
+    idsRenombrados,
+    fallidos,
+    nombre,
+    parcial,
+    mensaje: parcial
+      ? `Se renombraron ${idsRenombrados.length} de ${items.length} fotos. Las demás no se pudieron renombrar; inténtalo de nuevo.`
+      : '',
+  };
 }
 
 // Clasifica el error de subir una foto. 409 = la misma foto aún se está analizando (esperar y
