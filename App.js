@@ -1501,7 +1501,7 @@ function Root() {
           onNext={() => salirDelResultado(() => irANuevaMedicion({ mantenerLote: true }))}
           onTerminarLote={() => salirDelResultado(terminarLote)}
           resumenLote={resumirCola(colaFotos)}
-          onReintentar={analizar}
+          onReintentar={() => salida.reintentar(analizar)}
           onBack={() => salirDelResultado(irAInicioConservandoLote)}
           onHome={() => salirDelResultado(terminarLote)}
         />

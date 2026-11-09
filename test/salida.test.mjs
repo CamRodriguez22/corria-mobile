@@ -125,3 +125,61 @@ test('guardarNotaVigente se rinde si el borrador nunca se estabiliza', async () 
   });
   assert.equal(ok, false);
 });
+
+// ───── I13: "Reintentar las fallidas" desde el resultado ─────
+function conAnalisis(e) {
+  e.analisis = 0;
+  e.analizar = async () => {
+    // lo que hace App.analizar: limpia las notas del resultado en pantalla
+    e.analisis++;
+    e.nota = { id: 'B', espesor: '', descripcion: '' };
+  };
+  return e;
+}
+
+test('I13: Reintentar guarda primero la nota escrita (aunque el autoguardado de 700 ms no haya corrido) y luego analiza', async () => {
+  const e = conAnalisis(entorno({ nota: { id: 'A', espesor: '3', descripcion: 'recién escrita' } }));
+  const orden = [];
+  const original = e.analizar;
+  e.analizar = async () => {
+    orden.push(`analizar con ${e.guardados.length} guardado(s)`);
+    return original();
+  };
+  await e.salida.reintentar(e.analizar);
+  assert.deepEqual(e.guardados, [{ id: 'A', espesor: '3', descripcion: 'recién escrita' }]);
+  assert.deepEqual(orden, ['analizar con 1 guardado(s)']);
+});
+
+test('I13: con el almacenamiento fallando NO se analiza (no se borra la nota) y se ofrece reintentar o descartar', async () => {
+  const e = conAnalisis(entorno({ nota: { id: 'A', espesor: '3', descripcion: 'nota' } }));
+  e.falla = true;
+  await e.salida.reintentar(e.analizar);
+  assert.equal(e.analisis, 0);
+  assert.deepEqual(e.nota, { id: 'A', espesor: '3', descripcion: 'nota' });
+  assert.equal(e.dialogos.length, 1);
+  assert.match(e.dialogos[0].descartarLabel, /reintentar/i);
+  // el usuario reintenta guardar y ahora funciona
+  e.falla = false;
+  e.dialogos[0].reintentar();
+  await tick();
+  await tick();
+  assert.equal(e.analisis, 1);
+  assert.equal(e.guardados.length, 1);
+});
+
+test('I13: descartar la nota sigue con el análisis', async () => {
+  const e = conAnalisis(entorno({ nota: { id: 'A', espesor: '3', descripcion: 'nota' } }));
+  e.falla = true;
+  await e.salida.reintentar(e.analizar);
+  e.dialogos[0].descartar();
+  await tick();
+  assert.equal(e.analisis, 1);
+  assert.equal(e.guardados.length, 0);
+});
+
+test('I13: sin nota nueva, Reintentar analiza directo', async () => {
+  const e = conAnalisis(entorno());
+  await e.salida.reintentar(e.analizar);
+  assert.equal(e.analisis, 1);
+  assert.equal(e.guardados.length, 0);
+});

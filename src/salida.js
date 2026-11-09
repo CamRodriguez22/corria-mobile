@@ -37,5 +37,19 @@ export function crearSalidaResultado({ leer, guardar, preguntarNotaFallida, reso
     }
     resolverSalida(continuar);
   };
-  return { salir };
+  // "Reintentar las fallidas": analizar() limpia las notas del resultado en pantalla, así que primero se guarda la nota
+  // vigente; si no se puede guardar, NO se reintenta (la nota sigue en pantalla) y se ofrece reintentar el guardado o
+  // descartar la nota y seguir con el análisis.
+  const reintentar = async (analizar) => {
+    if (!(await asegurarNota())) {
+      preguntarNotaFallida({
+        descartarLabel: 'Descartar la nota y reintentar',
+        reintentar: () => reintentar(analizar),
+        descartar: () => analizar(),
+      });
+      return;
+    }
+    return analizar();
+  };
+  return { salir, reintentar };
 }
