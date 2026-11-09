@@ -29,7 +29,7 @@ export default function CameraScreen({ bloqueSel, onBack, onPick }) {
         </View>
         <Text style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, textAlign: 'center' }}>Enfoca la placa de frente</Text>
         <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, textAlign: 'center', maxWidth: 300 }}>
-          Toma una foto en campo o elige varias de la galería para subirlas juntas. Mínimo 640 × 480 px.
+          Toma una foto en campo o elige varias de la galería para subirlas juntas.
         </Text>
       </View>
       <View style={{ padding: PAD, gap: 12 }}>

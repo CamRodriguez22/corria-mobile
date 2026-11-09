@@ -25,6 +25,7 @@ import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600Sem
 import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
 
 import { TOKENS, num, severidad } from './src/DesignTokens';
+import { MENSAJE_FOTOS_PEQUENAS } from './src/subida';
 import {
   Screen,
   Logo,
@@ -1030,7 +1031,7 @@ function Root() {
           }
         }
         if (!validas.length) {
-          avisar('Fotos no válidas', 'Ninguna de las fotos seleccionadas cumple los requisitos de resolución.');
+          avisar('Fotos no válidas', MENSAJE_FOTOS_PEQUENAS);
           return;
         }
         setFoto(validas[0]);

@@ -64,12 +64,6 @@ export default function PreviewScreen({ foto, cola = [], bloqueSel, onBack, onCo
         <View style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <IconCheck size={18} color={TOKENS.colors.piedra_700} />
-            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.text }}>
-              {actual?.width && actual?.height ? `Resolución ${actual.width} × ${actual.height} px` : 'Resolución válida'}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <IconCheck size={18} color={TOKENS.colors.piedra_700} />
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.text }}>Se asociará al punto {bloqueSel}</Text>
           </View>
         </View>

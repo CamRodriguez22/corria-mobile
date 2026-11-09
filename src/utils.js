@@ -105,14 +105,8 @@ export async function pickPhoto({ fromCamera = true } = {}) {
   return fotos?.[0] || null;
 }
 
-// Valida que la foto tenga una resolución mínima adecuada para análisis (mín. 640x480).
-export function validarFoto(foto) {
-  if (!foto?.uri) return 'No se recibió ninguna foto.';
-  if (foto.width && foto.height && (foto.width < 640 || foto.height < 480)) {
-    return 'La foto es muy pequeña. Usa al menos 640 × 480 px.';
-  }
-  return '';
-}
+// Validación del tamaño mínimo de la foto (lógica pura en ./subida; mensajes sin píxeles).
+export { validarFoto } from './subida';
 
 // ───────────────────────────── Fechas ─────────────────────────────
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
