@@ -212,3 +212,16 @@ export function textoResultados(n, filtrado) {
   if (n === 0) return filtrado ? 'Ninguna foto coincide con los filtros' : 'Sin fotos';
   return plural(n, 'foto', 'fotos');
 }
+
+// Resultado de cargar un rango de fechas (App.cargarRango -> { truncado, error? }):
+// `parcial` si hay más fotos de las que caben; `error` (texto) si falló la carga. Con error no hay "parcial".
+export function estadoRango(r) {
+  const error = typeof r?.error === 'string' && r.error ? r.error : '';
+  return { parcial: !error && Boolean(r?.truncado), error };
+}
+
+// Qué muestra la lista de fotos cuando no hay ninguna: error de carga (con reintento) o "sin coincidencias".
+// Un error nunca se presenta como "No hay fotos".
+export function vacioDeActividad({ error = '' } = {}) {
+  return error ? 'error' : 'sin-fotos';
+}

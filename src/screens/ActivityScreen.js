@@ -9,7 +9,7 @@ import { TOKENS } from '../DesignTokens';
 import { nombrePuntoDe } from '../helpers';
 import { filasDeGaleria } from '../galeria';
 import {
-  filtrarMediciones, FILTROS_VACIOS, hayFiltros, rangoEfectivo,
+  filtrarMediciones, FILTROS_VACIOS, hayFiltros, rangoEfectivo, estadoRango, vacioDeActividad,
   aplicarFiltrosADias, totalesPorMes, aniosDisponibles,
 } from '../linea';
 import { hoyLocal } from '../fechas';
@@ -40,6 +40,8 @@ export default function ActivityScreen({
   const [filtros, setFiltros] = useState(FILTROS_VACIOS);
   const [hoja, setHoja] = useState(null); // 'punto' | 'fechas' | null
   const [parcial, setParcial] = useState(false);
+  const [errorRango, setErrorRango] = useState(''); // fallo al cargar el rango de fechas (se ofrece reintentar)
+  const [reintento, setReintento] = useState(0);
 
   // Resumen por día de cada año disponible (del punto elegido, si hay filtro de punto): alimenta el calendario
   // y los totales reales por mes de la galería. Se pide una vez por año y se guarda en App.
@@ -61,15 +63,22 @@ export default function ActivityScreen({
   useEffect(() => {
     if (!rango.desde && !rango.hasta) {
       setParcial(false);
+      setErrorRango('');
       return;
     }
     let vivo = true;
-    Promise.resolve(onCargarRango?.(rango, { forzar: refreshing })).then((r) => vivo && setParcial(Boolean(r?.truncado)));
+    setErrorRango('');
+    Promise.resolve(onCargarRango?.(rango, { forzar: refreshing || reintento > 0 })).then((r) => {
+      if (!vivo) return;
+      const e = estadoRango(r);
+      setParcial(e.parcial);
+      setErrorRango(e.error);
+    });
     return () => {
       vivo = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rango.desde, rango.hasta, refreshing]);
+  }, [rango.desde, rango.hasta, refreshing, reintento]);
 
   const listaPuntos = useMemo(() => Object.values(bloquesMap || {}), [bloquesMap]);
   const filtradas = useMemo(
@@ -121,7 +130,7 @@ export default function ActivityScreen({
         filtros={filtros}
         onChange={setFiltros}
         total={filtradas.length}
-        nota={parcial ? 'Datos parciales: hay más fotos de las que se pudieron cargar' : ''}
+        nota={errorRango ? 'No se pudieron cargar todas las fotos de este rango' : parcial ? 'Datos parciales: hay más fotos de las que se pudieron cargar' : ''}
       >
         <Chip
           label={puntoSel ? tituloPunto(puntoSel.nombre) : 'Punto'}
@@ -169,7 +178,15 @@ export default function ActivityScreen({
       ListHeaderComponent={cabecera}
       ListEmptyComponent={
         <View style={{ paddingVertical: 30 }}>
-          <EmptyState title="Sin fotos" subtitle="No hay fotos que coincidan con estos filtros." />
+          {vacioDeActividad({ error: errorRango }) === 'error' ? (
+            <EmptyState
+              title="No se pudieron cargar las fotos"
+              subtitle={errorRango}
+              action={<Button variant="tonal" label="Reintentar" fullWidth={false} onPress={() => setReintento((n) => n + 1)} />}
+            />
+          ) : (
+            <EmptyState title="Sin fotos" subtitle="No hay fotos que coincidan con estos filtros." />
+          )}
         </View>
       }
       ListFooterComponent={
