@@ -3,10 +3,10 @@ import { View, ScrollView, Image, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
 import { Screen, Header, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle, Segmented } from '../DesignComponents';
 import FotoConMascara from '../FotoConMascara';
-import { hayMascara, aspectoParaMascara } from '../mascara';
+import { hayMascara, aspectoParaMascara, uriParaMedirAspecto } from '../mascara';
 import { TOKENS } from '../DesignTokens';
 import { IconShare, IconMoreVertical, IconEdit, IconTrash } from '../Icons';
-import { imagenDe } from '../miniaturas';
+import { imagenDe, miniaturaDe } from '../miniaturas';
 import { fechaHoraLarga, fechaHoraCorta } from '../fechas';
 import { plural } from '../fechas';
 
@@ -37,7 +37,10 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
   const [vista, setVista] = useState('original'); // 'original' | 'corrosion'
   const { width } = useWindowDimensions();
   const uri = imagenDe(medicion);
-  const medido = useAspecto(uri);
+  // Miniatura (ya en caché por la galería): se pinta al instante mientras llega la foto completa.
+  const uriMini = miniaturaDe(medicion);
+  // La proporción sale del API (width/height) o de la miniatura; la foto grande no se baja solo para medirla.
+  const medido = useAspecto(uriParaMedirAspecto({ medicion, uri, uriMini }));
   // Aspecto real: el del API o el medido en la imagen. Solo mientras se desconoce, la caja usa 4:3 y la máscara
   // no se dibuja (con un aspecto supuesto saldría estirada).
   const aspectoReal = aspectoParaMascara({ medicion, medido });
@@ -87,7 +90,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
       <Header title={titulo} subtitle={subtitulo} onBack={onBack} right={acciones} />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={{ paddingHorizontal: 12, gap: 10 }}>
-          <FotoConMascara uri={uri} medicion={medicion} ancho={anchoFoto} alto={altoFoto} aspecto={aspecto} mostrarMascara={conMascara && vista === 'corrosion'} />
+          <FotoConMascara uri={uri} uriMini={uriMini} medicion={medicion} ancho={anchoFoto} alto={altoFoto} aspecto={aspecto} mostrarMascara={conMascara && vista === 'corrosion'} />
           {conMascara && (
             <View accessibilityLabel="Vista de la foto">
               <Segmented

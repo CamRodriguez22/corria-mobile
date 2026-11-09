@@ -48,3 +48,10 @@ export function aspectoParaMascara({ medicion, medido = null } = {}) {
   const real = aspectoDeMedicion(medicion) ?? (Number.isFinite(medido) && medido > 0 ? medido : null);
   return real;
 }
+
+// Qué imagen medir para conocer la proporción de la foto, sin bajar la grande dos veces:
+// null si el API ya trae width/height; si no, la miniatura (conserva la proporción) y, sin miniatura, la foto completa.
+export function uriParaMedirAspecto({ medicion, uri = null, uriMini = null } = {}) {
+  if (aspectoDeMedicion(medicion) != null) return null;
+  return uriMini || uri || null;
+}

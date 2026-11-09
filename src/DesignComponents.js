@@ -410,6 +410,38 @@ export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24 }) => {
   );
 };
 
+// Foto grande con la miniatura (ya en caché) de marcador: se ve al instante y la imagen completa aparece con un
+// fundido cuando termina de cargar. Si la completa falla, queda la miniatura. Sin miniatura distinta, es `Foto`.
+export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', iconSize = 24 }) => {
+  const reducido = useReducedMotion();
+  const fundido = useRef(new Animated.Value(0)).current;
+  const [fallo, setFallo] = useState(false);
+  const conMini = Boolean(uriMini) && uriMini !== uri;
+  useEffect(() => {
+    fundido.setValue(0);
+    setFallo(false);
+  }, [uri, fundido]);
+  if (!conMini) return <Foto uri={uri} style={style} resizeMode={resizeMode} iconSize={iconSize} />;
+  return (
+    <View style={[{ overflow: 'hidden' }, style]}>
+      <Foto uri={uriMini} style={StyleSheet.absoluteFill} resizeMode={resizeMode} iconSize={iconSize} />
+      {!!uri && !fallo && (
+        <Animated.Image
+          source={{ uri }}
+          style={[StyleSheet.absoluteFill, { opacity: fundido }]}
+          resizeMode={resizeMode}
+          onLoad={() => {
+            if (reducido) fundido.setValue(1);
+            else Animated.timing(fundido, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
+          }}
+          onError={() => setFallo(true)}
+          accessibilityIgnoresInvertColors
+        />
+      )}
+    </View>
+  );
+};
+
 export const Thumb = ({ uri, size = 52, radius = 14, style }) => (
   <Foto uri={uri} style={[{ width: size, height: size, borderRadius: radius }, style]} iconSize={Math.round(size * 0.4)} />
 );

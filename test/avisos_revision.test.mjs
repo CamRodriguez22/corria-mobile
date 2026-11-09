@@ -245,3 +245,11 @@ test('destinoTrasAnalisis: con una lista va al resultado (la última); cancelada
   assert.equal(e.mensaje, 'Sin red');
   assert.equal(destinoTrasAnalisis({ cola: [] }).mensaje, 'No se pudo procesar ninguna foto.');
 });
+
+import { uriParaMedirAspecto } from '../src/mascara.js';
+test('uriParaMedirAspecto: nada si el API trae width/height; si no, la miniatura y, sin ella, la foto', () => {
+  assert.equal(uriParaMedirAspecto({ medicion: { width: 800, height: 600 }, uri: 'g', uriMini: 'm' }), null);
+  assert.equal(uriParaMedirAspecto({ medicion: {}, uri: 'g', uriMini: 'm' }), 'm');
+  assert.equal(uriParaMedirAspecto({ medicion: {}, uri: 'g', uriMini: null }), 'g');
+  assert.equal(uriParaMedirAspecto({ medicion: {} }), null);
+});

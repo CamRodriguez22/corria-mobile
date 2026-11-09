@@ -4,20 +4,20 @@
 import React from 'react';
 import { View } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
-import { Foto } from './DesignComponents';
+import { FotoProgresiva } from './DesignComponents';
 import { TOKENS, NIVELES } from './DesignTokens';
 import { poligonosMascara, contornoPlaca, rectDeFoto, puntosAPixeles } from './mascara';
 
 const COLOR_CORROSION = NIVELES[3].color; // el mismo rojo de la web (#dc2626) para las manchas
 const COLOR_PLACA = NIVELES[0].color; // contorno de la placa: verde, solo línea (como la web)
 
-export default function FotoConMascara({ uri, medicion, ancho, alto, aspecto, mostrarMascara = false, radio = 20 }) {
+export default function FotoConMascara({ uri, uriMini = null, medicion, ancho, alto, aspecto, mostrarMascara = false, radio = 20 }) {
   const rect = rectDeFoto(ancho, alto, aspecto, 'cover');
   const poligonos = mostrarMascara ? poligonosMascara(medicion) : [];
   const placa = mostrarMascara ? contornoPlaca(medicion) : null;
   return (
     <View style={{ width: ancho, height: alto, borderRadius: radio, overflow: 'hidden' }}>
-      <Foto uri={uri} style={{ width: ancho, height: alto }} resizeMode="cover" iconSize={48} />
+      <FotoProgresiva uri={uri} uriMini={uriMini} style={{ width: ancho, height: alto }} resizeMode="cover" iconSize={48} />
       {mostrarMascara && (
         <Svg width={ancho} height={alto} style={{ position: 'absolute', left: 0, top: 0 }} pointerEvents="none" aria-hidden>
           {poligonos.map((ps, i) => (
