@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
 import { Text } from '../Typography';
-import { Screen, Header, Field, Button, Banner, SectionTitle } from '../DesignComponents';
+import { Screen, Header, Field, Button, Banner, SectionTitle, Segmented } from '../DesignComponents';
 import { TOKENS } from '../DesignTokens';
 import { IconGps, IconAlertTriangle, IconCheck } from '../Icons';
 import { tituloPunto } from '../galeria';
+import { MODO_INDIVIDUAL, MODO_LOTE, TEXTO_MODO, puedeContinuar } from '../subida';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -60,19 +61,37 @@ export default function ContextScreen({
   onReintentarBloques,
   bloqueSel,
   setBloqueSel,
+  modo = MODO_INDIVIDUAL,
+  setModo,
   loteNombre,
   setLoteNombre,
   onBack,
   onNext,
 }) {
   const ciudad = lugar?.ciudad || empresa?.ciudad || '';
+  const listo = puedeContinuar({ modo, bloqueSel, loteNombre });
+  const faltante = !bloqueSel ? 'Elige un punto para continuar' : 'Escribe el nombre del lote para continuar';
   const contexto = [empresa?.nombre, ciudad, lugar?.barrio].filter(Boolean).join(' · ');
 
   return (
     <Screen>
       <Header title="Nueva medición" subtitle={contexto || 'Elige dónde vas a medir'} onBack={onBack} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: PAD, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
-        <SectionTitle title="Punto" />
+        <View accessibilityLabel="Tipo de subida" style={{ paddingTop: 8 }}>
+          <Segmented
+            options={[
+              { value: MODO_INDIVIDUAL, label: 'Individual' },
+              { value: MODO_LOTE, label: 'Lote' },
+            ]}
+            value={modo}
+            onChange={setModo}
+          />
+        </View>
+        <Text accessibilityLiveRegion="polite" style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 8 }}>
+          {TEXTO_MODO[modo]}
+        </Text>
+
+        <SectionTitle title="Punto" style={{ marginTop: 12 }} />
         <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginBottom: 12 }}>
           Elige el punto de monitoreo donde estás tomando las fotos.
         </Text>
@@ -94,18 +113,22 @@ export default function ContextScreen({
           <Banner text="Tu zona aún no tiene puntos. Pide a un administrador que los cree en la plataforma web." />
         )}
 
-        <SectionTitle title="Lote" style={{ marginTop: 20 }} />
-        <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginBottom: 10 }}>
-          Opcional. Si subes varias fotos, agrúpalas con un nombre.
-        </Text>
-        <Field
-          label=""
-          accessibilityLabel="Nombre del lote (opcional)"
-          placeholder="Por ejemplo: Inspección de noviembre"
-          value={loteNombre}
-          onChangeText={setLoteNombre}
-          autoCapitalize="sentences"
-        />
+        {modo === MODO_LOTE && (
+          <>
+            <SectionTitle title="Nombre del lote" style={{ marginTop: 20 }} />
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginBottom: 10 }}>
+              Todas las fotos que subas quedarán juntas bajo este nombre.
+            </Text>
+            <Field
+              label=""
+              accessibilityLabel="Nombre del lote"
+              placeholder="Por ejemplo: Inspección de noviembre"
+              value={loteNombre}
+              onChangeText={setLoteNombre}
+              autoCapitalize="sentences"
+            />
+          </>
+        )}
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 }}>
           {gpsError ? <IconAlertTriangle size={20} color={TOKENS.colors.warning} /> : <IconGps size={20} color={TOKENS.colors.piedra_800} />}
@@ -121,13 +144,13 @@ export default function ContextScreen({
 
       <View style={{ padding: PAD, paddingTop: 12, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral300, backgroundColor: TOKENS.colors.surfaceAlt, gap: 8 }}>
         <Button
-          label="Capturar foto"
+          label="Continuar"
           onPress={onNext}
-          disabled={!bloqueSel}
-          accessibilityHint={!bloqueSel ? 'Primero elige un punto' : undefined}
+          disabled={!listo}
+          accessibilityHint={!listo ? faltante : undefined}
         />
-        {!bloqueSel && (
-          <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, textAlign: 'center' }}>Elige un punto para continuar</Text>
+        {!listo && (
+          <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, textAlign: 'center' }}>{faltante}</Text>
         )}
       </View>
     </Screen>

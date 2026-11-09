@@ -7,7 +7,8 @@ import { IconCamera, IconImages } from '../Icons';
 
 const PAD = TOKENS.spacing.lg;
 
-export default function CameraScreen({ bloqueSel, onBack, onPick }) {
+export default function CameraScreen({ bloqueSel, modo = 'individual', onBack, onPick }) {
+  const esLote = modo === 'lote';
   return (
     <Screen>
       <Header title="Capturar inspección" subtitle={`Punto ${bloqueSel}`} onBack={onBack} />
@@ -29,7 +30,9 @@ export default function CameraScreen({ bloqueSel, onBack, onPick }) {
         </View>
         <Text style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, textAlign: 'center' }}>Enfoca la placa de frente</Text>
         <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, textAlign: 'center', maxWidth: 300 }}>
-          Toma una foto en campo o elige varias de la galería para subirlas juntas.
+          {esLote
+            ? 'Toma una foto en campo o elige varias de la galería: todas quedarán en el mismo lote.'
+            : 'Toma una foto en campo o elige de la galería: cada foto se guarda como una medición suelta.'}
         </Text>
       </View>
       <View style={{ padding: PAD, gap: 12 }}>

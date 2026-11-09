@@ -33,3 +33,27 @@ test('necesitaConvertirAJpeg: sin MIME usa la extensión del nombre o de la URI;
   assert.equal(necesitaConvertirAJpeg({ mimeType: 'image/heic', uri: 'x.jpg' }), true); // el MIME manda
   assert.equal(necesitaConvertirAJpeg(), false);
 });
+
+import { paramsLote, puedeContinuar, MODO_INDIVIDUAL, MODO_LOTE, TEXTO_MODO } from '../src/subida.js';
+
+test('paramsLote: Individual nunca lleva lote, aunque haya un lote de antes', () => {
+  assert.deepEqual(paramsLote({ modo: MODO_INDIVIDUAL, loteId: 'lote_1', loteNombre: 'Inspección' }), { loteId: undefined, loteNombre: undefined });
+  assert.deepEqual(paramsLote({}), { loteId: undefined, loteNombre: undefined });
+});
+
+test('paramsLote: Lote conserva el id y el nombre (sin espacios sobrantes)', () => {
+  assert.deepEqual(paramsLote({ modo: MODO_LOTE, loteId: 'lote_1', loteNombre: '  Inspección  ' }), { loteId: 'lote_1', loteNombre: 'Inspección' });
+  assert.deepEqual(paramsLote({ modo: MODO_LOTE, loteId: '', loteNombre: '' }), { loteId: undefined, loteNombre: undefined });
+});
+
+test('puedeContinuar: punto siempre; en Lote también el nombre', () => {
+  assert.equal(puedeContinuar({ modo: MODO_INDIVIDUAL, bloqueSel: '' }), false);
+  assert.equal(puedeContinuar({ modo: MODO_INDIVIDUAL, bloqueSel: 'P1' }), true);
+  assert.equal(puedeContinuar({ modo: MODO_LOTE, bloqueSel: 'P1', loteNombre: '  ' }), false);
+  assert.equal(puedeContinuar({ modo: MODO_LOTE, bloqueSel: 'P1', loteNombre: 'Nov' }), true);
+  assert.equal(puedeContinuar({ modo: MODO_LOTE, bloqueSel: '', loteNombre: 'Nov' }), false);
+});
+
+test('hay una línea de explicación corta por pestaña', () => {
+  for (const m of [MODO_INDIVIDUAL, MODO_LOTE]) assert.ok(TEXTO_MODO[m].length > 10 && TEXTO_MODO[m].length < 100);
+});

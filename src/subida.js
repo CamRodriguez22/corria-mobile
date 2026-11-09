@@ -36,3 +36,26 @@ export function necesitaConvertirAJpeg({ mimeType, fileName, uri } = {}) {
   const ext = extensionDe(fileName) || extensionDe(uri);
   return ext ? !FORMATOS_DIRECTOS.test(ext) : false;
 }
+
+// ───────────────────────── Individual o lote ─────────────────────────
+// "Individual": cada foto es una medición suelta (sin lote), aunque se elijan varias.
+// "Lote": todas las fotos de la sesión llevan el mismo lote hasta "Terminar lote".
+export const MODO_INDIVIDUAL = 'individual';
+export const MODO_LOTE = 'lote';
+
+export const TEXTO_MODO = {
+  [MODO_INDIVIDUAL]: 'Cada foto se guarda como una medición suelta, sin lote.',
+  [MODO_LOTE]: 'Las fotos de esta sesión se agrupan en un lote con el nombre que elijas.',
+};
+
+// Lote que lleva cada foto al subirla. Individual NUNCA lleva lote (aunque quede un lote de antes en memoria).
+export function paramsLote({ modo, loteId, loteNombre } = {}) {
+  if (modo !== MODO_LOTE) return { loteId: undefined, loteNombre: undefined };
+  return { loteId: loteId || undefined, loteNombre: String(loteNombre || '').trim() || undefined };
+}
+
+// Para continuar hace falta un punto y, en Lote, también el nombre del lote (sin nombre no se crearía el lote).
+export function puedeContinuar({ modo, bloqueSel, loteNombre } = {}) {
+  if (!bloqueSel) return false;
+  return modo === MODO_LOTE ? Boolean(String(loteNombre || '').trim()) : true;
+}

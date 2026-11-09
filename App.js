@@ -25,7 +25,7 @@ import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600Sem
 import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
 
 import { TOKENS, num, severidad } from './src/DesignTokens';
-import { MENSAJE_FOTOS_PEQUENAS } from './src/subida';
+import { MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote } from './src/subida';
 import {
   Screen,
   Logo,
@@ -222,6 +222,7 @@ function Root() {
   const [bloqueSel, setBloqueSel] = useState('');
   const [loteIdActual, setLoteIdActual] = useState('');
   const [loteNombreInput, setLoteNombreInput] = useState('');
+  const [modoSubida, setModoSubida] = useState(MODO_INDIVIDUAL); // 'individual' (fotos sueltas) | 'lote'
   const [gps, setGps] = useState(null);
   const [gpsError, setGpsError] = useState('');
   const [foto, setFoto] = useState(null);
@@ -857,6 +858,7 @@ function Root() {
     setBloqueSel('');
     fijarLoteId('');
     setLoteNombreInput('');
+    setModoSubida(MODO_INDIVIDUAL);
     setGps(null);
     setGpsError('');
     setFoto(null);
@@ -905,6 +907,7 @@ function Root() {
       setBloqueSel('');
       fijarLoteId('');
       setLoteNombreInput('');
+      setModoSubida(MODO_INDIVIDUAL);
     }
     setFoto(null);
     fijarCola([]);
@@ -1004,6 +1007,7 @@ function Root() {
     setBloqueSel('');
     fijarLoteId('');
     setLoteNombreInput('');
+    setModoSubida(MODO_INDIVIDUAL);
     setScreen('home');
     setTab('home');
   };
@@ -1064,7 +1068,7 @@ function Root() {
       const notas = construirNotas(nombreCortoBloque(bloqueElegido, bloqueSel), descripcion);
       const bloqueIdReal = await resolverBloqueId({ bloque: bloqueElegido });
       if (!vigente()) return;
-      if (!loteIdRef.current && loteNombreInput) fijarLoteId(`lote_${Date.now()}`);
+      if (modoSubida === MODO_LOTE && !loteIdRef.current && loteNombreInput.trim()) fijarLoteId(`lote_${Date.now()}`);
 
       for (let i = 0; i < colaRef.current.length; i++) {
         if (!vigente()) return;
@@ -1078,8 +1082,8 @@ function Root() {
             foto: itemFoto,
             gps: gpsUsar,
             bloqueId: bloqueIdReal,
-            loteId: loteIdRef.current || undefined,
-            loteNombre: loteNombreInput || undefined,
+            // Individual: medición suelta, sin lote (nunca se reutiliza un lote anterior).
+            ...paramsLote({ modo: modoSubida, loteId: loteIdRef.current, loteNombre: loteNombreInput }),
             notas,
             imagenKey: itemFoto.imagenKey,
             onImagenKey: (k) => vigente() && actualizarFoto(i, { imagenKey: k }),
@@ -1351,6 +1355,11 @@ function Root() {
           onReintentarBloques={recargarBloques}
           bloqueSel={bloqueSel}
           setBloqueSel={setBloqueSel}
+          modo={modoSubida}
+          setModo={(m) => {
+            setModoSubida(m);
+            if (m === MODO_INDIVIDUAL) fijarLoteId('');
+          }}
           loteNombre={loteNombreInput}
           setLoteNombre={setLoteNombreInput}
           onBack={() => setScreen('home')}
@@ -1362,6 +1371,7 @@ function Root() {
       return (
         <CameraScreen
           bloqueSel={bloqueSelLabel}
+          modo={modoSubida}
           onBack={() => setScreen('context')}
           onPick={capturar}
         />
@@ -1389,7 +1399,7 @@ function Root() {
           cola={colaFotos}
           onSeleccionar={seleccionarResultado}
           bloqueSel={bloqueSelLabel}
-          loteNombre={loteNombreInput}
+          loteNombre={modoSubida === MODO_LOTE ? loteNombreInput : ''}
           espesor={espesor}
           setEspesor={setEspesor}
           descripcion={descripcion}
