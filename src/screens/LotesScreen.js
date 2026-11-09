@@ -8,6 +8,7 @@ import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconChevronRight, IconEdit, IconNivel } from '../Icons';
 import { nombrePuntoDe } from '../helpers';
 import { filasDeGaleria, agruparLotes, miniaturaDe } from '../galeria';
+import { estadoRenombrarLote } from '../lotes';
 import { filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
 import { formatoPct, fechaCorta, diaLocal, plural } from '../fechas';
 
@@ -78,6 +79,7 @@ export default function LotesScreen({
   if (loteAbierto) {
     const lote = loteAbierto;
     const puedeRenombrar = Boolean(onRenameLote && puedeRenombrarLote?.(lote.items));
+    const renombrado = estadoRenombrarLote({ historialEstado, puedeGestionar: puedeRenombrar });
     const fotosLote = filtrarMediciones(lote.items, filtros, { nombresExtra: () => [lote.nombre, lote.puntoTitulo] });
     const filtrado = hayFiltros(filtros);
     const cabecera = (
@@ -88,12 +90,20 @@ export default function LotesScreen({
           onBack={() => setLoteSeleccionado(null)}
           right={
             puedeRenombrar ? (
-              <IconButton onPress={() => setRenombrandoLote(lote)} label="Renombrar lote">
-                <IconEdit size={22} color={TOKENS.colors.text} />
+              <IconButton onPress={() => setRenombrandoLote(lote)} label="Renombrar lote" disabled={!renombrado.permitido}>
+                <IconEdit size={22} color={renombrado.permitido ? TOKENS.colors.text : TOKENS.colors.neutral500} />
               </IconButton>
             ) : null
           }
         />
+        {!!renombrado.aviso && puedeRenombrar && (
+          <View style={{ paddingHorizontal: PAD, paddingTop: 8, gap: 6 }}>
+            <Text accessibilityLiveRegion="polite" style={{ ...TOKENS.type.bodyMedium, color: renombrado.reintentar ? TOKENS.colors.danger : TOKENS.colors.neutral700 }}>
+              {renombrado.aviso}
+            </Text>
+            {renombrado.reintentar && !!onReintentarHistorial && <Button variant="tonal" label="Reintentar" onPress={onReintentarHistorial} />}
+          </View>
+        )}
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 6 }}>
           <View style={{ flex: 1, backgroundColor: TOKENS.colors.surfaceAlt, padding: 14, borderRadius: TOKENS.radius.md, borderWidth: 1, borderColor: TOKENS.colors.border, ...TOKENS.shadow.card }}>
             <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Promedio del lote</Text>
