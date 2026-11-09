@@ -76,7 +76,7 @@ import { quitarDeCola, marcarCanceladas, destinoTrasAnalisis } from './src/cola'
 import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranque';
 import { marcarFuentes } from './src/tipografia';
 import { resumenesAfectados, nuevoToken, tokenVigente, invalidarTokens } from './src/resumenes';
-import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs, esDetalleDe } from './src/detalle';
+import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs, detalleTrasCambiarPantalla, destinoTrasBorrar } from './src/detalle';
 import { crearSalidaResultado } from './src/salida';
 import { notasCambiaron, guardarNota, borradorDe, MENSAJE_NOTA_AL_SALIR, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
@@ -222,6 +222,9 @@ function Root() {
   const [loteSel, setLoteSel] = useState(null); // lote abierto en la pestaña Lotes (sobrevive al detalle)
   const [detalle, setDetalle] = useState(null);
   const detalleRef = useRef(null); // el detalle abierto ahora (para decidir tras un await)
+  const screenRef = useRef('home');
+  const tabRef = useRef('home');
+  const folderClaveRef = useRef(null);
 
   // flujo de medición
   const [bloqueSel, setBloqueSel] = useState('');
@@ -335,6 +338,9 @@ function Root() {
 
   medicionesRef.current = mediciones;
   detalleRef.current = detalle;
+  screenRef.current = screen;
+  tabRef.current = tab;
+  folderClaveRef.current = folderClave;
   porPuntoRef.current = porPunto;
   resumenesRef.current = resumenes;
 
@@ -918,6 +924,11 @@ function Root() {
     });
   };
 
+  // El detalle solo vive mientras la pantalla es 'detail' (atrás, nueva medición, cambio de pestaña lo descartan).
+  useEffect(() => {
+    setDetalle((prev) => detalleTrasCambiarPantalla(screen, prev));
+  }, [screen]);
+
   // ───────────────────────── flujo de medición ─────────────────────────
   const irANuevaMedicion = async ({ mantenerLote = false } = {}) => {
     if (!mantenerLote) {
@@ -1359,10 +1370,18 @@ function Root() {
           mapearTodo((lista) => lista.filter((x) => x.id_medicion !== m.id_medicion));
           refrescarIndicadores();
           invalidarResumenes(m.id_punto);
-          // Solo se cierra el detalle (y se vuelve a la lista) si seguía abierta esta misma foto.
-          if (esDetalleDe(detalleRef.current, m.id_medicion)) {
+          // La lista ya se actualizó. Solo se navega si el usuario SIGUE en el detalle de esta misma foto
+          // (si ya está en otra pantalla, no se le mueve). Valores actuales (refs), no los del momento de pulsar.
+          const nav = destinoTrasBorrar({
+            screen: screenRef.current,
+            detalle: detalleRef.current,
+            id: m.id_medicion,
+            folderClave: folderClaveRef.current,
+            tab: tabRef.current,
+          });
+          if (nav.navegar) {
             setDetalle(null);
-            setScreen(folderClave ? 'folder' : tab);
+            setScreen(nav.destino);
           }
           setAviso('Foto eliminada');
         } catch (e) {

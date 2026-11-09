@@ -33,3 +33,16 @@ export function actualizarDetalleSiEs(prev, id, cambio) {
 export function esDetalleDe(detalle, id) {
   return Boolean(detalle) && detalle.id_medicion === id;
 }
+
+// El detalle solo existe mientras la pantalla es 'detail': al salir (atrás, nueva medición, otra pestaña) se descarta,
+// para que una respuesta tardía (p. ej. el éxito de un borrado) no crea que la foto sigue abierta.
+export function detalleTrasCambiarPantalla(screen, detalle) {
+  return screen === 'detail' ? detalle : null;
+}
+
+// Tras borrar la foto `id` con éxito: la lista siempre se actualiza (lo hace quien llama), pero solo se navega si el
+// usuario SIGUE en el detalle de esa misma foto. Si ya está en otra pantalla, no se le mueve.
+export function destinoTrasBorrar({ screen, detalle, id, folderClave = null, tab = 'home' } = {}) {
+  if (screen === 'detail' && esDetalleDe(detalle, id)) return { navegar: true, destino: folderClave ? 'folder' : tab };
+  return { navegar: false, destino: null };
+}

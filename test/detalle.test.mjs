@@ -80,3 +80,39 @@ test('I9: esDetalleDe no confunde "sin detalle" con "es esta foto"', () => {
   assert.equal(esDetalleDe({ id_medicion: 'm2' }, 'm1'), false);
   assert.equal(esDetalleDe({ id_medicion: 'm1' }, 'm1'), true);
 });
+
+import { destinoTrasBorrar, detalleTrasCambiarPantalla } from '../src/detalle.js';
+
+test('I15: borrar con éxito navega solo si el usuario sigue en el detalle de esa foto', () => {
+  const det = { id_medicion: 'm1' };
+  assert.deepEqual(destinoTrasBorrar({ screen: 'detail', detalle: det, id: 'm1', folderClave: 'P1', tab: 'lotes' }), { navegar: true, destino: 'folder' });
+  assert.deepEqual(destinoTrasBorrar({ screen: 'detail', detalle: det, id: 'm1', tab: 'lotes' }), { navegar: true, destino: 'lotes' });
+});
+
+test('I15: si ya está en otra pantalla (cámara, contexto, lista) o en el detalle de otra foto, no se le mueve', () => {
+  const det = { id_medicion: 'm1' };
+  for (const screen of ['camera', 'context', 'home', 'lotes', 'folders']) {
+    assert.equal(destinoTrasBorrar({ screen, detalle: det, id: 'm1' }).navegar, false, screen);
+  }
+  assert.equal(destinoTrasBorrar({ screen: 'detail', detalle: { id_medicion: 'm2' }, id: 'm1' }).navegar, false);
+  assert.equal(destinoTrasBorrar({ screen: 'detail', detalle: null, id: 'm1' }).navegar, false);
+});
+
+test('I15: flujo completo: borrar A, volver y empezar una medición, llega el éxito tardío: no navega', () => {
+  let screen = 'detail';
+  let detalle = { id_medicion: 'A' };
+  const irA = (s) => {
+    screen = s;
+    detalle = detalleTrasCambiarPantalla(screen, detalle); // el efecto de App al cambiar de pantalla
+  };
+  irA('lotes'); // atrás
+  irA('context'); // nueva medición
+  assert.equal(detalle, null);
+  assert.equal(destinoTrasBorrar({ screen, detalle, id: 'A', tab: 'lotes' }).navegar, false);
+});
+
+test('I15: abrir el detalle lo conserva; salir de él lo descarta', () => {
+  const det = { id_medicion: 'A' };
+  assert.equal(detalleTrasCambiarPantalla('detail', det), det);
+  assert.equal(detalleTrasCambiarPantalla('camera', det), null);
+});
