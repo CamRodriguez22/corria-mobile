@@ -24,7 +24,7 @@ import { IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono/500Mediu
 import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600SemiBold';
 import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
 
-import { TOKENS, num, severidad, confianzaPct } from './src/DesignTokens';
+import { TOKENS, num, severidad } from './src/DesignTokens';
 import {
   Screen,
   Logo,
@@ -1225,7 +1225,6 @@ function Root() {
         message:
           `PIXELRUST — ${nombrePunto ? 'Punto ' + nombrePunto : 'Foto'}\n` +
           `Corrosión: ${s.label} (${formatoPct(m.area_corroida_pct)})\n` +
-          `Confianza: ${confianzaPct(m.confianza_promedio)}%\n` +
           `Fecha: ${formatDateTime(m.timestamp)}`,
       });
     } catch {}

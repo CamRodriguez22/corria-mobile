@@ -17,7 +17,7 @@ import {
   AccessibilityInfo,
 } from 'react-native';
 import { Text, TextInput as RNTextInput } from './Typography';
-import { TOKENS, NIVELES, severidad, confianzaPct, num } from './DesignTokens';
+import { TOKENS, NIVELES, severidad, num } from './DesignTokens';
 import { nivelDeMedicion } from './niveles';
 import { miniaturaDe } from './miniaturas';
 import { formatoPct } from './fechas';
@@ -1059,13 +1059,12 @@ export const TabBar = ({ current, onChange, items }) => (
 export const LecturaNivel = ({ medicion, compacta = false }) => {
   const s = severidad(medicion || {});
   const sobrePlaca = medicion?.area_base === 'placa' || medicion?.area_corroida_pct_foto != null;
-  const conf = medicion?.confianza_promedio;
   if (compacta) {
     // Bloque compacto (detalle de foto): ícono + nivel + aclaración a la izquierda y el % grande en cifras a la derecha.
     return (
       <View
         accessible
-        accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado${conf != null ? `, confianza del modelo ${confianzaPct(conf)} %` : ''}`}
+        accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado`}
         style={{ gap: 10 }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -1078,22 +1077,13 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
           </View>
           <PctMono value={medicion?.area_corroida_pct} size={32} />
         </View>
-        {conf != null && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Confianza del modelo</Text>
-            <View style={{ flex: 1 }}>
-              <ProgressBar value={confianzaPct(conf)} color={TOKENS.colors.piedra_600} />
-            </View>
-            <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: 14, fontWeight: '600', color: TOKENS.colors.text }}>{confianzaPct(conf)}%</Text>
-          </View>
-        )}
       </View>
     );
   }
   return (
     <View
       accessible
-      accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado${conf != null ? `, confianza del modelo ${confianzaPct(conf)} %` : ''}`}
+      accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado`}
       style={{ gap: 12 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -1108,15 +1098,6 @@ export const LecturaNivel = ({ medicion, compacta = false }) => {
       <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
         {sobrePlaca ? 'Aproximado sobre la placa' : 'Aproximado sobre la foto'}. Depende del encuadre y no reemplaza una inspección en sitio.
       </Text>
-      {conf != null && (
-        <View style={{ gap: 6 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Confianza del modelo</Text>
-            <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text }}>{confianzaPct(conf)} %</Text>
-          </View>
-          <ProgressBar value={confianzaPct(conf)} color={TOKENS.colors.piedra_600} />
-        </View>
-      )}
     </View>
   );
 };
