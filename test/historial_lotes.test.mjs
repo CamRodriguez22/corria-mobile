@@ -53,14 +53,24 @@ test('un lote grande queda completo tras paginar (conteo y fotos)', async () => 
   assert.equal(lotes.find((l) => l.id === 'L1').items.length, 22);
 });
 
-test('sin avance (misma página repetida) corta en vez de repetir sin fin', async () => {
+test('sin avance con truncado: true devuelve incompleto (no completo) y lo marca', async () => {
   const fijas = [med(1, dia(5)), med(2, dia(5))];
   let n = 0;
   const pedir = async () => (n++, { mediciones: fijas, truncado: true });
   const r = await cargarHistorialCompleto(pedir, { limite: 2, maxPaginas: 20 });
   assert.equal(r.lista.length, 2);
-  assert.ok(n <= 3, `pidió ${n} veces`);
+  assert.equal(r.completo, false);
+  assert.equal(r.sinAvance, true);
+  assert.equal(n, 2, `pidió ${n} veces`); // la segunda no trajo nada nuevo: se corta
+});
+
+test('sin fotos nuevas pero con truncado: false termina completo', async () => {
+  const fijas = [med(1, dia(5)), med(2, dia(5))];
+  let n = 0;
+  const pedir = async () => (n++ === 0 ? { mediciones: fijas } : { mediciones: fijas, truncado: false });
+  const r = await cargarHistorialCompleto(pedir, { limite: 2 });
   assert.equal(r.completo, true);
+  assert.equal(r.sinAvance, false);
 });
 
 test('maxPaginas limita las consultas y devuelve completo: false', async () => {

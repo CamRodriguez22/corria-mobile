@@ -298,7 +298,7 @@ export function nombreRol(rol) {
 //   pedir(limite, params) -> respuesta de GET /mediciones/recientes   (params = {} la primera vez, luego { hasta })
 //   vigente()            -> false si la sesión cambió: se corta sin más llamadas
 //   onProgreso(lista)    -> se llama con la lista acumulada tras cada página
-// Devuelve { lista, completo, cancelado?, error? }. Un error conserva lo ya traído (completo: false).
+// Devuelve { lista, completo, cancelado?, error?, sinAvance? } (`sinAvance`: el servidor sigue truncado sin dar fotos nuevas). Un error conserva lo ya traído (completo: false).
 // `maxPaginas` evita un bucle si el servidor siguiera diciendo "truncado" sin avanzar.
 export async function cargarHistorialCompleto(pedir, { limite = LIMITE_MEDICIONES_MAX, maxPaginas = 20, vigente = () => true, onProgreso, transformar = (l) => l } = {}) {
   let lista = [];
@@ -314,7 +314,10 @@ export async function cargarHistorialCompleto(pedir, { limite = LIMITE_MEDICIONE
     const unida = mezclarMediciones(lista, transformar(listaDeRespuesta(resp)));
     lista = unida.lista;
     onProgreso?.(lista);
-    // Primera página: sin rango el backend no manda `truncado` y se infiere por el tamaño; después, sin fotos nuevas no hay avance.
+    // Sin fotos nuevas tras la primera página no hay avance: si el servidor aún dice `truncado: true` (p. ej. 1000 o más
+    // fotos de un mismo día, que `hasta` no puede saltar) el historial está INCOMPLETO; si no, ya se trajo todo.
+    if (i > 0 && unida.agregadas === 0) return { lista, completo: resp?.truncado !== true, sinAvance: resp?.truncado === true };
+    // Primera página: sin rango el backend no manda `truncado` y se infiere por el tamaño.
     if (!hayMasMediciones(resp, limite, i === 0 ? 1 : unida.agregadas)) return { lista, completo: true };
     const pag = paginaAnterior(lista, limite, limite);
     if (!pag) return { lista, completo: true };
