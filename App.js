@@ -58,6 +58,7 @@ import {
   PAGINA_PUNTO,
   LIMITE_PUNTO_MAX,
   paginaAnterior,
+  cargarHistorialCompleto,
   mezclarMediciones,
   hayMasMediciones as calcularHayMas,
   resumirCola,
@@ -201,6 +202,10 @@ function Root() {
   // `mediciones` para no romper su paginación por fecha. Actividad ve la unión de las dos.
   const [extras, setExtras] = useState([]);
   const rangosCargados = useRef(new Map()); // clave de rango -> ¿truncado?
+  // Historial completo para agrupar lotes (pestaña Lotes): { lista, estado: 'idle'|'cargando'|'ok'|'error' }.
+  const [historialLotes, setHistorialLotes] = useState({ lista: [], estado: 'idle' });
+  const historialLotesRef = useRef({ lista: [], estado: 'idle' });
+  historialLotesRef.current = historialLotes;
   // Resumen por día de cada año: { [anio]: { estado: 'cargando'|'ok'|'error', dias, truncado, error } }.
   const [resumenes, setResumenes] = useState({});
   const resumenesRef = useRef({});
@@ -338,6 +343,11 @@ function Root() {
   const empresa = useMemo(() => datosEmpresa(perfil), [perfil]);
   const stats = useMemo(() => calcularEstadisticas(mediciones), [mediciones]);
   const medicionesTodas = useMemo(() => mezclarMediciones(mediciones, extras).lista, [mediciones, extras]);
+  // Lotes: lo cargado en Inicio/Actividad más el historial completo (para que cada lote muestre todas sus fotos).
+  const medicionesLotes = useMemo(
+    () => mezclarMediciones(medicionesTodas, historialLotes.lista).lista,
+    [medicionesTodas, historialLotes.lista]
+  );
 
   // Catálogo de bloques a usar: el real del backend si cargó, si no el de
   // respaldo offline (BLOQUES_CAMPUS/LISTA_BLOQUES, ver src/config.js).
@@ -375,6 +385,12 @@ function Root() {
     if (logged) cargarTodo(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logged]);
+
+  // Al abrir Lotes se trae el historial completo (una vez por sesión; refrescar lo vuelve a pedir).
+  useEffect(() => {
+    if (logged && tab === 'lotes' && screen === 'lotes') cargarHistorialLotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logged, tab, screen, historialLotes.estado === 'idle']);
 
   // Las URL de las fotos vencen a la hora: al volver a la app (o cada 5 min con la app abierta) se
   // recarga la lista si ya pasó el umbral, para que las miniaturas no se queden en blanco.
@@ -570,9 +586,30 @@ function Root() {
     }
   };
 
+  // Historial completo para la pestaña Lotes (GET /mediciones/recientes con el máximo y, si viene truncado,
+  // más páginas con `hasta`). Sin `forzar` no repite si ya está completo o en curso.
+  const cargarHistorialLotes = async ({ forzar = false } = {}) => {
+    const actual = historialLotesRef.current;
+    if (actual.estado === 'cargando' || (!forzar && actual.estado === 'ok')) return;
+    const sesion = sesionRef.current;
+    setHistorialLotes((h) => ({ lista: h.lista, estado: 'cargando' }));
+    const r = await cargarHistorialCompleto((limite, params) => getMedicionesRecientes(undefined, limite, params), {
+      limite: APP_CONFIG.limiteHistorialMax,
+      vigente: () => sesion === sesionRef.current,
+      transformar: (lista) => marcarCarga(lista.map(({ mascaras, ...rest }) => rest)),
+      // Se va mostrando lo que llega; la lista de la sesión anterior nunca se pisa (se descarta por `vigente`).
+      onProgreso: (lista) => setHistorialLotes((h) => ({ lista: mezclarMediciones(h.lista, lista).lista, estado: 'cargando' })),
+    });
+    if (sesion !== sesionRef.current) return;
+    if (r.error && esSesionVencida(r.error)) avisarSesionVencida();
+    // Completo: la lista del servidor reemplaza a la anterior (así una foto borrada en otro lado desaparece).
+    setHistorialLotes((h) => ({ lista: r.completo ? r.lista : h.lista, estado: r.completo ? 'ok' : 'error' }));
+  };
+
   // Aplica un cambio (renombrar, borrar...) a la lista general y a los historiales por punto.
   const mapearTodo = (fn) => {
     setMediciones((prev) => fn(prev));
+    setHistorialLotes((h) => ({ ...h, lista: fn(h.lista) }));
     setExtras((prev) => fn(prev));
     setPorPunto((prev) =>
       Object.fromEntries(Object.entries(prev).map(([k, v]) => [k, { ...v, lista: fn(v.lista || []) }]))
@@ -702,6 +739,8 @@ function Root() {
     setExtras([]);
     rangosCargados.current = new Map();
     cargarTodo(false);
+    if (tab === 'lotes') cargarHistorialLotes({ forzar: true });
+    else setHistorialLotes((h) => ({ lista: h.lista, estado: 'idle' })); // se completa al abrir Lotes
   };
 
   // ───────────────────────── auth handlers ─────────────────────────
@@ -790,6 +829,7 @@ function Root() {
     setCargandoMas(false);
     setPorPunto({});
     setExtras([]);
+    setHistorialLotes({ lista: [], estado: 'idle' });
     rangosCargados.current = new Map();
     setResumenes({});
     setBloques([]);
@@ -1452,7 +1492,7 @@ function Root() {
             offline={offline}
             iniciales={iniciales}
             onSettings={abrirAjustes}
-            mediciones={mediciones}
+            mediciones={medicionesLotes}
             bloqueMap={bloqueMap}
             bloquesMap={bloquesMap}
             refreshing={refreshing}
@@ -1460,9 +1500,8 @@ function Root() {
             onOpen={abrirDetalle}
             loteSeleccionado={loteSel}
             setLoteSeleccionado={setLoteSel}
-            hayMas={hayMasMediciones}
-            cargandoMas={cargandoMas}
-            onCargarMas={cargarMasMediciones}
+            historialEstado={historialLotes.estado}
+            onReintentarHistorial={() => cargarHistorialLotes({ forzar: true })}
             puedeRenombrarLote={(items) => puedeGestionarLote(perfil, items)}
             onRenameLote={async (items, nuevo) => {
               // Se actualiza el estado local (sin recargar: cargarTodo reiniciaría las páginas ya cargadas).

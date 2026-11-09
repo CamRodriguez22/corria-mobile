@@ -273,3 +273,35 @@ export function nombreRol(rol) {
   const r = String(rol || '').trim().toLowerCase();
   return NOMBRES_ROL[r] || (r ? r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, ' ') : '');
 }
+
+// ───────────────────────── Historial completo (pestaña Lotes) ─────────────────────────
+// Los lotes se agrupan en el teléfono, así que necesitan TODAS las fotos y no solo la página de Inicio.
+// Pide `limite` (máx. 1000) y, si la respuesta viene truncada, sigue con `hasta` = día de la foto más
+// antigua traída (paginaAnterior) hasta terminar. Cada página nueva se une sin duplicar (por id_medicion).
+//   pedir(limite, params) -> respuesta de GET /mediciones/recientes   (params = {} la primera vez, luego { hasta })
+//   vigente()            -> false si la sesión cambió: se corta sin más llamadas
+//   onProgreso(lista)    -> se llama con la lista acumulada tras cada página
+// Devuelve { lista, completo, cancelado?, error? }. Un error conserva lo ya traído (completo: false).
+// `maxPaginas` evita un bucle si el servidor siguiera diciendo "truncado" sin avanzar.
+export async function cargarHistorialCompleto(pedir, { limite = LIMITE_MEDICIONES_MAX, maxPaginas = 20, vigente = () => true, onProgreso, transformar = (l) => l } = {}) {
+  let lista = [];
+  let params = {};
+  for (let i = 0; i < maxPaginas; i++) {
+    let resp;
+    try {
+      resp = await pedir(limite, params);
+    } catch (error) {
+      return { lista, completo: false, error };
+    }
+    if (!vigente()) return { lista, completo: false, cancelado: true };
+    const unida = mezclarMediciones(lista, transformar(listaDeRespuesta(resp)));
+    lista = unida.lista;
+    onProgreso?.(lista);
+    // Primera página: sin rango el backend no manda `truncado` y se infiere por el tamaño; después, sin fotos nuevas no hay avance.
+    if (!hayMasMediciones(resp, limite, i === 0 ? 1 : unida.agregadas)) return { lista, completo: true };
+    const pag = paginaAnterior(lista, limite, limite);
+    if (!pag) return { lista, completo: true };
+    params = { hasta: pag.hasta };
+  }
+  return { lista, completo: false };
+}

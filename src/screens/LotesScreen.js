@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Pressable, RefreshControl, FlatList } from 'react-native';
 import { Text } from '../Typography';
-import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton, AvatarButton, PctMono, AvisoSinConexion } from '../DesignComponents';
+import { Button, Spinner, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton, AvatarButton, PctMono, AvisoSinConexion } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import FiltroFotos from '../FiltroFotos';
 import { TOKENS, NIVELES } from '../DesignTokens';
@@ -25,9 +25,9 @@ export default function LotesScreen({
   onOpen,
   onRenameLote,
   puedeRenombrarLote,
-  hayMas,
-  cargandoMas,
-  onCargarMas,
+  // Estado de la carga del historial completo: 'idle' | 'cargando' | 'ok' | 'error'.
+  historialEstado = 'ok',
+  onReintentarHistorial,
   // El lote abierto vive en App para sobrevivir a la pantalla de detalle (volver deja el lote abierto).
   loteSeleccionado,
   setLoteSeleccionado,
@@ -135,9 +135,16 @@ export default function LotesScreen({
     );
   }
 
+  const cargandoHistorial = historialEstado === 'cargando';
   const cabecera = (
     <View style={{ gap: 4, marginBottom: 14 }}>
       <ScreenTitle title="Lotes" subtitle="Fotos que subiste juntas en una misma inspección" right={<AvatarButton iniciales={iniciales} onPress={onSettings} />} />
+      {cargandoHistorial && (
+        <View accessibilityLiveRegion="polite" accessibilityLabel="Cargando todos los lotes" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 }}>
+          <Spinner size={20} thickness={2} />
+          <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>Cargando todos los lotes…</Text>
+        </View>
+      )}
       {offline && <View style={{ marginTop: 10 }}><AvisoSinConexion /></View>}
     </View>
   );
@@ -150,10 +157,12 @@ export default function LotesScreen({
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
       ListHeaderComponent={cabecera}
       ListEmptyComponent={
-        <EmptyState
-          title="Aún no hay lotes"
-          subtitle="Cuando subas varias fotos con el nombre de un lote, aparecerán agrupadas aquí."
-        />
+        cargandoHistorial ? null : (
+          <EmptyState
+            title="Aún no hay lotes"
+            subtitle="Cuando subas varias fotos con el nombre de un lote, aparecerán agrupadas aquí."
+          />
+        )
       }
       renderItem={({ item: lote }) => (
         <Pressable
@@ -204,13 +213,13 @@ export default function LotesScreen({
               {plural(sueltas, 'foto no pertenece', 'fotos no pertenecen')} a ningún lote. Las encuentras en Actividad.
             </Text>
           )}
-          {hayMas && onCargarMas && (
-            <Button
-              variant="tonal"
-              label={cargandoMas ? 'Cargando más…' : 'Cargar fotos anteriores'}
-              onPress={onCargarMas}
-              loading={cargandoMas}
-            />
+          {historialEstado === 'error' && (
+            <View style={{ gap: 8 }}>
+              <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.danger }}>
+                No se pudo cargar todo el historial: algunos lotes pueden verse incompletos.
+              </Text>
+              {!!onReintentarHistorial && <Button variant="tonal" label="Reintentar" onPress={onReintentarHistorial} />}
+            </View>
           )}
         </View>
       }
