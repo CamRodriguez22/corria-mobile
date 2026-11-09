@@ -1438,6 +1438,8 @@ function Root() {
             onNueva={irANuevaMedicion}
             onOpen={abrirDetalle}
             onVerTodas={() => setTabAndScreen('activity')}
+            resumenes={resumenes}
+            onCargarResumen={cargarResumen}
             onSettings={abrirAjustes}
             onAbrirPunto={(clave) => {
               setFolderClave(clave);

@@ -1,15 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
-import { Fab, Spinner, EmptyState, AvisoSinConexion, SectionTitle, SwatchNivel, AvatarButton } from '../DesignComponents';
+import { Fab, Spinner, EmptyState, AvisoSinConexion, SectionTitle, AvatarButton, Chip } from '../DesignComponents';
+import GraficaTendencia from '../GraficaTendencia';
+import useTendenciaPunto from '../useTendenciaPunto';
 import { FilaGaleria, anchoFicha } from '../GaleriaFotos';
 import { TOKENS } from '../DesignTokens';
 import { IconPlus, IconWifiOff, IconNivel, IconChevronRight } from '../Icons';
 import { ICONO_SOBRE_NIVEL } from '../paleta';
 import { nombreNivel, nivelAcotado } from '../niveles';
-import { formatoPct, fechaCorta, plural } from '../fechas';
+import { formatoPct, fechaCorta } from '../fechas';
 import { nombrePuntoDe } from '../helpers';
-import { construirMosaico, dividirEnFilas, indicadoresLocales, estadoPunto, puntoDeAtencion } from '../galeria';
+import { construirMosaico, dividirEnFilas, estadoPunto, puntoDeAtencion } from '../galeria';
+import { chipsDePuntos, puntoDeTendencia } from '../puntos';
 import { agruparPorBloque } from '../utils';
 import { NIVELES } from '../DesignTokens';
 
@@ -33,28 +36,13 @@ export default function HomeScreen({
   onVerTodas,
   onSettings,
   onAbrirPunto,
+  resumenes = {},
+  onCargarResumen,
 }) {
   const { width } = useWindowDimensions();
   const lado = anchoFicha(width, 3, PAD);
   const recientes = useMemo(() => dividirEnFilas(construirMosaico(mediciones.slice(0, 6), { agrupar: false }), 3), [mediciones]);
 
-  // Totales reales del servidor (como la web). Sin ellos (ni siquiera en caché) se calculan SOLO con
-  // las fotos cargadas: puntos por estado y fotos de los últimos 30 días, nunca fotos contadas como puntos.
-  const locales = useMemo(
-    () =>
-      indicadoresServidor
-        ? null
-        : indicadoresLocales(
-            mediciones,
-            agruparPorBloque(mediciones, bloqueMap, Object.values(bloquesMap)).map((g) => g.items)
-          ),
-    [indicadoresServidor, mediciones, bloqueMap, bloquesMap]
-  );
-  const totalMediciones = indicadoresServidor?.mediciones_30d ?? locales?.fotos30 ?? 0;
-  const totalPuntos = indicadoresServidor?.total_puntos ?? Object.keys(bloquesMap).length;
-  const porNivelSrv = indicadoresServidor?.por_nivel;
-  const porNivel = Array.isArray(porNivelSrv) && porNivelSrv.length === 4 ? porNivelSrv.map((n) => Number(n) || 0) : locales?.porNivel || [0, 0, 0, 0];
-  const totalConEstado = porNivel.reduce((a, b) => a + b, 0);
   // Punto que más atención pide: el `mas_critico` del servidor o, sin él, el peor de los cargados.
   const grupos = useMemo(
     () => agruparPorBloque(mediciones, bloqueMap, Object.values(bloquesMap)).map((g) => ({ ...g, estado: estadoPunto(g.items) })),
@@ -63,6 +51,11 @@ export default function HomeScreen({
   const atencion = useMemo(() => puntoDeAtencion(indicadoresServidor, grupos), [indicadoresServidor, grupos]);
   const puedeAbrirAtencion = Boolean(atencion && bloquesMap[atencion.clave]);
   const nivelAt = atencion ? nivelAcotado(atencion.nivel) : 0;
+  // Gráfica de tendencia: por defecto el punto de "Requiere atención"; los chips cambian de punto.
+  const [elegido, setElegido] = useState(null);
+  const chips = useMemo(() => chipsDePuntos(grupos), [grupos]);
+  const claveGrafica = puntoDeTendencia(elegido, atencion?.clave, chips.map((c) => c.clave));
+  const tendencia = useTendenciaPunto(claveGrafica, resumenes, onCargarResumen, { forzar: refreshing });
   const primerNombre = String(nombre || '').split(' ')[0] || nombre;
 
   return (
@@ -128,33 +121,40 @@ export default function HomeScreen({
           </Pressable>
         )}
 
-        {totalConEstado > 0 && (
+        {claveGrafica && (
           <View style={{ marginTop: 20 }}>
-            <SectionTitle title="Estado de los puntos" />
-            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: -6, marginBottom: 6 }}>
-              {plural(totalPuntos, 'punto activo', 'puntos activos')} · {plural(totalMediciones, 'foto', 'fotos')} en 30 días
-            </Text>
-            <View
-              accessible
-              accessibilityLabel={`Puntos por estado: ${NIVELES.map((n) => `${porNivel[n.i]} ${n.label}`).join(', ')}`}
-              style={{ gap: 12, marginTop: 4 }}
-            >
-              <View style={{ flexDirection: 'row', height: 10, gap: 2 }}>
-                {NIVELES.filter((n) => porNivel[n.i] > 0).map((n) => (
-                  <View key={n.i} style={{ flex: porNivel[n.i], backgroundColor: n.color, borderRadius: 5 }} />
-                ))}
-              </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 6 }}>
-                {NIVELES.filter((n) => porNivel[n.i] > 0).map((n) => (
-                  <View key={n.i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <SwatchNivel nivel={n.i} size={18} />
-                    <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700 }}>
-                      {n.label} <Text style={{ fontWeight: '800', color: TOKENS.colors.text }}>{porNivel[n.i]}</Text>
-                    </Text>
-                  </View>
-                ))}
-              </View>
+            <SectionTitle title="Tendencia por punto" />
+            <View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginHorizontal: -PAD }}
+                contentContainerStyle={{ paddingHorizontal: PAD, gap: 8, alignItems: 'center' }}
+                accessibilityLabel="Elegir el punto de la gráfica"
+              >
+                {chips.map((c) => {
+                  const activo = c.clave === claveGrafica;
+                  return (
+                    <Chip
+                      key={c.clave}
+                      label={c.nombre}
+                      selected={activo}
+                      icon={c.nivel === null ? null : <IconNivel nivel={c.nivel} size={16} color={activo ? TOKENS.colors.piedra_900 : NIVELES[c.nivel].texto} />}
+                      accessibilityLabel={`Ver la tendencia de ${c.nombre}`}
+                      onPress={() => setElegido(c.clave)}
+                    />
+                  );
+                })}
+              </ScrollView>
             </View>
+            <GraficaTendencia
+              puntos={tendencia.puntos}
+              estado={tendencia.estado}
+              truncado={tendencia.truncado}
+              error={tendencia.error}
+              onReintentar={tendencia.reintentar}
+              margen={PAD}
+            />
           </View>
         )}
 

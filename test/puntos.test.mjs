@@ -58,3 +58,31 @@ test('filasDePuntos ordena del más grave al menos grave y deja sin fotos al fin
   assert.deepEqual(orden.map((x) => x.clave), ['C', 'B', 'A']);
   assert.equal(totalFotosPuntos(orden), 3);
 });
+
+import { chipsDePuntos, puntoDeTendencia } from '../src/puntos.js';
+import { estadoPunto } from '../src/galeria.js';
+
+const grupo = (clave, nombre, items) => ({ clave, bloque: { nombre }, items, estado: estadoPunto(items) });
+
+test('chipsDePuntos: del más grave al menos grave, sin fotos al final, sin "Fotos sin punto", con nombre de punto', () => {
+  const grupos = [
+    grupo('A', 'Bloque A · Cubierta', []),
+    grupo('B', 'Bloque B · Fachada', [med('1', '2026-11-05T15:00:00Z', 2)]),
+    grupo('SIN_BLOQUE', 'Sin punto', [med('9', '2026-11-05T15:00:00Z', 90)]),
+    grupo('C', 'Bloque C · Puente', [med('2', '2026-11-05T15:00:00Z', 40)]),
+  ];
+  const chips = chipsDePuntos(grupos);
+  assert.deepEqual(chips.map((c) => c.clave), ['C', 'B', 'A']);
+  assert.deepEqual(chips.map((c) => c.nivel), [3, 1, null]);
+  assert.equal(chips[0].nombre, 'Punto C · Puente');
+  assert.deepEqual(chipsDePuntos([]), []);
+});
+
+test('puntoDeTendencia: el elegido, si no el de atención, si no el primero; null sin puntos', () => {
+  const claves = ['C', 'B', 'A'];
+  assert.equal(puntoDeTendencia('B', 'C', claves), 'B');
+  assert.equal(puntoDeTendencia(null, 'A', claves), 'A');
+  assert.equal(puntoDeTendencia('Z', 'Y', claves), 'C'); // elegido y atención ya no existen
+  assert.equal(puntoDeTendencia(null, undefined, claves), 'C');
+  assert.equal(puntoDeTendencia('B', 'C', []), null);
+});

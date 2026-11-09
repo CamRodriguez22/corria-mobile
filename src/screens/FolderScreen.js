@@ -9,10 +9,10 @@ import { TOKENS } from '../DesignTokens';
 import { agruparPorBloque } from '../utils';
 import { mezclarMediciones } from '../logic';
 import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
-import { fechaLarga, fechaMedia, formatoPct, plural, hoyLocal } from '../fechas';
+import { fechaLarga, fechaMedia, formatoPct, plural } from '../fechas';
 import { nombreNivel } from '../niveles';
-import { aniosDisponibles, totalesPorMes, filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
-import { puntosTendencia } from '../tendencia';
+import { totalesPorMes, filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
+import useTendenciaPunto from '../useTendenciaPunto';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -54,16 +54,8 @@ export default function FolderScreen({
   }, [clave]);
 
   // Tendencia: resumen por día de este punto del año en curso y del anterior (si existe en el backend).
-  const anios = useMemo(() => aniosDisponibles(hoyLocal()).slice(-2), []);
-  useEffect(() => {
-    if (!esPuntoReal) return;
-    anios.forEach((a) => onCargarResumen?.(a, { idPunto: clave }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clave]);
-  const resumenesPunto = anios.map((a) => resumenes[`${clave}|${a}`]);
-  const diasPunto = resumenesPunto.flatMap((r) => r?.dias || []);
-  const puntosGrafica = useMemo(() => puntosTendencia(diasPunto), [resumenes, clave]); // eslint-disable-line react-hooks/exhaustive-deps
-  const estadoGrafica = resumenesPunto.some((r) => r?.estado === 'cargando') ? 'cargando' : resumenesPunto.some((r) => r?.estado === 'error') ? 'error' : 'ok';
+  const tendencia = useTendenciaPunto(esPuntoReal ? clave : null, resumenes, onCargarResumen);
+  const { resumenesPunto, dias: diasPunto } = tendencia;
 
   // Total de cada mes según el servidor (no cambia al cargar más fotos).
   const totalesMes = useMemo(() => totalesPorMes(diasPunto, { truncado: resumenesPunto.some((r) => r?.truncado) }), [resumenes, clave]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -86,11 +78,11 @@ export default function FolderScreen({
       {esPuntoReal && (
         <View>
           <GraficaTendencia
-            puntos={puntosGrafica}
-            estado={estadoGrafica}
-            truncado={resumenesPunto.some((r) => r?.truncado)}
-            error={resumenesPunto.find((r) => r?.estado === 'error')?.error}
-            onReintentar={() => anios.forEach((a) => onCargarResumen?.(a, { idPunto: clave, forzar: true }))}
+            puntos={tendencia.puntos}
+            estado={tendencia.estado}
+            truncado={tendencia.truncado}
+            error={tendencia.error}
+            onReintentar={tendencia.reintentar}
             margen={PAD}
           />
         </View>

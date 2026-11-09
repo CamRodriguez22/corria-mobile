@@ -2,7 +2,7 @@
 // Cada punto muestra cuántas fotos tiene y su estado actual (promedio del día más reciente con fotos).
 // Con el resumen por día del servidor (GET /mediciones/resumen-diario?id_punto=) las cifras son las reales;
 // mientras no llega (o si está truncado) se calculan SOLO con las fotos ya cargadas en el teléfono.
-import { estadoPunto, ordenarPuntosPorGravedad } from './galeria.js';
+import { estadoPunto, ordenarPuntosPorGravedad, tituloPunto } from './galeria.js';
 import { nivelDePct, nivelAcotado } from './niveles.js';
 
 const esNumero = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -57,4 +57,22 @@ export function filasDePuntos(filas = []) {
 
 export function totalFotosPuntos(filas = []) {
   return filas.reduce((t, f) => t + f.fotos, 0);
+}
+
+// Chips de Inicio para cambiar de punto en la gráfica: del más grave al menos grave (según las fotos cargadas;
+// los puntos sin fotos al final). `grupos` = [{ clave, bloque: { nombre }, estado: estadoPunto(items) }].
+export function chipsDePuntos(grupos = []) {
+  return ordenarPuntosPorGravedad(grupos.filter((g) => g && g.clave && g.clave !== 'SIN_BLOQUE')).map((g) => ({
+    clave: g.clave,
+    nombre: tituloPunto(g.bloque?.nombre),
+    nivel: g.estado ? g.estado.nivel : null,
+  }));
+}
+
+// Punto que muestra la gráfica de Inicio: el elegido si sigue existiendo; si no, el de "Requiere atención";
+// si tampoco está, el primero de la lista (el más grave). null si no hay puntos.
+export function puntoDeTendencia(elegido, claveAtencion, claves = []) {
+  if (elegido && claves.includes(elegido)) return elegido;
+  if (claveAtencion && claves.includes(claveAtencion)) return claveAtencion;
+  return claves[0] || null;
 }
