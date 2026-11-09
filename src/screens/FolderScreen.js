@@ -12,6 +12,7 @@ import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
 import { fechaLarga, fechaMedia, formatoPct, plural } from '../fechas';
 import { nombreNivel } from '../niveles';
 import { elegirEstadoPunto } from '../puntos';
+import { hayMasPorCargar } from '../historialPunto';
 import { totalesPorMes, filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
 import useTendenciaPunto from '../useTendenciaPunto';
 
@@ -59,7 +60,7 @@ export default function FolderScreen({
   const { resumenesPunto, dias: diasPunto } = tendencia;
   // Estado del día más reciente: con el resumen del servidor (todas las fotos del día); si no, con las cargadas y se avisa.
   const { estado, parcial: estadoParcial } = useMemo(
-    () => elegirEstadoPunto({ resumenes: esPuntoReal ? resumenesPunto : [], local: estadoLocal, hayMas: !historial || historial.hayMas }),
+    () => elegirEstadoPunto({ resumenes: esPuntoReal ? resumenesPunto : [], local: estadoLocal, hayMas: hayMasPorCargar(historial) }),
     [resumenes, estadoLocal, historial, esPuntoReal, clave] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -153,7 +154,7 @@ export default function FolderScreen({
       filtros={filtros}
       onChange={setFiltros}
       total={filtradas.length}
-      nota={filtrado && (historial?.hayMas || !historial) ? 'Solo entre las fotos cargadas' : ''}
+      nota={filtrado && hayMasPorCargar(historial) ? 'Solo entre las fotos cargadas' : ''}
     />
   );
 

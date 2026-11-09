@@ -77,6 +77,7 @@ import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranq
 import { marcarFuentes } from './src/tipografia';
 import { resumenesAfectados, nuevoToken, tokenVigente, invalidarTokens } from './src/resumenes';
 import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs, detalleTrasCambiarPantalla, destinoTrasBorrar } from './src/detalle';
+import { historialCargando, historialOk, historialError } from './src/historialPunto';
 import { crearSalidaResultado } from './src/salida';
 import { notasCambiaron, guardarNota, borradorDe, MENSAJE_NOTA_AL_SALIR, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
@@ -642,10 +643,7 @@ function Root() {
       if (!pag) return;
       params = { limite: pag.limit, hasta: pag.hasta };
     }
-    setPorPunto((p) => ({
-      ...p,
-      [idPunto]: { lista: previo?.lista || [], hayMas: previo?.hayMas ?? false, estado: mas ? 'mas' : 'cargando', error: '' },
-    }));
+    setPorPunto((p) => ({ ...p, [idPunto]: historialCargando(previo, mas) }));
     try {
       const resp = await getMedicionesPunto(idPunto, params);
       if (sesion !== sesionRef.current) return;
@@ -653,24 +651,14 @@ function Root() {
       const { agregadas } = mezclarMediciones(previo?.lista || [], nuevas);
       setPorPunto((p) => ({
         ...p,
-        [idPunto]: {
-          lista: mezclarMediciones(p[idPunto]?.lista || [], nuevas).lista,
-          hayMas: calcularHayMas(resp, params.limite, mas ? agregadas : 1),
-          estado: 'ok',
-          error: '',
-        },
+        [idPunto]: historialOk(mezclarMediciones(p[idPunto]?.lista || [], nuevas).lista, calcularHayMas(resp, params.limite, mas ? agregadas : 1)),
       }));
     } catch (e) {
       if (sesion !== sesionRef.current) return;
       if (esSesionVencida(e)) avisarSesionVencida();
       setPorPunto((p) => ({
         ...p,
-        [idPunto]: {
-          lista: p[idPunto]?.lista || [],
-          hayMas: p[idPunto]?.hayMas ?? false,
-          estado: 'error',
-          error: e?.message || 'No se pudo cargar el historial del punto.',
-        },
+        [idPunto]: historialError(p[idPunto], e?.message),
       }));
     }
   };
