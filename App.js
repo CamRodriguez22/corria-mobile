@@ -75,6 +75,7 @@ import { tituloPunto } from './src/galeria';
 import { quitarDeCola, marcarCanceladas, destinoTrasAnalisis } from './src/cola';
 import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranque';
 import { marcarFuentes } from './src/tipografia';
+import { resumenesAfectados, nuevoToken, tokenVigente, invalidarTokens } from './src/resumenes';
 import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs } from './src/detalle';
 import { notasCambiaron, guardarNota, borradorDe, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
@@ -211,6 +212,7 @@ function Root() {
   // Resumen por día de cada año: { [anio]: { estado: 'cargando'|'ok'|'error', dias, truncado, error } }.
   const [resumenes, setResumenes] = useState({});
   const resumenesRef = useRef({});
+  const resumenTokens = useRef({}); // clave -> número de la última petición (descarta respuestas viejas)
 
   // navegación
   const [tab, setTab] = useState('home');
@@ -670,19 +672,28 @@ function Root() {
     const previo = resumenesRef.current[clave];
     if (!forzar && previo && (previo.estado === 'ok' || previo.estado === 'cargando')) return;
     const sesion = sesionRef.current;
+    const token = nuevoToken(resumenTokens.current, clave);
     setResumenes((r) => ({ ...r, [clave]: { ...(previo || { dias: [] }), estado: 'cargando', error: '' } }));
     try {
       const resp = await getResumenDiario(anio, idPunto);
-      if (sesion !== sesionRef.current) return;
+      if (sesion !== sesionRef.current || !tokenVigente(resumenTokens.current, clave, token)) return;
       setResumenes((r) => ({ ...r, [clave]: { estado: 'ok', dias: resp?.dias || [], truncado: Boolean(resp?.truncado), error: '' } }));
     } catch (e) {
-      if (sesion !== sesionRef.current) return;
+      if (sesion !== sesionRef.current || !tokenVigente(resumenTokens.current, clave, token)) return;
       if (esSesionVencida(e)) avisarSesionVencida();
       setResumenes((r) => ({
         ...r,
         [clave]: { estado: 'error', dias: r[clave]?.dias || [], truncado: false, error: e?.message || 'No se pudo cargar el resumen por día.' },
       }));
     }
+  };
+
+  // Subir o borrar una foto cambia los resúmenes (gráfica, calendario, filas de Puntos): se recargan los ya cargados
+  // del punto y los globales. Una respuesta anterior a la recarga se descarta (resumenTokens).
+  const invalidarResumenes = (idPunto) => {
+    resumenesAfectados(Object.keys(resumenesRef.current), idPunto).forEach((r) =>
+      cargarResumen(r.anio, { forzar: true, idPunto: r.idPunto })
+    );
   };
 
   // Trae TODAS las fotos de un rango de días (inclusivo, UTC-5) y las suma a `extras`.
@@ -738,6 +749,7 @@ function Root() {
 
   const onRefresh = () => {
     setRefreshing(true);
+    invalidarTokens(resumenTokens.current);
     setResumenes({});
     setExtras([]);
     rangosCargados.current = new Map();
@@ -832,6 +844,7 @@ function Root() {
     setCargandoMas(false);
     setPorPunto({});
     setExtras([]);
+    invalidarTokens(resumenTokens.current);
     setHistorialLotes({ lista: [], estado: 'idle' });
     rangosCargados.current = new Map();
     setResumenes({});
@@ -1137,7 +1150,10 @@ function Root() {
       const cancelada = cancelarRef.current;
       if (cancelada) fijarCola(marcarCanceladas(colaRef.current));
       setEtapaSubida('completado');
-      if (Object.keys(bloquesNuevos).length) refrescarIndicadores();
+      if (Object.keys(bloquesNuevos).length) {
+        refrescarIndicadores();
+        invalidarResumenes(bloqueIdReal);
+      }
 
       // La imagen y el análisis que se muestran salen del MISMO ítem de la cola.
       const { destino, ultima: ultimaLista, mensaje } = destinoTrasAnalisis({ cola: colaRef.current, cancelada });
@@ -1288,6 +1304,7 @@ function Root() {
           await eliminarMedicion(m.id_punto, m.id_medicion);
           mapearTodo((lista) => lista.filter((x) => x.id_medicion !== m.id_medicion));
           refrescarIndicadores();
+          invalidarResumenes(m.id_punto);
           setDetalle(null);
           setScreen(folderClave ? 'folder' : tab);
           setAviso('Foto eliminada');
