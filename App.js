@@ -1486,6 +1486,8 @@ function Root() {
             bloqueMap={bloqueMap}
             listaBloques={listaBloques}
             empresaLinea={empresa.linea}
+            resumenes={resumenes}
+            onCargarResumen={cargarResumen}
             refreshing={refreshing}
             onRefresh={onRefresh}
             onOpen={(clave) => {

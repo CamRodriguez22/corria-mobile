@@ -15,6 +15,12 @@ import { puntosTendencia } from '../tendencia';
 
 const PAD = TOKENS.spacing.lg;
 
+function textoFotosCargadas(n, historial) {
+  if (!n) return historial?.estado === 'ok' ? 'Sin fotos' : 'Cargando las fotos…';
+  const todas = historial?.estado === 'ok' && !historial.hayMas;
+  return todas ? plural(n, 'foto', 'fotos') : `${plural(n, 'foto cargada', 'fotos cargadas')}; hay más por cargar`;
+}
+
 export default function FolderScreen({
   clave,
   mediciones,
@@ -67,12 +73,25 @@ export default function FolderScreen({
 
   const cabecera = (
     <View style={{ paddingHorizontal: PAD, paddingTop: PAD }}>
+      {esPuntoReal && (
+        <View>
+          <GraficaTendencia
+            puntos={puntosGrafica}
+            estado={estadoGrafica}
+            truncado={resumenesPunto.some((r) => r?.truncado)}
+            error={resumenesPunto.find((r) => r?.estado === 'error')?.error}
+            onReintentar={() => anios.forEach((a) => onCargarResumen?.(a, { idPunto: clave, forzar: true }))}
+            margen={PAD}
+          />
+        </View>
+      )}
       {estado ? (
         <View
           accessible
           accessibilityLabel={`Estado del punto el ${fechaLarga(estado.dia)}. Promedio del día: ${estado.promedio === null ? 'sin porcentaje' : formatoPct(estado.promedio)}, ${nombreNivel(estado.nivel)}. Peor foto del día: ${estado.peorPct === null ? '' : formatoPct(estado.peorPct) + ', '}${nombreNivel(estado.peor)}.`}
           style={{
             gap: 12,
+            marginTop: esPuntoReal ? 16 : 0,
             backgroundColor: TOKENS.colors.surfaceAlt,
             borderRadius: TOKENS.radius.lg,
             borderWidth: 1,
@@ -103,22 +122,16 @@ export default function FolderScreen({
             </View>
           </View>
           <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
-            {plural(estado.fotos, 'foto', 'fotos')} ese día · {plural(lista.length, 'foto cargada', 'fotos cargadas')} en total
+            {plural(estado.fotos, 'foto', 'fotos')} ese día
           </Text>
         </View>
       ) : null}
-      {esPuntoReal && (
-        <View style={{ marginTop: 20 }}>
-          <GraficaTendencia
-            puntos={puntosGrafica}
-            estado={estadoGrafica}
-            truncado={resumenesPunto.some((r) => r?.truncado)}
-            error={resumenesPunto.find((r) => r?.estado === 'error')?.error}
-            onReintentar={() => anios.forEach((a) => onCargarResumen?.(a, { idPunto: clave, forzar: true }))}
-            margen={PAD}
-          />
-        </View>
-      )}
+      <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, marginTop: 24 }}>
+        Fotos del punto
+      </Text>
+      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 2 }}>
+        {textoFotosCargadas(lista.length, historial)}
+      </Text>
     </View>
   );
 
