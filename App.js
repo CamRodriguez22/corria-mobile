@@ -25,7 +25,7 @@ import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600Sem
 import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
 
 import { TOKENS, num, severidad } from './src/DesignTokens';
-import { MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote } from './src/subida';
+import { MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote, opcionesSelector, MENSAJE_FOTO_PEQUENA } from './src/subida';
 import {
   Screen,
   Logo,
@@ -1012,7 +1012,8 @@ function Root() {
     setTab('home');
   };
 
-  const capturar = async (fromCamera) => {
+  const capturar = async (fromCamera, { unaSola = false } = {}) => {
+    const sel = opcionesSelector({ modo: modoSubida, deCamara: fromCamera, unaSola });
     try {
       if (fromCamera) {
         const f = await pickPhoto({ fromCamera: true });
@@ -1026,7 +1027,7 @@ function Root() {
         fijarCola([{ ...f, status: 'esperando' }]);
         setScreen('preview');
       } else {
-        const fotosSeleccionadas = await pickPhotos({ fromCamera: false, allowsMultiple: true });
+        const fotosSeleccionadas = await pickPhotos(sel);
         if (!fotosSeleccionadas || !fotosSeleccionadas.length) return;
         const validas = [];
         for (const item of fotosSeleccionadas) {
@@ -1035,7 +1036,7 @@ function Root() {
           }
         }
         if (!validas.length) {
-          avisar('Fotos no válidas', MENSAJE_FOTOS_PEQUENAS);
+          avisar('Fotos no válidas', fotosSeleccionadas.length === 1 ? MENSAJE_FOTO_PEQUENA : MENSAJE_FOTOS_PEQUENAS);
           return;
         }
         setFoto(validas[0]);

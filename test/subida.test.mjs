@@ -57,3 +57,21 @@ test('puedeContinuar: punto siempre; en Lote también el nombre', () => {
 test('hay una línea de explicación corta por pestaña', () => {
   for (const m of [MODO_INDIVIDUAL, MODO_LOTE]) assert.ok(TEXTO_MODO[m].length > 10 && TEXTO_MODO[m].length < 100);
 });
+
+import { opcionesSelector } from '../src/subida.js';
+
+test('opcionesSelector: la cámara siempre recorta; Individual una foto recorta; varias y Lote no recortan', () => {
+  assert.deepEqual(opcionesSelector({ modo: MODO_INDIVIDUAL, deCamara: true }), { fromCamera: true, allowsMultiple: false, recortar: true });
+  assert.deepEqual(opcionesSelector({ modo: MODO_LOTE, deCamara: true }), { fromCamera: true, allowsMultiple: false, recortar: true });
+  assert.deepEqual(opcionesSelector({ modo: MODO_INDIVIDUAL, unaSola: true }), { fromCamera: false, allowsMultiple: false, recortar: true });
+  assert.deepEqual(opcionesSelector({ modo: MODO_INDIVIDUAL }), { fromCamera: false, allowsMultiple: true, recortar: false });
+  assert.deepEqual(opcionesSelector({ modo: MODO_LOTE }), { fromCamera: false, allowsMultiple: true, recortar: false });
+  assert.deepEqual(opcionesSelector({ modo: MODO_LOTE, unaSola: true }), { fromCamera: false, allowsMultiple: true, recortar: false }); // Lote siempre multiselección
+});
+
+test('nunca se pide recorte junto con selección múltiple', () => {
+  for (const modo of [MODO_INDIVIDUAL, MODO_LOTE]) for (const deCamara of [true, false]) for (const unaSola of [true, false]) {
+    const o = opcionesSelector({ modo, deCamara, unaSola });
+    if (!o.fromCamera) assert.equal(o.recortar && o.allowsMultiple, false);
+  }
+});

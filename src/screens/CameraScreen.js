@@ -37,7 +37,26 @@ export default function CameraScreen({ bloqueSel, modo = 'individual', onBack, o
       </View>
       <View style={{ padding: PAD, gap: 12 }}>
         <Button label="Tomar foto con la cámara" left={<IconCamera size={20} color="#fff" />} onPress={() => onPick(true)} />
-        <Button variant="tonal" label="Elegir fotos de la galería" left={<IconImages size={20} color={TOKENS.colors.piedra_900} />} onPress={() => onPick(false)} />
+        {esLote ? (
+          <Button variant="tonal" label="Elegir fotos de la galería" left={<IconImages size={20} color={TOKENS.colors.piedra_900} />} onPress={() => onPick(false)} />
+        ) : (
+          <>
+            <Button
+              variant="tonal"
+              label="Elegir una foto"
+              left={<IconImages size={20} color={TOKENS.colors.piedra_900} />}
+              onPress={() => onPick(false, { unaSola: true })}
+              accessibilityHint="Abre la galería y te deja recortar la foto"
+            />
+            <Button
+              variant="tonal"
+              label="Elegir varias fotos"
+              left={<IconImages size={20} color={TOKENS.colors.piedra_900} />}
+              onPress={() => onPick(false)}
+              accessibilityHint="Abre la galería para elegir varias; no se pueden recortar"
+            />
+          </>
+        )}
       </View>
     </Screen>
   );

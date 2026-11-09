@@ -67,7 +67,8 @@ export async function reverseGeocode(lat, lng) {
 
 // ───────────────────────────── Cámara / galería ─────────────────────────────
 // Devuelve array de fotos [{ uri, base64, width, height }] o null si se canceló.
-export async function pickPhotos({ fromCamera = false, allowsMultiple = true } = {}) {
+// `recortar`: abre el editor de recorte en la galería (solo con una foto; con varias el selector no recorta).
+export async function pickPhotos({ fromCamera = false, allowsMultiple = true, recortar = false } = {}) {
   if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').pickPhotosDemo({ fromCamera, allowsMultiple });
   const perm = fromCamera
     ? await ImagePicker.requestCameraPermissionsAsync()
@@ -89,7 +90,7 @@ export async function pickPhotos({ fromCamera = false, allowsMultiple = true } =
   };
   const res = fromCamera
     ? await ImagePicker.launchCameraAsync({ ...opts, allowsEditing: true })
-    : await ImagePicker.launchImageLibraryAsync(opts);
+    : await ImagePicker.launchImageLibraryAsync({ ...opts, allowsEditing: recortar && !allowsMultiple });
   if (res.canceled || !res.assets?.length) return null;
   return Promise.all(
     res.assets.map((a) =>

@@ -59,3 +59,13 @@ export function puedeContinuar({ modo, bloqueSel, loteNombre } = {}) {
   if (!bloqueSel) return false;
   return modo === MODO_LOTE ? Boolean(String(loteNombre || '').trim()) : true;
 }
+
+// Opciones del selector de fotos según la pestaña y el botón:
+//  · cámara: siempre con recorte, una foto;
+//  · Individual, "Elegir una foto": galería con recorte (una sola selección);
+//  · Individual, "Elegir varias" y Lote: selección múltiple, sin recorte (el selector del sistema no recorta varias).
+export function opcionesSelector({ modo, deCamara = false, unaSola = false } = {}) {
+  if (deCamara) return { fromCamera: true, allowsMultiple: false, recortar: true };
+  if (modo === MODO_INDIVIDUAL && unaSola) return { fromCamera: false, allowsMultiple: false, recortar: true };
+  return { fromCamera: false, allowsMultiple: true, recortar: false };
+}
