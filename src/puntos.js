@@ -76,3 +76,35 @@ export function puntoDeTendencia(elegido, claveAtencion, claves = []) {
   if (claveAtencion && claves.includes(claveAtencion)) return claveAtencion;
   return claves[0] || null;
 }
+
+// Estado del día más reciente con fotos según el resumen por día del servidor (cuenta TODAS las fotos del día,
+// no solo las cargadas). Misma forma que `estadoPunto`: { dia, nivel, promedio, fotos, peor, peorPct }.
+export function estadoDesdeResumen(dias = []) {
+  const conFotos = (dias || []).filter((d) => d && d.fecha && Number(d.total) > 0);
+  if (!conFotos.length) return null;
+  const d = conFotos.reduce((a, x) => (x.fecha > a.fecha ? x : a));
+  const promedio = esNumero(d.promedio_pct) ? d.promedio_pct : null;
+  const nivel = promedio !== null ? nivelDePct(promedio) : nivelAcotado(d.peor_nivel);
+  const maxPct = esNumero(d.max_pct) ? d.max_pct : null;
+  return {
+    dia: d.fecha,
+    nivel,
+    promedio,
+    fotos: Number(d.total),
+    peor: Number.isInteger(d.peor_nivel) ? nivelAcotado(d.peor_nivel) : maxPct !== null ? nivelDePct(maxPct) : nivel,
+    peorPct: maxPct,
+  };
+}
+
+// Estado que muestra el detalle del punto. Con el resumen del servidor completo (todos los años bien cargados y sin
+// truncar) manda el servidor; si no, se calcula con las fotos cargadas y se marca `parcial` cuando aún hay más fotos
+// por cargar (el promedio/peor del día podría cambiar).
+//   resumenes: [{ estado, dias, truncado }]; local: estadoPunto(lista); hayMas: ¿faltan fotos por cargar?
+export function elegirEstadoPunto({ resumenes = [], local = null, hayMas = false } = {}) {
+  const completo = resumenes.length > 0 && resumenes.every((r) => r && r.estado === 'ok' && !r.truncado);
+  if (completo) {
+    const srv = estadoDesdeResumen(resumenes.flatMap((r) => r.dias || []));
+    if (srv) return { estado: srv, parcial: false, fuente: 'servidor' };
+  }
+  return { estado: local, parcial: Boolean(local) && Boolean(hayMas), fuente: 'local' };
+}

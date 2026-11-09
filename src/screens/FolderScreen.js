@@ -11,6 +11,7 @@ import { mezclarMediciones } from '../logic';
 import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
 import { fechaLarga, fechaMedia, formatoPct, plural } from '../fechas';
 import { nombreNivel } from '../niveles';
+import { elegirEstadoPunto } from '../puntos';
 import { totalesPorMes, filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
 import useTendenciaPunto from '../useTendenciaPunto';
 
@@ -46,7 +47,7 @@ export default function FolderScreen({
     [mediciones, bloqueMap, listaBloques, clave]
   );
   const lista = useMemo(() => mezclarMediciones(locales, historial?.lista || []).lista, [locales, historial]);
-  const estado = useMemo(() => estadoPunto(lista), [lista]);
+  const estadoLocal = useMemo(() => estadoPunto(lista), [lista]);
 
   useEffect(() => {
     if (esPuntoReal && !historial) onCargarHistorial?.();
@@ -56,6 +57,11 @@ export default function FolderScreen({
   // Tendencia: resumen por día de este punto del año en curso y del anterior (si existe en el backend).
   const tendencia = useTendenciaPunto(esPuntoReal ? clave : null, resumenes, onCargarResumen);
   const { resumenesPunto, dias: diasPunto } = tendencia;
+  // Estado del día más reciente: con el resumen del servidor (todas las fotos del día); si no, con las cargadas y se avisa.
+  const { estado, parcial: estadoParcial } = useMemo(
+    () => elegirEstadoPunto({ resumenes: esPuntoReal ? resumenesPunto : [], local: estadoLocal, hayMas: !historial || historial.hayMas }),
+    [resumenes, estadoLocal, historial, esPuntoReal, clave] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   // Total de cada mes según el servidor (no cambia al cargar más fotos).
   const totalesMes = useMemo(() => totalesPorMes(diasPunto, { truncado: resumenesPunto.some((r) => r?.truncado) }), [resumenes, clave]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -126,6 +132,11 @@ export default function FolderScreen({
           <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
             {plural(estado.fotos, 'foto', 'fotos')} ese día
           </Text>
+          {estadoParcial && (
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.warningText }}>
+              Calculado con las fotos cargadas; puede cambiar al cargar más.
+            </Text>
+          )}
         </View>
       ) : null}
       <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, marginTop: 24 }}>
