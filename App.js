@@ -75,6 +75,7 @@ import { tituloPunto } from './src/galeria';
 import { quitarDeCola, marcarCanceladas, destinoTrasAnalisis } from './src/cola';
 import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranque';
 import { marcarFuentes } from './src/tipografia';
+import { necesitaDetalleCompleto } from './src/detalle';
 import { notasCambiaron, guardarNota, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
@@ -1200,7 +1201,8 @@ function Root() {
   const abrirDetalle = (m) => {
     setDetalle(m);
     setScreen('detail');
-    if (m.detecciones || !m.id_punto) return;
+    // Se pide el detalle completo si faltan las máscaras (también en fotos recién subidas, que traen `detecciones`).
+    if (!necesitaDetalleCompleto(m)) return;
     const sesion = sesionRef.current;
     getMedicionCompleta(m.id_punto, m.id_medicion)
       .then((completa) => {
