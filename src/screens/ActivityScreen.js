@@ -1,19 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
-import { View, RefreshControl, ScrollView, Pressable } from 'react-native';
+import { View, RefreshControl, ScrollView } from 'react-native';
 import { Text } from '../Typography';
 import { Button, Chip, HojaOpciones, EmptyState, ScreenTitle, AvatarButton, AvisoSinConexion } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import CalendarioMes from '../CalendarioMes';
-import { TOKENS, NIVELES } from '../DesignTokens';
-import { IconNivel } from '../Icons';
+import FiltroFotos from '../FiltroFotos';
+import { TOKENS } from '../DesignTokens';
 import { nombrePuntoDe } from '../helpers';
 import { filasDeGaleria } from '../galeria';
 import {
-  filtrarMediciones, FILTROS_VACIOS, hayFiltros, textoResultados, alternarNivel, rangoEfectivo, PRESETS_RANGO,
+  filtrarMediciones, FILTROS_VACIOS, hayFiltros, rangoEfectivo,
   aplicarFiltrosADias, totalesPorMes, aniosDisponibles,
 } from '../linea';
-import { hoyLocal, fechaMedia } from '../fechas';
+import { hoyLocal } from '../fechas';
 import { tituloPunto } from '../galeria';
 import { bloqueDeMedicion } from '../utils';
 
@@ -78,8 +77,9 @@ export default function ActivityScreen({
       filtrarMediciones(mediciones, filtros, {
         hoy,
         clavePunto: (m) => bloqueDeMedicion(m, bloqueMap, listaPuntos.length ? listaPuntos : undefined),
+        nombresExtra: (m) => nombrePuntoDe(m, bloqueMap, bloquesMap),
       }),
-    [mediciones, filtros, hoy, bloqueMap, listaPuntos]
+    [mediciones, filtros, hoy, bloqueMap, bloquesMap, listaPuntos]
   );
   const filtrado = hayFiltros(filtros);
   // El calendario y los totales por mes siguen los mismos filtros que la galería.
@@ -91,16 +91,9 @@ export default function ActivityScreen({
   const filas = useMemo(() => filasDeGaleria(filtradas, { hoy, totalesMes }), [filtradas, hoy, totalesMes]);
 
   const puntoSel = filtros.idPunto ? bloquesMap?.[filtros.idPunto] : null;
-  const presetSel = PRESETS_RANGO.find((p) => p.id === filtros.preset) || PRESETS_RANGO[0];
   const opcionesPunto = [{ value: null, label: 'Todos los puntos' }].concat(
     listaPuntos.map((b) => ({ value: b.clave, label: tituloPunto(b.nombre) }))
   );
-  const opcionesFechas = PRESETS_RANGO.map((p) => ({
-    value: p.id,
-    label: p.id === 'todo' ? 'Todas las fechas' : `Últimos ${p.label}`,
-  }));
-  const quitarTodo = () => setFiltros(FILTROS_VACIOS);
-
   const cabecera = (
     <View style={{ paddingTop: PAD, paddingBottom: 4 }}>
       <View style={{ paddingHorizontal: PAD }}>
@@ -124,24 +117,12 @@ export default function ActivityScreen({
       <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, paddingHorizontal: PAD, marginTop: 18 }}>
         Filtrar fotos
       </Text>
-      <View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingLeft: PAD, paddingRight: PAD + 32, gap: 8, alignItems: 'center' }}
+      <FiltroFotos
+        filtros={filtros}
+        onChange={setFiltros}
+        total={filtradas.length}
+        nota={parcial ? 'Datos parciales: hay más fotos de las que se pudieron cargar' : ''}
       >
-        {NIVELES.map((n) => {
-          const activo = filtros.niveles.includes(n.i);
-          return (
-            <Chip
-              key={n.i}
-              label={n.label}
-              selected={activo}
-              icon={<IconNivel nivel={n.i} size={16} color={activo ? TOKENS.colors.piedra_900 : n.texto} />}
-              onPress={() => setFiltros((f) => ({ ...f, niveles: alternarNivel(f.niveles, n.i) }))}
-            />
-          );
-        })}
         <Chip
           label={puntoSel ? tituloPunto(puntoSel.nombre) : 'Punto'}
           selected={Boolean(puntoSel)}
@@ -150,45 +131,7 @@ export default function ActivityScreen({
           accessibilityLabel={puntoSel ? `Punto: ${tituloPunto(puntoSel.nombre)}` : 'Filtrar por punto'}
           onQuitar={puntoSel ? () => setFiltros((f) => ({ ...f, idPunto: null })) : undefined}
         />
-        {filtros.dia ? (
-          <Chip label={`Día: ${fechaMedia(filtros.dia)}`} selected onPress={() => {}} onQuitar={() => setFiltros((f) => ({ ...f, dia: null }))} />
-        ) : (
-          <Chip
-            label={filtros.preset === 'todo' ? 'Fechas' : `Últimos ${presetSel.label}`}
-            selected={filtros.preset !== 'todo'}
-            menu
-            onPress={() => setHoja('fechas')}
-            accessibilityLabel="Filtrar por fechas"
-            onQuitar={filtros.preset !== 'todo' ? () => setFiltros((f) => ({ ...f, preset: 'todo' })) : undefined}
-          />
-        )}
-      </ScrollView>
-      {/* Degradado a la derecha: indica que la fila sigue y no corta chips a media palabra. */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={['rgba(245,234,216,0)', TOKENS.colors.bg]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 36 }}
-      />
-      </View>
-
-      <View style={{ paddingHorizontal: PAD, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text accessibilityLiveRegion="polite" style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, flex: 1 }}>
-          {textoResultados(filtradas.length, filtrado)}
-          {parcial ? ' · Datos parciales: hay más fotos de las que se pudieron cargar' : ''}
-        </Text>
-        {filtrado && (
-          <Pressable
-            onPress={quitarTodo}
-            accessibilityRole="button"
-            accessibilityLabel="Limpiar todos los filtros"
-            style={{ minHeight: 48, justifyContent: 'center', paddingLeft: 12 }}
-          >
-            <Text style={{ ...TOKENS.type.labelLarge, color: TOKENS.colors.accentText }}>Limpiar filtros</Text>
-          </Pressable>
-        )}
-      </View>
+      </FiltroFotos>
       <HojaOpciones
         visible={hoja === 'punto'}
         titulo="Filtrar por punto"
@@ -196,17 +139,6 @@ export default function ActivityScreen({
         valor={filtros.idPunto}
         onElegir={(v) => {
           setFiltros((f) => ({ ...f, idPunto: v }));
-          setHoja(null);
-        }}
-        onCerrar={() => setHoja(null)}
-      />
-      <HojaOpciones
-        visible={hoja === 'fechas'}
-        titulo="Filtrar por fechas"
-        opciones={opcionesFechas}
-        valor={filtros.preset}
-        onElegir={(v) => {
-          setFiltros((f) => ({ ...f, preset: v }));
           setHoja(null);
         }}
         onCerrar={() => setHoja(null)}

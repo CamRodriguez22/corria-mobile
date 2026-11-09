@@ -2,6 +2,7 @@
 // Espejo de lib/lineaTiempo.js de la web (barra anual por día local UTC-5).
 import { diaLocal, hoyLocal, partesDia, sumarDias, diaSemana, MESES, fechaLarga, plural } from './fechas.js';
 import { nivelDeMedicion, nombreNivel } from './niveles.js';
+import { coincideTexto, camposNombre, rangoPersonalizado } from './filtroFotos.js';
 
 export const ANIO_MINIMO = 2026; // el backend rechaza años anteriores
 
@@ -94,7 +95,7 @@ export function calendarioMes(dias = [], { anio, mes }, hoy = hoyLocal()) {
 // El día elegido (filtros.dia) no atenúa nada: se resalta en el calendario.
 export function aplicarFiltrosADias(dias = [], filtros = FILTROS_VACIOS, hoy = hoyLocal()) {
   const niveles = filtros.niveles || [];
-  const { desde, hasta } = rangoDePreset(filtros.preset || 'todo', hoy);
+  const { desde, hasta } = rangoDeFiltros(filtros, hoy);
   if (!niveles.length && !desde && !hasta) return dias || [];
   return (dias || []).map((d) => {
     if ((desde && d.fecha < desde) || (hasta && d.fecha > hasta)) return { ...d, total: 0, peor_nivel: null };
@@ -145,17 +146,35 @@ export function rangoDePreset(id, hoy = hoyLocal()) {
   return { desde: sumarDias(hoy, -(dias - 1)), hasta: hoy };
 }
 
-export const FILTROS_VACIOS = { niveles: [], idPunto: null, preset: 'todo', dia: null };
+// Filtro común de fotos: niveles, punto, fechas (preset o rango propio), día del calendario y texto de búsqueda.
+// preset: 'todo' | '7' | '30' | '90' | 'personalizado' (usa `desde` y `hasta`, "AAAA-MM-DD").
+export const FILTROS_VACIOS = { niveles: [], idPunto: null, preset: 'todo', dia: null, texto: '', desde: '', hasta: '' };
 
-// El filtro efectivo de fechas: un día elegido en el mapa de calor manda sobre el preset.
+// Rango de fechas de los filtros SIN el día del calendario: preset o rango propio.
+export function rangoDeFiltros(filtros = FILTROS_VACIOS, hoy = hoyLocal()) {
+  if (filtros.preset === 'personalizado') return rangoPersonalizado(filtros.desde, filtros.hasta);
+  return rangoDePreset(filtros.preset || 'todo', hoy);
+}
+
+// El filtro efectivo de fechas: un día elegido en el calendario manda sobre el preset.
 export function rangoEfectivo(filtros = FILTROS_VACIOS, hoy = hoyLocal()) {
   if (filtros.dia) return { desde: filtros.dia, hasta: filtros.dia };
-  return rangoDePreset(filtros.preset || 'todo', hoy);
+  return rangoDeFiltros(filtros, hoy);
+}
+
+export function hayTexto(filtros = FILTROS_VACIOS) {
+  return Boolean(String(filtros.texto || '').trim());
+}
+
+// Hay filtro de fechas si el preset limita o si el rango propio tiene al menos una fecha válida.
+export function hayFiltroFechas(filtros = FILTROS_VACIOS) {
+  const r = rangoDeFiltros(filtros);
+  return Boolean(r.desde || r.hasta);
 }
 
 export function hayFiltros(filtros = FILTROS_VACIOS) {
   return Boolean(
-    (filtros.niveles && filtros.niveles.length) || filtros.idPunto || filtros.dia || (filtros.preset && filtros.preset !== 'todo')
+    (filtros.niveles && filtros.niveles.length) || filtros.idPunto || filtros.dia || hayTexto(filtros) || hayFiltroFechas(filtros)
   );
 }
 
@@ -164,10 +183,18 @@ export function alternarNivel(niveles = [], n) {
 }
 
 // `clavePunto(m)` resuelve a qué punto pertenece una medición (por defecto m.id_punto).
-export function filtrarMediciones(lista = [], filtros = FILTROS_VACIOS, { hoy = hoyLocal(), clavePunto = (m) => m.id_punto } = {}) {
+// `nombresExtra(m)` aporta más nombres donde buscar el texto (p. ej. el nombre del punto que la foto no trae).
+// Es el filtro único de todas las pantallas con muchas fotos: nivel, punto, fechas y nombre.
+export function filtrarMediciones(
+  lista = [],
+  filtros = FILTROS_VACIOS,
+  { hoy = hoyLocal(), clavePunto = (m) => m.id_punto, nombresExtra = null } = {}
+) {
   const { desde, hasta } = rangoEfectivo(filtros, hoy);
   const niveles = filtros.niveles || [];
+  const buscar = hayTexto(filtros);
   return lista.filter((m) => {
+    if (buscar && !coincideTexto(filtros.texto, [...camposNombre(m), ...(nombresExtra ? [].concat(nombresExtra(m)) : [])])) return false;
     if (niveles.length && !niveles.includes(nivelDeMedicion(m))) return false;
     if (filtros.idPunto && clavePunto(m) !== filtros.idPunto) return false;
     if (desde || hasta) {

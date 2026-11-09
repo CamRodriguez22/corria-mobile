@@ -3,10 +3,12 @@ import { View, Pressable, RefreshControl, FlatList } from 'react-native';
 import { Text } from '../Typography';
 import { Button, EmptyState, PromptModal, Foto, NivelBadge, ScreenTitle, Header, IconButton, AvatarButton, PctMono, AvisoSinConexion } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
+import FiltroFotos from '../FiltroFotos';
 import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconChevronRight, IconEdit, IconNivel } from '../Icons';
 import { nombrePuntoDe } from '../helpers';
 import { filasDeGaleria, agruparLotes, miniaturaDe } from '../galeria';
+import { filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
 import { formatoPct, fechaCorta, diaLocal, plural } from '../fechas';
 
 const PAD = TOKENS.spacing.lg;
@@ -31,6 +33,11 @@ export default function LotesScreen({
   setLoteSeleccionado,
 }) {
   const [renombrandoLote, setRenombrandoLote] = useState(null);
+  // Filtro común de las fotos del lote abierto (se reinicia al cambiar de lote).
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+  useEffect(() => {
+    setFiltros(FILTROS_VACIOS);
+  }, [loteSeleccionado]);
 
   const { lotes, sueltas } = useMemo(() => {
     const r = agruparLotes(mediciones);
@@ -71,6 +78,8 @@ export default function LotesScreen({
   if (loteAbierto) {
     const lote = loteAbierto;
     const puedeRenombrar = Boolean(onRenameLote && puedeRenombrarLote?.(lote.items));
+    const fotosLote = filtrarMediciones(lote.items, filtros, { nombresExtra: () => [lote.nombre, lote.puntoTitulo] });
+    const filtrado = hayFiltros(filtros);
     const cabecera = (
       <View style={{ paddingBottom: 4 }}>
         <Header
@@ -101,15 +110,23 @@ export default function LotesScreen({
         <Text accessibilityRole="header" style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text, paddingHorizontal: PAD, paddingTop: 16, paddingBottom: 10 }}>
           Fotos del lote
         </Text>
+        <FiltroFotos filtros={filtros} onChange={setFiltros} total={fotosLote.length} />
       </View>
     );
     return (
       <>
         <GaleriaFotos
-          filas={filasDeGaleria(lote.items, { porDia: false, agrupar: false })}
+          filas={filasDeGaleria(fotosLote, { porDia: false, agrupar: false })}
           nombrePunto={() => lote.puntoTitulo}
           onAbrirFoto={onOpen}
           ListHeaderComponent={cabecera}
+          ListEmptyComponent={
+            filtrado ? (
+              <View style={{ paddingVertical: 30 }}>
+                <EmptyState title="Sin fotos" subtitle="Ninguna foto del lote coincide con estos filtros." />
+              </View>
+            ) : null
+          }
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={TOKENS.colors.accent} />}
           contentContainerStyle={{ paddingBottom: 40 }}
         />

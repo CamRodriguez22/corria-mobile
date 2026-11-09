@@ -1,16 +1,17 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { Text } from '../Typography';
 import { Screen, Header, EmptyState, Button, NivelBadge, Spinner, PctMono } from '../DesignComponents';
 import GaleriaFotos from '../GaleriaFotos';
 import GraficaTendencia from '../GraficaTendencia';
+import FiltroFotos from '../FiltroFotos';
 import { TOKENS } from '../DesignTokens';
 import { agruparPorBloque } from '../utils';
 import { mezclarMediciones } from '../logic';
 import { filasDeGaleria, estadoPunto, tituloPunto } from '../galeria';
 import { fechaLarga, fechaMedia, formatoPct, plural, hoyLocal } from '../fechas';
 import { nombreNivel } from '../niveles';
-import { aniosDisponibles, totalesPorMes } from '../linea';
+import { aniosDisponibles, totalesPorMes, filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
 import { puntosTendencia } from '../tendencia';
 
 const PAD = TOKENS.spacing.lg;
@@ -66,7 +67,16 @@ export default function FolderScreen({
 
   // Total de cada mes según el servidor (no cambia al cargar más fotos).
   const totalesMes = useMemo(() => totalesPorMes(diasPunto, { truncado: resumenesPunto.some((r) => r?.truncado) }), [resumenes, clave]); // eslint-disable-line react-hooks/exhaustive-deps
-  const filas = useMemo(() => filasDeGaleria(lista, { totalesMes }), [lista, totalesMes]);
+  // Filtro común (nombre, fechas, nivel) sobre las fotos cargadas del punto.
+  const [filtros, setFiltros] = useState(FILTROS_VACIOS);
+  const nombreDelPunto = tituloPunto(bloque.nombre);
+  const filtradas = useMemo(
+    () => filtrarMediciones(lista, filtros, { clavePunto: () => clave, nombresExtra: () => nombreDelPunto }),
+    [lista, filtros, clave, nombreDelPunto]
+  );
+  const filtrado = hayFiltros(filtros);
+  // Con filtros, los totales por mes del servidor ya no corresponden a lo que se ve.
+  const filas = useMemo(() => filasDeGaleria(filtradas, { totalesMes: filtrado ? null : totalesMes }), [filtradas, totalesMes, filtrado]);
 
   const cargando = historial?.estado === 'cargando';
   const cargandoMas = historial?.estado === 'mas';
@@ -135,6 +145,22 @@ export default function FolderScreen({
     </View>
   );
 
+  const filtro = (
+    <FiltroFotos
+      filtros={filtros}
+      onChange={setFiltros}
+      total={filtradas.length}
+      nota={filtrado && (historial?.hayMas || !historial) ? 'Solo entre las fotos cargadas' : ''}
+    />
+  );
+
+  const cabeceraCompleta = (
+    <View>
+      {cabecera}
+      {filtro}
+    </View>
+  );
+
   const pie = (
     <View style={{ padding: PAD, gap: 12 }}>
       {(cargando || cargandoMas) && (
@@ -168,10 +194,12 @@ export default function FolderScreen({
         nombrePunto={() => tituloPunto(bloque.nombre)}
         onAbrirFoto={onOpen}
         onAbrirLote={(f) => onAbrirLote?.(f.loteClave)}
-        ListHeaderComponent={cabecera}
+        ListHeaderComponent={cabeceraCompleta}
         ListFooterComponent={pie}
         ListEmptyComponent={
-          cargando || !historial ? null : (
+          cargando || !historial ? null : filtrado && lista.length ? (
+            <EmptyState title="Sin fotos" subtitle="Ninguna foto cargada coincide con estos filtros." />
+          ) : (
             <EmptyState title="Punto sin fotos" subtitle="Todavía no se han subido fotos de este punto." />
           )
         }
