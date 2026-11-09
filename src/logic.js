@@ -172,15 +172,32 @@ export function paginaAnterior(mediciones = [], tamano = PAGINA_MEDICIONES, max 
 }
 
 // Une sin duplicar por id_medicion (gana la ya cargada, que puede traer campos locales)
-// y ordena de la más reciente a la más antigua.
+// y ordena de la más reciente a la más antigua. Excepción: si el duplicado llega con URL más recientes
+// (_urlTs mayor), la copia cargada refresca url_imagen / url_thumbnail / _urlTs (las URL firmadas vencen) y
+// conserva todo lo demás. Una foto local (_localUri) no cambia sus URL. `agregadas` solo cuenta las nuevas.
 export function mezclarMediciones(actuales = [], nuevas = []) {
-  const vistos = new Set(actuales.map((m) => m.id_medicion));
-  const unicas = nuevas.filter((m) => {
-    if (vistos.has(m.id_medicion)) return false;
+  const porId = new Map(actuales.map((m, i) => [m.id_medicion, i]));
+  const base = [...actuales];
+  const vistos = new Set(porId.keys());
+  const unicas = [];
+  for (const m of nuevas) {
+    if (vistos.has(m.id_medicion)) {
+      const i = porId.get(m.id_medicion);
+      if (i !== undefined) {
+        const actual = base[i];
+        if ((Number(m._urlTs) || 0) > (Number(actual._urlTs) || 0)) {
+          const refresco = { _urlTs: m._urlTs };
+          if (m.url_imagen) refresco.url_imagen = m.url_imagen;
+          if (m.url_thumbnail) refresco.url_thumbnail = m.url_thumbnail;
+          base[i] = { ...actual, ...refresco };
+        }
+      }
+      continue;
+    }
     vistos.add(m.id_medicion);
-    return true;
-  });
-  const lista = [...actuales, ...unicas].sort((a, z) => (tsMs(z) ?? 0) - (tsMs(a) ?? 0));
+    unicas.push(m);
+  }
+  const lista = [...base, ...unicas].sort((a, z) => (tsMs(z) ?? 0) - (tsMs(a) ?? 0));
   return { lista, agregadas: unicas.length };
 }
 

@@ -75,7 +75,7 @@ import { tituloPunto } from './src/galeria';
 import { quitarDeCola, marcarCanceladas, destinoTrasAnalisis } from './src/cola';
 import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranque';
 import { marcarFuentes } from './src/tipografia';
-import { necesitaDetalleCompleto } from './src/detalle';
+import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs } from './src/detalle';
 import { notasCambiaron, guardarNota, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
@@ -1207,8 +1207,9 @@ function Root() {
     getMedicionCompleta(m.id_punto, m.id_medicion)
       .then((completa) => {
         if (!completa || sesion !== sesionRef.current) return;
-        // Conserva lo local (_localUri, nombre renombrado, etc.) y evita pisar otra pantalla.
-        setDetalle((prev) => (prev && prev.id_medicion === m.id_medicion ? { ...completa, ...prev, detecciones: completa.detecciones, clima: completa.clima, mascaras: completa.mascaras, contorno_placa: completa.contorno_placa } : prev));
+        const ahora = Date.now();
+        // Gana lo remoto (URL frescas y su sello); se conserva solo lo local (_localUri, nombre cambiado en el camino).
+        setDetalle((prev) => actualizarDetalleSiEs(prev, m.id_medicion, (p) => fusionarDetalle({ prev: p, abierta: m, completa, ahora })));
       })
       .catch((e) => {
         if (esSesionVencida(e)) avisarSesionVencida();
