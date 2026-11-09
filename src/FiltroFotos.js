@@ -10,7 +10,7 @@ import { Chip, HojaOpciones } from './DesignComponents';
 import { TOKENS, NIVELES } from './DesignTokens';
 import { IconNivel, IconClose } from './Icons';
 import { alternarNivel, PRESETS_RANGO, FILTROS_VACIOS, hayFiltros, textoResultados } from './linea';
-import { fechaValida } from './filtroFotos';
+import { fechaValida } from './criteriosFiltro';
 import { fechaMedia } from './fechas';
 
 const PAD = TOKENS.spacing.lg;

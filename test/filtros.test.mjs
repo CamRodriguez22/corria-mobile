@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizarTexto, coincideTexto, camposNombre, fechaValida, rangoPersonalizado } from '../src/filtroFotos.js';
+import { normalizarTexto, coincideTexto, camposNombre, fechaValida, rangoPersonalizado } from '../src/criteriosFiltro.js';
 import { filtrarMediciones, FILTROS_VACIOS, hayFiltros, rangoEfectivo, aplicarFiltrosADias } from '../src/linea.js';
 
 const HOY = '2026-11-09';

@@ -2,7 +2,7 @@
 // Espejo de lib/lineaTiempo.js de la web (barra anual por día local UTC-5).
 import { diaLocal, hoyLocal, partesDia, sumarDias, diaSemana, MESES, fechaLarga, plural } from './fechas.js';
 import { nivelDeMedicion, nombreNivel } from './niveles.js';
-import { coincideTexto, camposNombre, rangoPersonalizado } from './filtroFotos.js';
+import { coincideTexto, camposNombre, rangoPersonalizado } from './criteriosFiltro.js';
 
 export const ANIO_MINIMO = 2026; // el backend rechaza años anteriores
 

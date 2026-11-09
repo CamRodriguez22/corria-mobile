@@ -1,4 +1,4 @@
-// src/filtroFotos.js — Piezas puras del filtro común de fotos (búsqueda por nombre, fechas). Sin React Native.
+// src/criteriosFiltro.js — Piezas puras del filtro común de fotos (búsqueda por nombre, fechas). Sin React Native.
 // El filtro completo vive en linea.js (`filtrarMediciones`); aquí están el texto y el rango personalizado.
 import { partesDia } from './fechas.js';
 
