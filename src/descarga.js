@@ -38,3 +38,24 @@ export function comandosSegmentacion(medicion, ancho, alto) {
 
 // ¿La URL se baja de internet (hay que descargarla) o ya es un archivo/objeto local?
 export const esUrlRemota = (uri) => /^https?:\/\//i.test(String(uri || ''));
+
+export const MENSAJE_IMAGEN_NO_CARGO = 'No se pudo cargar la foto para generar la imagen. Revisa tu conexión e inténtalo de nuevo.';
+export const MENSAJE_IMAGEN_TARDA = 'La foto tarda demasiado en cargar. Inténtalo de nuevo en un momento.';
+
+// Espera a que la foto de la vista de captura haya cargado de verdad (onLoad) antes de capturarla: si se captura antes,
+// se compartiría el marcador de posición con la máscara dibujada encima. `leer()` devuelve 'cargando' | 'lista' | 'error'.
+// Devuelve 'lista', 'error' o 'tiempo' (pasó `timeoutMs` sin cargar ni fallar). `dormir` se inyecta para probarlo sin esperar.
+export async function esperarImagenLista(leer, { timeoutMs = 20000, cada = 100, dormir = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  for (let esperado = 0; ; esperado += cada) {
+    const e = leer();
+    if (e === 'lista' || e === 'error') return e;
+    if (esperado >= timeoutMs) return 'tiempo';
+    await dormir(cada);
+  }
+}
+
+// Texto para el usuario según cómo terminó la espera ('' si se puede capturar).
+export function mensajeCaptura(resultado) {
+  if (resultado === 'lista') return '';
+  return resultado === 'tiempo' ? MENSAJE_IMAGEN_TARDA : MENSAJE_IMAGEN_NO_CARGO;
+}

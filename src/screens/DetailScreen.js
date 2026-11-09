@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, ScrollView, Image, Platform, useWindowDimensions } from 'react-native';
 import { Text } from '../Typography';
 import { Screen, Header, LecturaNivel, FilaDato, IconButton, MenuAcciones, SectionTitle, Segmented, Button } from '../DesignComponents';
 import { descargarOriginal, descargarSegmentacion } from '../descargas';
+import { esperarImagenLista, mensajeCaptura } from '../descarga';
 import FotoConMascara from '../FotoConMascara';
 import { hayMascara, aspectoParaMascara, uriParaMedirAspecto } from '../mascara';
 import { TOKENS } from '../DesignTokens';
@@ -55,6 +56,11 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
   // Descargas: la foto original y la imagen con la corrosión detectada (máscara + contorno de la placa).
   const [descargando, setDescargando] = useState(null); // null | 'original' | 'corrosion'
   const [avisoDescarga, setAvisoDescarga] = useState({ texto: '', error: false });
+  const estadoCaptura = useRef('cargando'); // 'cargando' | 'lista' | 'error': ¿la foto de la vista de captura ya cargó?
+  // Al cambiar de foto se reinicia durante el render, antes de que la vista de captura (key={uri}) vuelva a montarse.
+  useMemo(() => {
+    estadoCaptura.current = 'cargando';
+  }, [uri]);
   const vistaCaptura = useRef(null); // nativo: vista fuera de pantalla con la foto completa y la máscara dibujada
   const descargar = async (tipo) => {
     if (descargando) return;
@@ -64,10 +70,11 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
       let r;
       if (tipo === 'original') r = await descargarOriginal(medicion, uri);
       else {
-        // Nativo: asegura que la foto completa ya esté en caché antes de capturar la vista.
-        if (Platform.OS !== 'web' && uri) {
-          await Image.prefetch(uri).catch(() => {});
-          await new Promise((ok) => setTimeout(ok, 300));
+        // Nativo: solo se captura cuando ESTA foto disparó onLoad en la vista de captura; si falla se aborta
+        // (nunca se comparte el marcador de posición).
+        if (Platform.OS !== 'web') {
+          const msg = mensajeCaptura(await esperarImagenLista(() => estadoCaptura.current));
+          if (msg) throw new Error(msg);
         }
         r = await descargarSegmentacion(medicion, { uri, vista: vistaCaptura });
       }
@@ -190,7 +197,22 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
           importantForAccessibility="no-hide-descendants"
           style={{ position: 'absolute', left: -anchoFoto * 2, top: 0, width: anchoFoto, height: Math.round(anchoFoto / aspectoReal) }}
         >
-          <FotoConMascara uri={uri} medicion={medicion} ancho={anchoFoto} alto={Math.round(anchoFoto / aspectoReal)} aspecto={aspectoReal} mostrarMascara radio={0} />
+          <FotoConMascara
+            key={uri}
+            uri={uri}
+            medicion={medicion}
+            ancho={anchoFoto}
+            alto={Math.round(anchoFoto / aspectoReal)}
+            aspecto={aspectoReal}
+            mostrarMascara
+            radio={0}
+            onCargada={() => {
+              estadoCaptura.current = 'lista';
+            }}
+            onFallo={() => {
+              estadoCaptura.current = 'error';
+            }}
+          />
         </View>
       )}
       <MenuAcciones

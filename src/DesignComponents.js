@@ -364,7 +364,7 @@ export const StatCard = ({ value, label, color = TOKENS.colors.text }) => (
 // ─────────────────────────────────────────────────────────────
 const COLOR_MARCADOR = '#e6dac4';
 
-export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24 }) => {
+export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
   const [estado, setEstado] = useState(uri ? 'cargando' : 'vacia');
   const reducido = useReducedMotion();
   const pulso = useRef(new Animated.Value(0)).current;
@@ -396,8 +396,14 @@ export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24 }) => {
           source={{ uri }}
           style={StyleSheet.absoluteFill}
           resizeMode={resizeMode}
-          onLoad={() => setEstado('lista')}
-          onError={() => setEstado('error')}
+          onLoad={() => {
+            setEstado('lista');
+            onCargada?.();
+          }}
+          onError={() => {
+            setEstado('error');
+            onFallo?.();
+          }}
           accessibilityIgnoresInvertColors
         />
       )}
@@ -412,7 +418,7 @@ export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24 }) => {
 
 // Foto grande con la miniatura (ya en caché) de marcador: se ve al instante y la imagen completa aparece con un
 // fundido cuando termina de cargar. Si la completa falla, queda la miniatura. Sin miniatura distinta, es `Foto`.
-export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', iconSize = 24 }) => {
+export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
   const reducido = useReducedMotion();
   const fundido = useRef(new Animated.Value(0)).current;
   const [fallo, setFallo] = useState(false);
@@ -421,7 +427,7 @@ export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', icon
     fundido.setValue(0);
     setFallo(false);
   }, [uri, fundido]);
-  if (!conMini) return <Foto uri={uri} style={style} resizeMode={resizeMode} iconSize={iconSize} />;
+  if (!conMini) return <Foto uri={uri} style={style} resizeMode={resizeMode} iconSize={iconSize} onCargada={onCargada} onFallo={onFallo} />;
   return (
     <View style={[{ overflow: 'hidden' }, style]}>
       <Foto uri={uriMini} style={StyleSheet.absoluteFill} resizeMode={resizeMode} iconSize={iconSize} />
@@ -431,10 +437,14 @@ export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', icon
           style={[StyleSheet.absoluteFill, { opacity: fundido }]}
           resizeMode={resizeMode}
           onLoad={() => {
+            onCargada?.();
             if (reducido) fundido.setValue(1);
             else Animated.timing(fundido, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
           }}
-          onError={() => setFallo(true)}
+          onError={() => {
+            setFallo(true);
+            onFallo?.();
+          }}
           accessibilityIgnoresInvertColors
         />
       )}
