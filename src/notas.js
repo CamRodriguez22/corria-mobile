@@ -32,3 +32,13 @@ export function borradorDe(obsMap = {}, id) {
   const g = (id && obsMap && obsMap[id]) || null;
   return { espesor: g?.espesor || '', descripcion: g?.descripcion || '' };
 }
+
+// Al salir del resultado: si había notas sin guardar y el guardado falló, NO se sigue (el borrador se conserva
+// en pantalla) y se pregunta al usuario; en cualquier otro caso se sigue con la salida normal.
+//   cambioNotas: había notas distintas de lo guardado · guardadoOk: resultado de intentar guardarlas (true/false)
+export function decidirSalida({ cambioNotas = false, guardadoOk = true } = {}) {
+  return cambioNotas && guardadoOk === false ? 'nota_fallida' : 'seguir';
+}
+
+export const MENSAJE_NOTA_AL_SALIR =
+  'La nota sigue en pantalla pero no se pudo guardar en el teléfono. Si continúas sin guardarla, se perderá.';

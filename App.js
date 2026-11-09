@@ -77,7 +77,7 @@ import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranq
 import { marcarFuentes } from './src/tipografia';
 import { resumenesAfectados, nuevoToken, tokenVigente, invalidarTokens } from './src/resumenes';
 import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs, esDetalleDe } from './src/detalle';
-import { notasCambiaron, guardarNota, borradorDe, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
+import { notasCambiaron, guardarNota, borradorDe, decidirSalida, MENSAJE_NOTA_AL_SALIR, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
 import {
@@ -970,9 +970,36 @@ function Root() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [espesor, descripcion, resultado?.id_medicion, obsCambiaron]);
 
-  const salirDelResultado = (continuar) => {
-    // Las observaciones se autoguardan: se guardan ya (si cambiaron) y no frenan la salida.
-    if (resultado && obsCambiaron) guardarObs();
+  const salirDelResultado = async (continuar) => {
+    // Las observaciones se autoguardan: aquí se esperan. Si el guardado falla, la nota se conserva en pantalla
+    // (no se borra) y se pregunta: reintentar, quedarse o descartarla.
+    if (resultado && obsCambiaron) {
+      const guardadoOk = await guardarObs();
+      if (decidirSalida({ cambioNotas: true, guardadoOk }) === 'nota_fallida') {
+        setConfirmModal({
+          visible: true,
+          title: 'No se pudo guardar la nota',
+          message: MENSAJE_NOTA_AL_SALIR,
+          confirmLabel: 'Reintentar',
+          extraLabel: 'Descartar la nota y continuar',
+          cancelLabel: 'Quedarme aquí',
+          onConfirm: () => {
+            cerrarConfirm();
+            salirDelResultado(continuar);
+          },
+          onExtra: () => {
+            cerrarConfirm();
+            resolverSalida(continuar);
+          },
+        });
+        return;
+      }
+    }
+    resolverSalida(continuar);
+  };
+
+  // Salida del resultado: avisa de las fotos fallidas que se perderían (o sigue directo si no hay ninguna).
+  const resolverSalida = (continuar) => {
     const pend = pendientesAlSalir({ cola: colaRef.current });
     if (!pend.hay) {
       continuar();
@@ -1206,7 +1233,7 @@ function Root() {
   // bloquear) y el siguiente cambio (o salir del resultado) lo reintenta.
   const avisoNotaPendiente = useRef(false);
   const guardarObs = async () => {
-    if (!resultado) return;
+    if (!resultado) return true;
     const r = await guardarNota({
       obsMap,
       id: resultado.id_medicion,
@@ -1222,6 +1249,7 @@ function Root() {
     } else if (r.avisar) {
       setAviso(MENSAJE_NOTA_NO_GUARDADA);
     }
+    return r.ok; // false: la nota NO se guardó (sigue en pantalla)
   };
 
   // La lista viene en modo resumen (sin detecciones ni clima): se muestra el detalle de
