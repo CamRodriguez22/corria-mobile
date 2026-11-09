@@ -28,3 +28,8 @@ export function actualizarDetalleSiEs(prev, id, cambio) {
   if (cambio === null) return null;
   return typeof cambio === 'function' ? cambio(prev) : { ...prev, ...cambio };
 }
+
+// ¿El detalle abierto es de la foto `id`?
+export function esDetalleDe(detalle, id) {
+  return Boolean(detalle) && detalle.id_medicion === id;
+}

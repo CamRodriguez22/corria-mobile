@@ -76,7 +76,7 @@ import { quitarDeCola, marcarCanceladas, destinoTrasAnalisis } from './src/cola'
 import { arranqueListo, fuentesCargadas, TIEMPO_ARRANQUE_MS } from './src/arranque';
 import { marcarFuentes } from './src/tipografia';
 import { resumenesAfectados, nuevoToken, tokenVigente, invalidarTokens } from './src/resumenes';
-import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs } from './src/detalle';
+import { necesitaDetalleCompleto, fusionarDetalle, actualizarDetalleSiEs, esDetalleDe } from './src/detalle';
 import { notasCambiaron, guardarNota, borradorDe, MENSAJE_NOTA_NO_GUARDADA } from './src/notas';
 import { formatoPct } from './src/fechas';
 import { marcarCarga, limpiarVencidas, necesitaRefresco, envolverCache, leerCache } from './src/miniaturas';
@@ -220,6 +220,7 @@ function Root() {
   const [folderClave, setFolderClave] = useState(null);
   const [loteSel, setLoteSel] = useState(null); // lote abierto en la pestaña Lotes (sobrevive al detalle)
   const [detalle, setDetalle] = useState(null);
+  const detalleRef = useRef(null); // el detalle abierto ahora (para decidir tras un await)
 
   // flujo de medición
   const [bloqueSel, setBloqueSel] = useState('');
@@ -332,6 +333,7 @@ function Root() {
   };
 
   medicionesRef.current = mediciones;
+  detalleRef.current = detalle;
   porPuntoRef.current = porPunto;
   resumenesRef.current = resumenes;
 
@@ -1277,13 +1279,18 @@ function Root() {
       onConfirm: async (nuevoNombre) => {
         setPromptModal((prev) => ({ ...prev, visible: false }));
         if (!nuevoNombre || !nuevoNombre.trim()) return;
+        // La sesión se captura ANTES de esperar: si cambió mientras tanto (otra cuenta), no se toca nada.
+        const sesion = sesionRef.current;
         try {
           await renombrarMedicion(m.id_punto, m.id_medicion, nuevoNombre.trim());
-          const act = { ...m, nombre: nuevoNombre.trim() };
-          setDetalle(act);
+          if (sesion !== sesionRef.current) return;
+          const nombre = nuevoNombre.trim();
+          // Solo cambia el detalle si sigue abierta la misma foto.
+          setDetalle((prev) => actualizarDetalleSiEs(prev, m.id_medicion, { nombre }));
           setAviso('Foto renombrada');
-          mapearTodo((lista) => lista.map((x) => (x.id_medicion === m.id_medicion ? act : x)));
+          mapearTodo((lista) => lista.map((x) => (x.id_medicion === m.id_medicion ? { ...x, nombre } : x)));
         } catch (e) {
+          if (sesion !== sesionRef.current) return;
           avisarError('No se pudo renombrar', e);
         }
       },
@@ -1300,15 +1307,21 @@ function Root() {
       variant: 'danger',
       onConfirm: async () => {
         setConfirmModal((prev) => ({ ...prev, visible: false }));
+        const sesion = sesionRef.current; // antes de esperar: una respuesta tardía de otra sesión se ignora
         try {
           await eliminarMedicion(m.id_punto, m.id_medicion);
+          if (sesion !== sesionRef.current) return;
           mapearTodo((lista) => lista.filter((x) => x.id_medicion !== m.id_medicion));
           refrescarIndicadores();
           invalidarResumenes(m.id_punto);
-          setDetalle(null);
-          setScreen(folderClave ? 'folder' : tab);
+          // Solo se cierra el detalle (y se vuelve a la lista) si seguía abierta esta misma foto.
+          if (esDetalleDe(detalleRef.current, m.id_medicion)) {
+            setDetalle(null);
+            setScreen(folderClave ? 'folder' : tab);
+          }
           setAviso('Foto eliminada');
         } catch (e) {
+          if (sesion !== sesionRef.current) return;
           avisarError('No se pudo eliminar', e);
         }
       },
@@ -1549,12 +1562,15 @@ function Root() {
               // Se actualiza el estado local (sin recargar: cargarTodo reiniciaría las páginas ya cargadas).
               const aplicar = (ids, nombreFinal) =>
                 mapearTodo((lista) => lista.map((x) => (ids.includes(x.id_medicion) ? { ...x, lote_nombre: nombreFinal } : x)));
+              const sesion = sesionRef.current;
               try {
                 const r = await renombrarLote(items, nuevo);
+                if (sesion !== sesionRef.current) return;
                 // Se usa el nombre que dejó el servidor (lo normaliza) y solo las fotos que de verdad se renombraron.
                 aplicar(r.idsRenombrados, r.nombre || nuevo);
                 setAviso(r.parcial ? r.mensaje : 'Lote renombrado');
               } catch (e) {
+                if (sesion !== sesionRef.current) return;
                 if (e.idsRenombrados?.length) aplicar(e.idsRenombrados, nuevo);
                 avisarError('No se pudo renombrar el lote', e);
               }

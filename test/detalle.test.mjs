@@ -65,3 +65,18 @@ test('I4: un duplicado más viejo o sin sello no pisa las URL cargadas; el conte
   assert.equal(r.agregadas, 1);
   assert.equal(r.lista.length, 2);
 });
+test('I9: el detalle solo se actualiza si sigue siendo la misma foto', () => {
+  const det = { id_medicion: 'm1', nombre: 'a' };
+  assert.deepEqual(actualizarDetalleSiEs(det, 'm1', { nombre: 'b' }), { id_medicion: 'm1', nombre: 'b' });
+  assert.equal(actualizarDetalleSiEs(det, 'm2', { nombre: 'b' }), det);
+  assert.equal(actualizarDetalleSiEs(null, 'm1', { nombre: 'b' }), null);
+  assert.equal(actualizarDetalleSiEs(det, 'm1', null), null);
+  assert.equal(actualizarDetalleSiEs({ id_medicion: 'm9' }, 'm1', null).id_medicion, 'm9');
+});
+
+import { esDetalleDe } from '../src/detalle.js';
+test('I9: esDetalleDe no confunde "sin detalle" con "es esta foto"', () => {
+  assert.equal(esDetalleDe(null, 'm1'), false);
+  assert.equal(esDetalleDe({ id_medicion: 'm2' }, 'm1'), false);
+  assert.equal(esDetalleDe({ id_medicion: 'm1' }, 'm1'), true);
+});
