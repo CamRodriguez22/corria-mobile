@@ -27,7 +27,9 @@ export default function FoldersScreen({
   const claves = grupos.filter((g) => g.clave !== 'SIN_BLOQUE').map((g) => g.clave).join('|');
   useEffect(() => {
     // Al tirar para refrescar se vuelve a pedir aunque ya estuviera guardado.
-    claves.split('|').filter(Boolean).forEach((c) => anios.forEach((a) => onCargarResumen?.(a, { idPunto: c, forzar: refreshing })));
+    // Año en curso primero para todos los puntos, luego el anterior (la cola de App.js respeta este orden).
+    const puntos = claves.split('|').filter(Boolean);
+    [...anios].reverse().forEach((a) => puntos.forEach((c) => onCargarResumen?.(a, { idPunto: c, forzar: refreshing })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claves, refreshing]);
 
