@@ -106,8 +106,8 @@ export async function pickPhotos({ fromCamera = false, allowsMultiple = true, re
   );
 }
 
-// La subida declara image/jpeg: una foto HEIF/WebP (algunos Android) se convierte a JPEG en silencio.
-// Si la conversión falla se conserva la original (el backend decide por los bytes) y no se molesta al usuario.
+// La subida declara image/jpeg: una foto HEIF/WebP/PNG se convierte a JPEG antes de subirla.
+// Si la conversión falla se avisa al usuario: nunca se sube un archivo que no sea JPEG con tipo image/jpeg.
 async function asegurarJpeg(foto) {
   if (!necesitaConvertirAJpeg(foto)) return foto;
   try {
@@ -115,7 +115,7 @@ async function asegurarJpeg(foto) {
     const r = await manipulateAsync(foto.uri, [], { compress: 0.9, format: SaveFormat.JPEG });
     return { ...foto, uri: r.uri, width: r.width || foto.width, height: r.height || foto.height, mimeType: 'image/jpeg', base64: null };
   } catch {
-    return foto;
+    throw new Error('No se pudo convertir la foto a JPEG. Prueba con otra foto o tómala con la cámara.');
   }
 }
 

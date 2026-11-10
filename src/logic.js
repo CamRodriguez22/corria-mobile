@@ -257,11 +257,19 @@ export function esSesionVencida(e) {
   return e?.status === 401;
 }
 
-// Parte `file` del FormData del POST prefirmado a S3. En React Native nativo basta
-// {uri,name,type}; en web FormData exige un Blob/File, así que se descarga la URI
-// (blob: / data:) a un Blob. `fetchFn` se inyecta para poder probarlo sin red.
-export async function parteArchivoForm({ uri, type = 'image/jpeg', nombre = 'foto.jpg', esWeb = false, fetchFn }) {
-  if (!esWeb) return { valor: { uri, name: nombre, type }, nombre: undefined };
+// Parte `file` del FormData del POST prefirmado a S3.
+//  · Nativo (Expo SDK 57): el fetch de Expo ya no acepta el {uri,name,type} de React Native; solo
+//    string, Blob u objetos con `bytes()`. Se envuelve el `File` de expo-file-system en un objeto con
+//    `name`, `type` y `bytes()`: convertFormData usa name/type para el filename y el Content-Type de la parte.
+//    `crearArchivo(uri)` se inyecta (api-real.js pasa `new File(uri)`) para no importar Expo aquí.
+//  · Web: FormData exige un Blob/File, así que se descarga la URI (blob: / data:) a un Blob.
+// `fetchFn` y `crearArchivo` se inyectan para poder probarlo sin red ni módulos nativos.
+export async function parteArchivoForm({ uri, type = 'image/jpeg', nombre = 'foto.jpg', esWeb = false, fetchFn, crearArchivo }) {
+  if (!esWeb) {
+    if (typeof crearArchivo !== 'function') throw new Error('No se pudo preparar la foto para subirla.');
+    const archivo = crearArchivo(uri);
+    return { valor: { name: nombre, type, bytes: () => archivo.bytes() }, nombre: undefined };
+  }
   const resp = await fetchFn(uri);
   const blob = await resp.blob();
   return { valor: blob, nombre };

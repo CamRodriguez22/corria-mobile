@@ -284,10 +284,25 @@ test('conAutor - completa tomado_por_id/usuario_id para que el técnico gestione
   assert.deepEqual(conAutor({ id_medicion: 'm3' }, null), { id_medicion: 'm3' });
 });
 
-test('parteArchivoForm - nativo usa {uri,name,type}; web descarga un Blob con nombre', async () => {
-  const nativo = await parteArchivoForm({ uri: 'file:///a.jpg', type: 'image/jpeg', esWeb: false });
-  assert.deepEqual(nativo.valor, { uri: 'file:///a.jpg', name: 'foto.jpg', type: 'image/jpeg' });
+test('parteArchivoForm - nativo envuelve el File (name, type, bytes()); web descarga un Blob con nombre', async () => {
+  const bytesFalsos = new Uint8Array([1, 2, 3]);
+  let uriPedida = null;
+  const nativo = await parteArchivoForm({
+    uri: 'file:///a.jpg',
+    type: 'image/jpeg',
+    esWeb: false,
+    crearArchivo: (u) => {
+      uriPedida = u;
+      return { bytes: async () => bytesFalsos };
+    },
+  });
+  assert.equal(uriPedida, 'file:///a.jpg');
+  assert.equal(nativo.valor.name, 'foto.jpg');
+  assert.equal(nativo.valor.type, 'image/jpeg');
+  assert.equal(await nativo.valor.bytes(), bytesFalsos);
+  assert.equal(nativo.valor.uri, undefined); // ya no es el {uri,name,type} de RN
   assert.equal(nativo.nombre, undefined);
+  await assert.rejects(() => parteArchivoForm({ uri: 'file:///a.jpg', esWeb: false }), /preparar la foto/);
 
   const blobFalso = { size: 3 };
   let pedida = null;

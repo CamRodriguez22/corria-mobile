@@ -15,9 +15,10 @@ export function validarFoto(foto) {
 }
 
 // ───────────────────────── Formato de la foto ─────────────────────────
-// La subida siempre declara image/jpeg (api-real.js pedirUploadUrl). Algunos Android guardan HEIF/HEIC (o WebP)
-// en la galería: esas fotos se convierten a JPEG sin avisar. JPEG y PNG se suben tal cual.
-const FORMATOS_DIRECTOS = /^(jpe?g|png)$/;
+// La subida siempre declara image/jpeg (api-real.js pedirUploadUrl), así que el archivo debe SER un JPEG.
+// Algunos Android guardan HEIF/HEIC (o WebP) en la galería y hay galerías con PNG: todo lo que no sea JPEG
+// se convierte a JPEG antes de subir. Solo el JPEG se sube tal cual.
+const FORMATOS_DIRECTOS = /^jpe?g$/;
 
 function extensionDe(texto) {
   const limpio = String(texto || '').split(/[?#]/)[0];
