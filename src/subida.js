@@ -15,9 +15,10 @@ export function validarFoto(foto) {
 }
 
 // ───────────────────────── Formato de la foto ─────────────────────────
-// La subida siempre declara image/jpeg (api-real.js pedirUploadUrl). Algunos Android guardan HEIF/HEIC (o WebP)
-// en la galería: esas fotos se convierten a JPEG sin avisar. JPEG y PNG se suben tal cual.
-const FORMATOS_DIRECTOS = /^(jpe?g|png)$/;
+// La subida siempre declara image/jpeg (api-real.js pedirUploadUrl), así que el archivo debe SER un JPEG.
+// Algunos Android guardan HEIF/HEIC (o WebP) en la galería y hay galerías con PNG: todo lo que no sea JPEG
+// se convierte a JPEG antes de subir. Solo el JPEG se sube tal cual.
+const FORMATOS_DIRECTOS = /^jpe?g$/;
 
 function extensionDe(texto) {
   const limpio = String(texto || '').split(/[?#]/)[0];
@@ -26,7 +27,7 @@ function extensionDe(texto) {
 }
 
 // true si hay que convertir a JPEG. Primero manda el tipo MIME; sin él, la extensión del nombre o de la URI.
-// Sin ninguna pista (p. ej. una URI sin extensión) no se convierte: el selector del sistema ya entrega JPEG.
+// Unknown URI formats must be converted: a content provider does not guarantee JPEG bytes.
 export function necesitaConvertirAJpeg({ mimeType, fileName, uri } = {}) {
   const mime = String(mimeType || '').toLowerCase().trim();
   if (mime) {
@@ -34,7 +35,27 @@ export function necesitaConvertirAJpeg({ mimeType, fileName, uri } = {}) {
     return !FORMATOS_DIRECTOS.test(tipo);
   }
   const ext = extensionDe(fileName) || extensionDe(uri);
-  return ext ? !FORMATOS_DIRECTOS.test(ext) : false;
+  return ext ? !FORMATOS_DIRECTOS.test(ext) : Boolean(uri);
+}
+
+// Resultado de convertir varias fotos con Promise.allSettled: conserva las que salieron bien (en su orden)
+// y cuenta las que fallaron. `error` es el primer motivo, por si fallaron todas.
+export function separarConversiones(resultados = []) {
+  const buenas = [];
+  let omitidas = 0;
+  let error = null;
+  resultados.forEach((r) => {
+    if (r.status === 'fulfilled') buenas.push(r.value);
+    else {
+      omitidas++;
+      error = error || r.reason;
+    }
+  });
+  return { buenas, omitidas, error };
+}
+
+export function mensajeFotosOmitidas(n) {
+  return n === 1 ? 'No se pudo preparar 1 foto; se omitió.' : `No se pudo preparar ${n} fotos; se omitieron.`;
 }
 
 // ───────────────────────── Individual o lote ─────────────────────────

@@ -11,13 +11,13 @@ import { poligonosMascara, contornoPlaca, rectDeFoto, puntosAPixeles } from './m
 const COLOR_CORROSION = NIVELES[3].color; // el mismo rojo de la web (#dc2626) para las manchas
 const COLOR_PLACA = NIVELES[0].color; // contorno de la placa: verde, solo línea (como la web)
 
-export default function FotoConMascara({ uri, uriMini = null, medicion, ancho, alto, aspecto, mostrarMascara = false, radio = 20, onCargada, onFallo }) {
+export default function FotoConMascara({ uri, uriMini = null, cacheKey = null, cacheKeyMini = null, medicion, ancho, alto, aspecto, mostrarMascara = false, radio = 20, onCargada, onFallo }) {
   const rect = rectDeFoto(ancho, alto, aspecto, 'cover');
   const poligonos = mostrarMascara ? poligonosMascara(medicion) : [];
   const placa = mostrarMascara ? contornoPlaca(medicion) : null;
   return (
     <View style={{ width: ancho, height: alto, borderRadius: radio, overflow: 'hidden' }}>
-      <FotoProgresiva uri={uri} uriMini={uriMini} style={{ width: ancho, height: alto }} resizeMode="cover" iconSize={48} onCargada={onCargada} onFallo={onFallo} />
+      <FotoProgresiva uri={uri} uriMini={uriMini} cacheKey={cacheKey} cacheKeyMini={cacheKeyMini} style={{ width: ancho, height: alto }} resizeMode="cover" iconSize={48} onCargada={onCargada} onFallo={onFallo} />
       {mostrarMascara && (
         <Svg width={ancho} height={alto} style={{ position: 'absolute', left: 0, top: 0 }} pointerEvents="none" aria-hidden>
           {poligonos.map((ps, i) => (

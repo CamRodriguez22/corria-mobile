@@ -7,7 +7,7 @@ import { IconChevronRight, IconNivel } from '../Icons';
 import { ICONO_SOBRE_NIVEL } from '../paleta';
 import { agruparPorBloque } from '../utils';
 import { tituloPunto } from '../galeria';
-import { filaDePunto, filasDePuntos, totalFotosPuntos } from '../puntos';
+import { filaDePunto, filasDePuntos, totalFotosPuntos, solicitudesResumenPuntos } from '../puntos';
 import { aniosDisponibles } from '../linea';
 import { nombreNivel } from '../niveles';
 import { formatoPct, fechaCorta, plural, hoyLocal } from '../fechas';
@@ -27,7 +27,9 @@ export default function FoldersScreen({
   const claves = grupos.filter((g) => g.clave !== 'SIN_BLOQUE').map((g) => g.clave).join('|');
   useEffect(() => {
     // Al tirar para refrescar se vuelve a pedir aunque ya estuviera guardado.
-    claves.split('|').filter(Boolean).forEach((c) => anios.forEach((a) => onCargarResumen?.(a, { idPunto: c, forzar: refreshing })));
+    // Año en curso primero para todos los puntos, luego el anterior (la cola de App.js respeta este orden).
+    const puntos = claves.split('|').filter(Boolean);
+    solicitudesResumenPuntos(anios, puntos, refreshing).forEach(({ anio, opciones }) => onCargarResumen?.(anio, opciones));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claves, refreshing]);
 
