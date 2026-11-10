@@ -38,6 +38,26 @@ export function necesitaConvertirAJpeg({ mimeType, fileName, uri } = {}) {
   return ext ? !FORMATOS_DIRECTOS.test(ext) : false;
 }
 
+// Resultado de convertir varias fotos con Promise.allSettled: conserva las que salieron bien (en su orden)
+// y cuenta las que fallaron. `error` es el primer motivo, por si fallaron todas.
+export function separarConversiones(resultados = []) {
+  const buenas = [];
+  let omitidas = 0;
+  let error = null;
+  resultados.forEach((r) => {
+    if (r.status === 'fulfilled') buenas.push(r.value);
+    else {
+      omitidas++;
+      error = error || r.reason;
+    }
+  });
+  return { buenas, omitidas, error };
+}
+
+export function mensajeFotosOmitidas(n) {
+  return n === 1 ? 'No se pudo preparar 1 foto; se omitió.' : `No se pudo preparar ${n} fotos; se omitieron.`;
+}
+
 // ───────────────────────── Individual o lote ─────────────────────────
 // "Individual": cada foto es una medición suelta (sin lote), aunque se elijan varias.
 // "Lote": todas las fotos de la sesión llevan el mismo lote hasta "Terminar lote".

@@ -3,7 +3,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { necesitaConvertirAJpeg } from './subida';
+import { necesitaConvertirAJpeg, separarConversiones } from './subida';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchAuthSession } from 'aws-amplify/auth';
@@ -68,7 +68,7 @@ export async function reverseGeocode(lat, lng) {
 // ───────────────────────────── Cámara / galería ─────────────────────────────
 // Devuelve array de fotos [{ uri, base64, width, height }] o null si se canceló.
 // `recortar`: abre el editor de recorte en la galería (solo con una foto; con varias el selector no recorta).
-export async function pickPhotos({ fromCamera = false, allowsMultiple = true, recortar = false } = {}) {
+export async function pickPhotos({ fromCamera = false, allowsMultiple = true, recortar = false, onOmitidas } = {}) {
   if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').pickPhotosDemo({ fromCamera, allowsMultiple });
   const perm = fromCamera
     ? await ImagePicker.requestCameraPermissionsAsync()
@@ -92,7 +92,8 @@ export async function pickPhotos({ fromCamera = false, allowsMultiple = true, re
     ? await ImagePicker.launchCameraAsync({ ...opts, allowsEditing: true })
     : await ImagePicker.launchImageLibraryAsync({ ...opts, allowsEditing: recortar && !allowsMultiple });
   if (res.canceled || !res.assets?.length) return null;
-  return Promise.all(
+  // Cada foto se convierte por separado: si una falla se omite y las demás siguen. Si fallan todas, se lanza el error.
+  const resultados = await Promise.allSettled(
     res.assets.map((a) =>
       asegurarJpeg({
         uri: a.uri,
@@ -104,6 +105,10 @@ export async function pickPhotos({ fromCamera = false, allowsMultiple = true, re
       })
     )
   );
+  const { buenas, omitidas, error } = separarConversiones(resultados);
+  if (!buenas.length) throw error;
+  if (omitidas) onOmitidas?.(omitidas);
+  return buenas;
 }
 
 // La subida declara image/jpeg: una foto HEIF/WebP/PNG se convierte a JPEG antes de subirla.

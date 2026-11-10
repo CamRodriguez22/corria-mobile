@@ -21,6 +21,8 @@ import {
   esSesionVencida,
   conAutor,
   parteArchivoForm,
+  mensajeErrorSubidaS3,
+  errorLecturaFoto,
   navegarAtras,
   pendientesAlSalir,
   datosEmpresa,
@@ -381,4 +383,27 @@ test('resumirCola/pendientesAlSalir - una fallida definitiva (410) no es reinten
   assert.equal(resumirCola(cola).reintentables, 0);
   assert.equal(pendientesAlSalir({ cola }).reintentables, 0);
   assert.equal(pendientesAlSalir({ cola }).hay, true);
+});
+
+test('parteArchivoForm - un fallo al leer el archivo local es un error de lectura con la causa original', async () => {
+  const causa = new Error('ENOENT');
+  const e = await parteArchivoForm({
+    uri: 'file:///a.jpg',
+    crearArchivo: () => ({ bytes: async () => { throw causa; } }),
+  }).catch((x) => x);
+  assert.equal(e.code, 'LECTURA_FOTO');
+  assert.equal(e.cause, causa);
+  assert.match(e.message, /No se pudo leer la foto/);
+});
+
+test('mensajeErrorSubidaS3: tiempo agotado, lectura local u otra causa (conexión)', () => {
+  assert.match(mensajeErrorSubidaS3({ name: 'AbortError' }), /tardó demasiado/);
+  assert.match(mensajeErrorSubidaS3(errorLecturaFoto(new Error('x'))), /No se pudo leer la foto/);
+  assert.match(mensajeErrorSubidaS3(new TypeError('Network request failed')), /Revisa tu conexión/);
+  assert.match(mensajeErrorSubidaS3(undefined), /Revisa tu conexión/);
+});
+
+test('clasificarErrorSubida: foto ilegible no es reintentable; error de red sí', () => {
+  assert.equal(clasificarErrorSubida(errorLecturaFoto(new Error('x'))).reintentable, false);
+  assert.equal(clasificarErrorSubida(new Error('No se pudo subir la foto. Revisa tu conexión')).reintentable, true);
 });

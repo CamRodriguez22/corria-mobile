@@ -169,6 +169,8 @@ export function clasificarErrorSubida(e) {
     };
   }
   if (e?.status === 401) return { mensaje: 'Tu sesión expiró. Inicia sesión nuevamente.', reintentable: false };
+  // Foto ilegible en el teléfono: reintentar lee el mismo archivo y fallaría igual; hay que volver a elegirla o tomarla.
+  if (e?.code === CODIGO_LECTURA_FOTO) return { mensaje: msg, reintentable: false };
   return { mensaje: msg, reintentable: true };
 }
 
@@ -257,6 +259,23 @@ export function esSesionVencida(e) {
   return e?.status === 401;
 }
 
+export const CODIGO_LECTURA_FOTO = 'LECTURA_FOTO';
+export const MENSAJE_LECTURA_FOTO = 'No se pudo leer la foto. Vuelve a elegirla o tómala de nuevo.';
+
+// Error por no poder leer el archivo local de la foto (conserva el original en `cause`).
+export function errorLecturaFoto(causa) {
+  const err = new Error(MENSAJE_LECTURA_FOTO, { cause: causa });
+  err.code = CODIGO_LECTURA_FOTO;
+  return err;
+}
+
+// Error del fetch al POST a S3 -> mensaje claro: tiempo agotado, lectura local o conexión.
+export function mensajeErrorSubidaS3(e) {
+  if (e?.name === 'AbortError') return 'La subida de la foto tardó demasiado. Revisa tu conexión e intenta de nuevo.';
+  if (e?.code === CODIGO_LECTURA_FOTO) return MENSAJE_LECTURA_FOTO;
+  return 'No se pudo subir la foto. Revisa tu conexión e intenta de nuevo.';
+}
+
 // Parte `file` del FormData del POST prefirmado a S3.
 //  · Nativo (Expo SDK 57): el fetch de Expo ya no acepta el {uri,name,type} de React Native; solo
 //    string, Blob u objetos con `bytes()`. Se envuelve el `File` de expo-file-system en un objeto con
@@ -267,8 +286,14 @@ export function esSesionVencida(e) {
 export async function parteArchivoForm({ uri, type = 'image/jpeg', nombre = 'foto.jpg', esWeb = false, fetchFn, crearArchivo }) {
   if (!esWeb) {
     if (typeof crearArchivo !== 'function') throw new Error('No se pudo preparar la foto para subirla.');
-    const archivo = crearArchivo(uri);
-    return { valor: { name: nombre, type, bytes: () => archivo.bytes() }, nombre: undefined };
+    // Los bytes se leen ANTES del fetch: un fallo al leer el archivo local es distinto de un fallo de red.
+    let bytes;
+    try {
+      bytes = await crearArchivo(uri).bytes();
+    } catch (e) {
+      throw errorLecturaFoto(e);
+    }
+    return { valor: { name: nombre, type, bytes: async () => bytes }, nombre: undefined };
   }
   const resp = await fetchFn(uri);
   const blob = await resp.blob();

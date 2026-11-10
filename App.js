@@ -26,7 +26,7 @@ import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
 
 import { TOKENS, num, severidad } from './src/DesignTokens';
 import { crearLimitador } from './src/limitador';
-import { MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote, opcionesSelector, MENSAJE_FOTO_PEQUENA } from './src/subida';
+import { mensajeFotosOmitidas, MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote, opcionesSelector, MENSAJE_FOTO_PEQUENA } from './src/subida';
 import {
   Screen,
   Logo,
@@ -1110,7 +1110,7 @@ function Root() {
         fijarCola([{ ...f, status: 'esperando' }]);
         setScreen('preview');
       } else {
-        const fotosSeleccionadas = await pickPhotos(sel);
+        const fotosSeleccionadas = await pickPhotos({ ...sel, onOmitidas: (n) => avisar('Fotos omitidas', mensajeFotosOmitidas(n)) });
         if (!fotosSeleccionadas || !fotosSeleccionadas.length) return;
         const validas = [];
         for (const item of fotosSeleccionadas) {

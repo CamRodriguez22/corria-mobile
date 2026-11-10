@@ -32,7 +32,7 @@
 
 import { Platform } from 'react-native';
 import { File } from 'expo-file-system';
-import { parteArchivoForm, renombrarPorTandas } from './logic';
+import { parteArchivoForm, renombrarPorTandas, mensajeErrorSubidaS3 } from './logic';
 import { AWS_CONFIG, APP_CONFIG } from './config';
 import { getIdToken } from './utils';
 
@@ -233,8 +233,8 @@ export async function subirFotoAS3({ url, fields }, uri) {
   try {
     res = await fetch(url, { method: 'POST', body: form, signal: ctrl.signal });
   } catch (e) {
-    if (e?.name === 'AbortError') throw new Error('La subida de la foto tardó demasiado. Revisa tu conexión e intenta de nuevo.');
-    throw new Error('No se pudo subir la foto. Revisa tu conexión e intenta de nuevo.');
+    console.log('subirFotoAS3', e?.name, e?.message);
+    throw new Error(mensajeErrorSubidaS3(e), { cause: e });
   } finally {
     clearTimeout(t);
   }

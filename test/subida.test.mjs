@@ -17,7 +17,7 @@ test('los mensajes de foto pequeña no muestran píxeles ni requisitos de resolu
   }
 });
 
-import { necesitaConvertirAJpeg } from '../src/subida.js';
+import { necesitaConvertirAJpeg, separarConversiones, mensajeFotosOmitidas } from '../src/subida.js';
 
 test('necesitaConvertirAJpeg: solo JPEG se sube tal cual; PNG, HEIC, HEIF, WebP y otros se convierten', () => {
   for (const mimeType of ['image/jpeg', 'image/jpg', 'IMAGE/JPEG']) assert.equal(necesitaConvertirAJpeg({ mimeType }), false, mimeType);
@@ -75,4 +75,30 @@ test('nunca se pide recorte junto con selección múltiple', () => {
     const o = opcionesSelector({ modo, deCamara, unaSola });
     if (!o.fromCamera) assert.equal(o.recortar && o.allowsMultiple, false);
   }
+});
+
+const ok = (v) => ({ status: 'fulfilled', value: v });
+const mal = (m) => ({ status: 'rejected', reason: new Error(m) });
+
+test('separarConversiones: conserva las buenas en su orden y cuenta las omitidas', () => {
+  const r = separarConversiones([ok('a'), mal('x'), ok('c'), mal('y')]);
+  assert.deepEqual(r.buenas, ['a', 'c']);
+  assert.equal(r.omitidas, 2);
+  assert.equal(r.error.message, 'x');
+});
+
+test('separarConversiones: todas fallan -> sin buenas y el primer error; ninguna falla -> sin omitidas', () => {
+  const todas = separarConversiones([mal('x'), mal('y')]);
+  assert.deepEqual(todas.buenas, []);
+  assert.equal(todas.omitidas, 2);
+  assert.equal(todas.error.message, 'x');
+  const ninguna = separarConversiones([ok(1), ok(2), ok(3)]);
+  assert.deepEqual(ninguna.buenas, [1, 2, 3]);
+  assert.equal(ninguna.omitidas, 0);
+  assert.equal(ninguna.error, null);
+});
+
+test('mensajeFotosOmitidas: singular y plural', () => {
+  assert.equal(mensajeFotosOmitidas(1), 'No se pudo preparar 1 foto; se omitió.');
+  assert.equal(mensajeFotosOmitidas(3), 'No se pudo preparar 3 fotos; se omitieron.');
 });
