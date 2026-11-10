@@ -67,3 +67,57 @@ test('crearLimitador - tope inválido se trata como 1', async () => {
   );
   assert.equal(maximo, 1);
 });
+
+
+const deferred = () => {
+  let resolve;
+  const promise = new Promise((r) => { resolve = r; });
+  return { promise, resolve };
+};
+
+test('a forced refresh settles superseded queued requests without starting them', async () => {
+  const lim = crearLimitador(1);
+  const active = deferred();
+  const started = [];
+  let token = 1;
+  const first = lim.ejecutar(() => active.promise);
+  const old = lim.ejecutar(() => started.push('old'), { vigente: () => token === 1 });
+  token = 2;
+  const fresh = lim.ejecutar(() => started.push('fresh'), { vigente: () => token === 2 });
+  assert.equal(await old, undefined);
+  assert.equal(lim.enEspera, 1);
+  active.resolve();
+  await Promise.all([first, fresh]);
+  assert.deepEqual(started, ['fresh']);
+  assert.equal(lim.activas, 0);
+});
+
+test('a session change clears queued work immediately and suppresses old in-flight publication', async () => {
+  const lim = crearLimitador(1);
+  const network = deferred();
+  let session = 1;
+  const vigente = () => session === 1;
+  const published = [];
+  const active = lim.ejecutar(() => network.promise, { vigente }).then((value) => {
+    if (vigente()) published.push(value);
+  });
+  await Promise.resolve(); // The first request has already started.
+  const queued = lim.ejecutar(() => assert.fail('obsolete network call'), { vigente });
+  session = 2;
+  lim.descartarObsoletas();
+  assert.equal(await queued, undefined);
+  assert.equal(lim.enEspera, 0);
+  network.resolve('old response');
+  await active;
+  assert.deepEqual(published, []);
+  assert.equal(await lim.ejecutar(() => 'new session'), 'new session');
+});
+
+test('validity is checked again immediately before a scheduled task starts', async () => {
+  const lim = crearLimitador(3);
+  let valid = true;
+  const result = lim.ejecutar(() => assert.fail('invalidated before microtask'), { vigente: () => valid });
+  valid = false;
+  assert.equal(await result, undefined);
+  assert.equal(lim.activas, 0);
+});

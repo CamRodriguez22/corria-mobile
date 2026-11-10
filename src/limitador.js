@@ -7,13 +7,21 @@ export function crearLimitador(maxSimultaneas = 3) {
   const espera = [];
   let activas = 0;
 
+  // Settle obsolete queued callers without invoking their network task.
+  const descartarObsoletas = () => {
+    for (let i = espera.length - 1; i >= 0; i--) {
+      if (!espera[i].vigente()) espera.splice(i, 1)[0].resolver(undefined);
+    }
+  };
+
   const siguiente = () => {
+    descartarObsoletas();
     while (activas < max && espera.length) {
-      const { tarea, resolver, rechazar } = espera.shift();
+      const { tarea, vigente, resolver, rechazar } = espera.shift();
       activas++;
       // Promise.resolve().then: una tarea que lanza de forma síncrona también cuenta como fallo, no rompe la cola.
       Promise.resolve()
-        .then(tarea)
+        .then(() => vigente() ? tarea() : undefined)
         .then(
           (v) => {
             activas--;
@@ -30,12 +38,13 @@ export function crearLimitador(maxSimultaneas = 3) {
   };
 
   return {
-    ejecutar(tarea) {
+    ejecutar(tarea, { vigente = () => true } = {}) {
       return new Promise((resolver, rechazar) => {
-        espera.push({ tarea, resolver, rechazar });
+        espera.push({ tarea, vigente, resolver, rechazar });
         siguiente();
       });
     },
+    descartarObsoletas,
     get activas() {
       return activas;
     },

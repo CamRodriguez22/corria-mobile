@@ -701,7 +701,8 @@ function Root() {
     setResumenes((r) => ({ ...r, [clave]: { ...(previo || { dias: [] }), estado: 'cargando', error: '' } }));
     try {
       // Por punto hay muchas peticiones a la vez (puntos × 2 años): se limitan a pocas simultáneas.
-      const resp = await (idPunto ? limitadorResumenes.ejecutar(() => getResumenDiario(anio, idPunto)) : getResumenDiario(anio, idPunto));
+      const vigente = () => sesion === sesionRef.current && tokenVigente(resumenTokens.current, clave, token);
+      const resp = await (idPunto ? limitadorResumenes.ejecutar(() => getResumenDiario(anio, idPunto), { vigente }) : getResumenDiario(anio, idPunto));
       if (sesion !== sesionRef.current || !tokenVigente(resumenTokens.current, clave, token)) return;
       setResumenes((r) => ({ ...r, [clave]: { estado: 'ok', dias: resp?.dias || [], truncado: Boolean(resp?.truncado), error: '' } }));
     } catch (e) {
@@ -776,6 +777,7 @@ function Root() {
   const onRefresh = () => {
     setRefreshing(true);
     invalidarTokens(resumenTokens.current);
+    limitadorResumenes.descartarObsoletas();
     setResumenes({});
     setExtras([]);
     rangosCargados.current = new Map();
@@ -862,6 +864,7 @@ function Root() {
   // filtrarse al siguiente usuario que inicie sesión en este dispositivo.
   const reiniciarEstadoSesion = () => {
     sesionRef.current += 1;
+    limitadorResumenes.descartarObsoletas();
     setLogged(false);
     setPerfil(null);
     setIndicadoresServidor(null);
@@ -871,6 +874,7 @@ function Root() {
     setPorPunto({});
     setExtras([]);
     invalidarTokens(resumenTokens.current);
+    limitadorResumenes.descartarObsoletas();
     setHistorialLotes({ lista: [], estado: 'idle' });
     rangosCargados.current = new Map();
     setResumenes({});
@@ -919,6 +923,7 @@ function Root() {
   const cerrarSesionLocal = async () => {
     // Invalida la sesión ANTES de esperar: las respuestas tardías ya se descartan.
     sesionRef.current += 1;
+    limitadorResumenes.descartarObsoletas();
     try {
       await signOut();
     } catch {}
