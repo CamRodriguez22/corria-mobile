@@ -27,7 +27,7 @@ function extensionDe(texto) {
 }
 
 // true si hay que convertir a JPEG. Primero manda el tipo MIME; sin él, la extensión del nombre o de la URI.
-// Sin ninguna pista (p. ej. una URI sin extensión) no se convierte: el selector del sistema ya entrega JPEG.
+// Unknown URI formats must be converted: a content provider does not guarantee JPEG bytes.
 export function necesitaConvertirAJpeg({ mimeType, fileName, uri } = {}) {
   const mime = String(mimeType || '').toLowerCase().trim();
   if (mime) {
@@ -35,7 +35,7 @@ export function necesitaConvertirAJpeg({ mimeType, fileName, uri } = {}) {
     return !FORMATOS_DIRECTOS.test(tipo);
   }
   const ext = extensionDe(fileName) || extensionDe(uri);
-  return ext ? !FORMATOS_DIRECTOS.test(ext) : false;
+  return ext ? !FORMATOS_DIRECTOS.test(ext) : Boolean(uri);
 }
 
 // Resultado de convertir varias fotos con Promise.allSettled: conserva las que salieron bien (en su orden)

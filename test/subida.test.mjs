@@ -24,13 +24,13 @@ test('necesitaConvertirAJpeg: solo JPEG se sube tal cual; PNG, HEIC, HEIF, WebP 
   for (const mimeType of ['image/png', 'image/heic', 'image/heif', 'image/heic-sequence', 'image/webp', 'image/avif', 'image/gif']) assert.equal(necesitaConvertirAJpeg({ mimeType }), true, mimeType);
 });
 
-test('necesitaConvertirAJpeg: sin MIME usa la extensión del nombre o de la URI; sin pistas no convierte', () => {
+test('necesitaConvertirAJpeg: sin MIME usa la extensión del nombre o de la URI; una URI sin pistas se convierte', () => {
   assert.equal(necesitaConvertirAJpeg({ fileName: 'IMG_0001.HEIC' }), true);
   assert.equal(necesitaConvertirAJpeg({ uri: 'file:///x/foto.heif?v=2' }), true);
   assert.equal(necesitaConvertirAJpeg({ uri: 'file:///x/foto.JPG' }), false);
   assert.equal(necesitaConvertirAJpeg({ uri: 'file:///x/foto.png' }), true);
   assert.equal(necesitaConvertirAJpeg({ fileName: 'captura.PNG' }), true);
-  assert.equal(necesitaConvertirAJpeg({ uri: 'content://media/external/images/42' }), false);
+  assert.equal(necesitaConvertirAJpeg({ uri: 'content://media/external/images/42' }), true);
   assert.equal(necesitaConvertirAJpeg({ mimeType: 'image/heic', uri: 'x.jpg' }), true); // el MIME manda
   assert.equal(necesitaConvertirAJpeg(), false);
 });
@@ -101,4 +101,16 @@ test('separarConversiones: todas fallan -> sin buenas y el primer error; ninguna
 test('mensajeFotosOmitidas: singular y plural', () => {
   assert.equal(mensajeFotosOmitidas(1), 'No se pudo preparar 1 foto; se omitió.');
   assert.equal(mensajeFotosOmitidas(3), 'No se pudo preparar 3 fotos; se omitieron.');
+});
+
+
+test('unknown content providers convert unless JPEG metadata is available', () => {
+  const uri = 'content://media/external/images/42';
+  assert.equal(necesitaConvertirAJpeg({ uri, mimeType: '  ' }), true);
+  assert.equal(necesitaConvertirAJpeg({ uri, fileName: 'photo' }), true);
+  assert.equal(necesitaConvertirAJpeg({ uri: 'file:///photos/unknown' }), true);
+  assert.equal(necesitaConvertirAJpeg({ uri, mimeType: 'image/jpeg' }), false);
+  assert.equal(necesitaConvertirAJpeg({ uri, fileName: 'photo.JPEG' }), false);
+  assert.equal(necesitaConvertirAJpeg({ uri, mimeType: 'image/png', fileName: 'photo.jpg' }), true);
+  assert.equal(necesitaConvertirAJpeg({}), false);
 });
