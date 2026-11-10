@@ -7,6 +7,7 @@ import FiltroFotos from '../FiltroFotos';
 import { TOKENS, NIVELES } from '../DesignTokens';
 import { IconChevronRight, IconEdit, IconNivel } from '../Icons';
 import { nombrePuntoDe } from '../helpers';
+import { claveCacheMiniatura } from '../miniaturas';
 import { filasDeGaleria, agruparLotes, miniaturaDe } from '../galeria';
 import { estadoRenombrarLote } from '../lotes';
 import { filtrarMediciones, FILTROS_VACIOS, hayFiltros } from '../linea';
@@ -192,7 +193,7 @@ export default function LotesScreen({
           })}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Foto uri={miniaturaDe(lote.portada)} style={{ width: 64, height: 64, borderRadius: 14 }} />
+            <Foto uri={miniaturaDe(lote.portada)} cacheKey={claveCacheMiniatura(lote.portada)} style={{ width: 64, height: 64, borderRadius: 14 }} />
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               <Text numberOfLines={1} style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.text }}>
                 {lote.nombre}

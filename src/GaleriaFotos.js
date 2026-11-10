@@ -7,6 +7,7 @@ import { Text } from './Typography';
 import { TOKENS } from './DesignTokens';
 import { Foto, NivelChip } from './DesignComponents';
 import { IconLotes } from './Icons';
+import { claveCacheMiniatura } from './miniaturas';
 import { miniaturaDe, etiquetaFoto, etiquetaLote, COLUMNAS_GALERIA } from './galeria';
 import { pctCorto, plural, diaLocal, fechaCorta } from './fechas';
 
@@ -40,7 +41,7 @@ export const FichaFoto = React.memo(function FichaFoto({ medicion, lado, punto, 
       accessibilityHint="Abre el detalle de la foto"
       style={({ pressed }) => ({ width: lado, height: lado, opacity: pressed ? 0.82 : 1 })}
     >
-      <Foto uri={miniaturaDe(medicion)} style={{ width: lado, height: lado, borderRadius: radio }} />
+      <Foto uri={miniaturaDe(medicion)} cacheKey={claveCacheMiniatura(medicion)} style={{ width: lado, height: lado, borderRadius: radio }} />
       {seleccionada && (
         <View
           pointerEvents="none"
@@ -66,7 +67,7 @@ export const FichaLote = React.memo(function FichaLote({ ficha, lado, punto, onP
       accessibilityHint="Abre el lote"
       style={({ pressed }) => ({ width: lado, height: lado, opacity: pressed ? 0.82 : 1 })}
     >
-      <Foto uri={miniaturaDe(ficha.portada)} style={{ width: lado, height: lado, borderRadius: radio }} />
+      <Foto uri={miniaturaDe(ficha.portada)} cacheKey={claveCacheMiniatura(ficha.portada)} style={{ width: lado, height: lado, borderRadius: radio }} />
       <View
         style={{
           position: 'absolute',

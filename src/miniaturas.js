@@ -33,6 +33,20 @@ export function imagenDe(m, ahora = Date.now()) {
   return m.url_imagen || m.url_thumbnail || null;
 }
 
+// ───────── Clave de caché en disco (expo-image) ─────────
+// Las URL prefirmadas cambian de firma en cada carga, así que la caché por URL no sirve: se cachea por
+// medición y variante. La variante sigue a la URL que devuelven miniaturaDe / imagenDe (con respaldo a la otra).
+// null para fotos locales (no hay nada que cachear), sin id o con la URL vencida (no se pinta).
+export function claveCacheMiniatura(m, ahora = Date.now()) {
+  if (!m || esLocal(m) || !m.id_medicion || !miniaturaDe(m, ahora)) return null;
+  return `${m.id_medicion}:${m.url_thumbnail ? 'thumb' : 'full'}`;
+}
+
+export function claveCacheImagen(m, ahora = Date.now()) {
+  if (!m || esLocal(m) || !m.id_medicion || !imagenDe(m, ahora)) return null;
+  return `${m.id_medicion}:${m.url_imagen ? 'full' : 'thumb'}`;
+}
+
 // Marca las mediciones recién traídas del servidor con el instante de carga.
 export function marcarCarga(lista = [], ahora = Date.now()) {
   return lista.map((m) => ({ ...m, _urlTs: ahora }));
