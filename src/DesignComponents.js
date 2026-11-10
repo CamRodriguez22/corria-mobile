@@ -4,9 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
   Pressable,
-  TextInput as RNTextInput,
   Animated,
   Easing,
   Image,
@@ -14,8 +12,39 @@ import {
   ScrollView,
   Platform,
   StatusBar,
+  Modal,
+  StyleSheet,
+  AccessibilityInfo,
 } from 'react-native';
-import { TOKENS, severidad, confianzaPct, num } from './DesignTokens';
+import { Text, TextInput as RNTextInput } from './Typography';
+import { TOKENS, NIVELES, severidad, num } from './DesignTokens';
+import { nivelDeMedicion } from './niveles';
+import { miniaturaDe } from './miniaturas';
+import { formatoPct } from './fechas';
+import { ICONO_SOBRE_NIVEL } from './paleta';
+import {
+  IconHome, IconLotes, IconPuntos, IconActivity, IconSettings, IconChevronLeft, IconDot, IconNivel, IconImageOff,
+  IconChevronDown, IconClose, IconCheck, IconArrowLeft, IconAlertTriangle, IconWifiOff,
+} from './Icons';
+
+// ─────────────────────────────────────────────────────────────
+// Movimiento reducido: true si el usuario pidió quitar animaciones (Ajustes del sistema).
+// ─────────────────────────────────────────────────────────────
+export function useReducedMotion() {
+  const [reducido, setReducido] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    AccessibilityInfo.isReduceMotionEnabled?.()
+      .then((v) => vivo && setReducido(Boolean(v)))
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (v) => setReducido(Boolean(v)));
+    return () => {
+      vivo = false;
+      sub?.remove?.();
+    };
+  }, []);
+  return reducido;
+}
 
 // ─────────────────────────────────────────────────────────────
 // Screen — contenedor de pantalla con "safe area" sin dependencias nativas extra.
@@ -65,11 +94,16 @@ export const Logo = ({ size = 14, gap = 3 }) => {
 // Botón único con variantes (accesible)
 // ─────────────────────────────────────────────────────────────
 const VARIANTS = {
-  primary: { bg: TOKENS.colors.accent, bgPressed: TOKENS.colors.accent600, fg: '#fff', border: 'transparent' },
-  secondary: { bg: TOKENS.colors.accent2, bgPressed: TOKENS.colors.accent2_600, fg: '#fff', border: 'transparent' },
-  ghost: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.neutral700, border: TOKENS.colors.neutral300 },
+  primary: { bg: TOKENS.colors.accent, bgPressed: TOKENS.colors.accent700, fg: '#fff', border: 'transparent' },
+  // Tonal (Material 3 "filled tonal"): salvia suave con texto oscuro (>= 10:1).
+  tonal: { bg: TOKENS.colors.piedra_200, bgPressed: TOKENS.colors.piedra_300, fg: TOKENS.colors.piedra_900, border: 'transparent' },
+  // Outlined y texto: acciones secundarias y de bajo énfasis.
+  outlined: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.neutral700, border: TOKENS.colors.neutral400 },
+  text: { bg: 'transparent', bgPressed: TOKENS.colors.neutral200, fg: TOKENS.colors.accentText, border: 'transparent' },
   danger: { bg: 'transparent', bgPressed: TOKENS.colors.dangerTint, fg: TOKENS.colors.danger, border: TOKENS.colors.danger },
 };
+VARIANTS.secondary = VARIANTS.tonal;
+VARIANTS.ghost = VARIANTS.outlined;
 
 export const Button = ({
   label,
@@ -79,6 +113,7 @@ export const Button = ({
   loading = false,
   fullWidth = true,
   left = null,
+  compact = false,
   style = {},
   accessibilityHint,
 }) => {
@@ -100,7 +135,7 @@ export const Button = ({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 9,
-          paddingHorizontal: TOKENS.spacing.lg,
+          paddingHorizontal: compact ? 14 : TOKENS.spacing.lg,
           paddingVertical: 15,
           borderRadius: TOKENS.radius.pill,
           borderWidth: v.border === 'transparent' ? 0 : 1.5,
@@ -116,7 +151,7 @@ export const Button = ({
       ) : (
         <>
           {left}
-          <Text style={{ color: v.fg, fontWeight: '700', fontSize: TOKENS.fontSizes.h5 }}>{label}</Text>
+          <Text style={{ color: v.fg, fontWeight: '700', fontSize: compact ? TOKENS.fontSizes.small + 1 : TOKENS.fontSizes.h5 }} numberOfLines={compact ? 1 : undefined}>{label}</Text>
         </>
       )}
     </Pressable>
@@ -188,6 +223,8 @@ export const Field = ({
   multiline = false,
   error = '',
   editable = true,
+  autoFocus = false,
+  accessibilityLabel: etiquetaA11y,
   style = {},
 }) => {
   const [focused, setFocused] = useState(false);
@@ -204,7 +241,8 @@ export const Field = ({
         autoCapitalize={autoCapitalize}
         multiline={multiline}
         editable={editable}
-        accessibilityLabel={label || placeholder}
+        autoFocus={autoFocus}
+        accessibilityLabel={etiquetaA11y || label || placeholder}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={{
@@ -232,14 +270,81 @@ export const Field = ({
 // ─────────────────────────────────────────────────────────────
 export const Badge = ({ label, color = TOKENS.colors.accent700, tint = TOKENS.colors.accent100, style = {} }) => (
   <View style={[{ alignSelf: 'flex-start', backgroundColor: tint, borderRadius: TOKENS.radius.pill, paddingHorizontal: 11, paddingVertical: 6 }, style]}>
-    <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color }}>{label}</Text>
+    <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color }}>{label}</Text>
   </View>
 );
 
+// Badge de nivel: color + ícono + nombre (nunca solo color). Texto en minúscula salvo la inicial.
+export const NivelBadge = ({ nivel = 0, style, compacto = false }) => {
+  const s = NIVELES[Math.max(0, Math.min(3, nivel))];
+  return (
+    <View
+      accessible
+      accessibilityLabel={s.label}
+      style={[
+        {
+          alignSelf: 'flex-start',
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: s.tint,
+          borderRadius: TOKENS.radius.pill,
+          paddingHorizontal: compacto ? 9 : 11,
+          paddingVertical: compacto ? 4 : 6,
+        },
+        style,
+      ]}
+    >
+      <IconNivel nivel={s.i} size={compacto ? 14 : 16} color={s.texto} />
+      <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '700', color: s.texto }}>{s.label}</Text>
+    </View>
+  );
+};
+
 // Badge de severidad a partir de una medición (o de {nivel_corrosion}/{area_corroida_pct})
-export const SeverityBadge = ({ medicion, style }) => {
-  const s = severidad(medicion || {});
-  return <Badge label={s.short} color={s.color} tint={s.tint} style={style} />;
+export const SeverityBadge = ({ medicion, style, compacto }) => (
+  <NivelBadge nivel={nivelDeMedicion(medicion || {})} style={style} compacto={compacto} />
+);
+
+// Muestra de color de un nivel con su ícono dentro (leyendas): el color nunca va solo.
+export const SwatchNivel = ({ nivel = 0, size = 18 }) => {
+  const s = NIVELES[Math.max(0, Math.min(3, nivel))];
+  return (
+    <View style={{ width: size, height: size, borderRadius: 4, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+      <IconNivel nivel={s.i} size={size - 6} color={ICONO_SOBRE_NIVEL[s.i]} />
+    </View>
+  );
+};
+
+// Ficha sobre una foto: fondo oscuro translúcido (texto blanco >= 9:1 sobre cualquier foto),
+// ícono del nivel en su color de estado y el valor.
+export const NivelChip = ({ nivel = 0, texto, style }) => {
+  const s = NIVELES[Math.max(0, Math.min(3, nivel))];
+  return (
+    <View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          alignSelf: 'flex-start',
+          backgroundColor: 'rgba(32,30,29,0.84)',
+          borderRadius: TOKENS.radius.pill,
+          paddingLeft: 6,
+          paddingRight: 8,
+          paddingVertical: 3,
+        },
+        style,
+      ]}
+    >
+      <IconNivel nivel={s.i} size={14} color={s.color} />
+      {!!texto && (
+        <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: TOKENS.fontSizes.xs, fontWeight: '600', color: '#fff' }}>
+          {String(texto).replace(/\u00a0/g, '')}
+        </Text>
+      )}
+    </View>
+  );
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -253,19 +358,103 @@ export const StatCard = ({ value, label, color = TOKENS.colors.text }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// Miniatura de foto (con placeholder de "óxido")
+// Foto con marcador de posición y respaldo si falla: llena su contenedor.
+//   sin uri (p. ej. URL vencida) -> marcador con ícono; cargando -> marcador que respira (quieto si
+//   el sistema pide menos movimiento); onError -> marcador con ícono. Nunca queda un hueco negro.
 // ─────────────────────────────────────────────────────────────
-export const Thumb = ({ uri, size = 52, radius = 14 }) => {
-  const base = {
-    width: size,
-    height: size,
-    borderRadius: radius,
-    backgroundColor: '#5c4133',
-    overflow: 'hidden',
-  };
-  if (uri) return <Image source={{ uri }} style={base} resizeMode="cover" />;
-  return <View style={base} />;
+const COLOR_MARCADOR = '#e6dac4';
+
+export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
+  const [estado, setEstado] = useState(uri ? 'cargando' : 'vacia');
+  const reducido = useReducedMotion();
+  const pulso = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    setEstado(uri ? 'cargando' : 'vacia');
+  }, [uri]);
+  useEffect(() => {
+    if (estado !== 'cargando' || reducido) {
+      pulso.setValue(0);
+      return undefined;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulso, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulso, { toValue: 0, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [estado, reducido, pulso]);
+  const opacidad = pulso.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] });
+  return (
+    <View style={[{ overflow: 'hidden', backgroundColor: COLOR_MARCADOR }, style]}>
+      {estado === 'cargando' && (
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#d9cbb0', opacity: opacidad }]} />
+      )}
+      {!!uri && estado !== 'error' && (
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={resizeMode}
+          onLoad={() => {
+            setEstado('lista');
+            onCargada?.();
+          }}
+          onError={() => {
+            setEstado('error');
+            onFallo?.();
+          }}
+          accessibilityIgnoresInvertColors
+        />
+      )}
+      {(estado === 'vacia' || estado === 'error') && (
+        <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+          <IconImageOff size={iconSize} color={TOKENS.colors.neutral500} />
+        </View>
+      )}
+    </View>
+  );
 };
+
+// Foto grande con la miniatura (ya en caché) de marcador: se ve al instante y la imagen completa aparece con un
+// fundido cuando termina de cargar. Si la completa falla, queda la miniatura. Sin miniatura distinta, es `Foto`.
+export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
+  const reducido = useReducedMotion();
+  const fundido = useRef(new Animated.Value(0)).current;
+  const [fallo, setFallo] = useState(false);
+  const conMini = Boolean(uriMini) && uriMini !== uri;
+  useEffect(() => {
+    fundido.setValue(0);
+    setFallo(false);
+  }, [uri, fundido]);
+  if (!conMini) return <Foto uri={uri} style={style} resizeMode={resizeMode} iconSize={iconSize} onCargada={onCargada} onFallo={onFallo} />;
+  return (
+    <View style={[{ overflow: 'hidden' }, style]}>
+      <Foto uri={uriMini} style={StyleSheet.absoluteFill} resizeMode={resizeMode} iconSize={iconSize} />
+      {!!uri && !fallo && (
+        <Animated.Image
+          source={{ uri }}
+          style={[StyleSheet.absoluteFill, { opacity: fundido }]}
+          resizeMode={resizeMode}
+          onLoad={() => {
+            onCargada?.();
+            if (reducido) fundido.setValue(1);
+            else Animated.timing(fundido, { toValue: 1, duration: 250, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
+          }}
+          onError={() => {
+            setFallo(true);
+            onFallo?.();
+          }}
+          accessibilityIgnoresInvertColors
+        />
+      )}
+    </View>
+  );
+};
+
+export const Thumb = ({ uri, size = 52, radius = 14, style }) => (
+  <Foto uri={uri} style={[{ width: size, height: size, borderRadius: radius }, style]} iconSize={Math.round(size * 0.4)} />
+);
 
 // ─────────────────────────────────────────────────────────────
 // Fila de medición (lista de historial / recientes / carpeta)
@@ -291,7 +480,7 @@ export const MeasurementRow = ({ medicion, title, subtitle, onPress }) => {
         },
       ]}
     >
-      <Thumb uri={medicion?.url_thumbnail || medicion?.url_imagen} />
+      <Thumb uri={miniaturaDe(medicion)} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: TOKENS.fontSizes.h5, fontWeight: '700', color: TOKENS.colors.text }}>
           {title}
@@ -302,6 +491,23 @@ export const MeasurementRow = ({ medicion, title, subtitle, onPress }) => {
       </View>
       <SeverityBadge medicion={medicion} />
     </Pressable>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Cifra de porcentaje: dígitos en IBM Plex Mono y el % en Outfit, más pequeño (en mono la coma y el % ocupan
+// una celda entera y la cifra se ve suelta). Sin número: raya.
+// ─────────────────────────────────────────────────────────────
+export const PctMono = ({ value, size = 34, color = TOKENS.colors.text, weight = '700', style }) => {
+  const n = typeof value === 'string' ? parseFloat(value) : Number(value);
+  if (value == null || value === '' || !Number.isFinite(n)) {
+    return <Text style={[{ fontFamily: TOKENS.fonts.mono, fontSize: size, lineHeight: Math.round(size * 1.2), fontWeight: weight, color }, style]}>—</Text>;
+  }
+  return (
+    <Text style={[{ color, lineHeight: Math.round(size * 1.2) }, style]}>
+      <Text style={{ fontFamily: TOKENS.fonts.mono, fontSize: size, fontWeight: weight }}>{n.toFixed(1).replace('.', ',')}</Text>
+      <Text style={{ fontSize: Math.round(size * 0.55), fontWeight: '600' }}> %</Text>
+    </Text>
   );
 };
 
@@ -326,16 +532,20 @@ export const ProgressBar = ({ value = 0, color = TOKENS.colors.accent }) => {
 // ─────────────────────────────────────────────────────────────
 export const Spinner = ({ size = 60, thickness = 4 }) => {
   const spin = useRef(new Animated.Value(0)).current;
+  const reducido = useReducedMotion();
   useEffect(() => {
+    if (reducido) return undefined;
     const loop = Animated.loop(
       Animated.timing(spin, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true })
     );
     loop.start();
     return () => loop.stop();
-  }, [spin]);
+  }, [spin, reducido]);
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   return (
     <Animated.View
+      accessibilityRole="progressbar"
+      accessibilityLabel="Cargando"
       style={{
         width: size,
         height: size,
@@ -343,7 +553,8 @@ export const Spinner = ({ size = 60, thickness = 4 }) => {
         borderWidth: thickness,
         borderColor: TOKENS.colors.neutral300,
         borderTopColor: TOKENS.colors.accent,
-        transform: [{ rotate }],
+        // Con movimiento reducido el anillo queda quieto (sigue indicando "cargando").
+        transform: reducido ? [] : [{ rotate }],
       }}
     />
   );
@@ -395,7 +606,7 @@ export const Segmented = ({ options, value, onChange, scroll = false }) => {
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             style={{
-              minHeight: 40,
+              minHeight: 44,
               justifyContent: 'center',
               paddingHorizontal: 15,
               paddingVertical: 9,
@@ -412,6 +623,112 @@ export const Segmented = ({ options, value, onChange, scroll = false }) => {
         );
       })}
     </Wrap>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Chip de filtro (Material 3): área táctil de 48 con la píldora visible de 36.
+//   icono opcional a la izquierda; `menu` agrega la flecha de lista desplegable;
+//   `onQuitar` agrega una X para limpiar ese filtro.
+// ─────────────────────────────────────────────────────────────
+export const Chip = ({ label, selected = false, onPress, icon = null, menu = false, onQuitar, accessibilityLabel }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: TOKENS.tapTarget }}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || label}
+      accessibilityState={{ selected }}
+      style={{
+        minHeight: 36,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingLeft: icon ? 10 : 14,
+        paddingRight: menu || onQuitar ? 8 : 14,
+        borderRadius: 10,
+        borderWidth: 1.5,
+        borderColor: selected ? TOKENS.colors.piedra_700 : TOKENS.colors.neutral400,
+        backgroundColor: selected ? TOKENS.colors.piedra_200 : 'transparent',
+      }}
+    >
+      {selected && !icon && <IconCheck size={16} color={TOKENS.colors.piedra_900} />}
+      {icon}
+      <Text style={{ fontSize: TOKENS.fontSizes.small, fontWeight: '600', color: selected ? TOKENS.colors.piedra_900 : TOKENS.colors.neutral700 }}>
+        {label}
+      </Text>
+      {menu && <IconChevronDown size={16} color={selected ? TOKENS.colors.piedra_900 : TOKENS.colors.neutral700} />}
+    </Pressable>
+    {!!onQuitar && (
+      <Pressable
+        onPress={onQuitar}
+        accessibilityRole="button"
+        accessibilityLabel={`Quitar filtro: ${label}`}
+        hitSlop={4}
+        style={{ width: 36, height: 48, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <IconClose size={18} color={TOKENS.colors.neutral700} />
+      </Pressable>
+    )}
+  </View>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Hoja inferior de opciones (Material 3 bottom sheet): una sola elección, filas de 56.
+// ─────────────────────────────────────────────────────────────
+export const HojaOpciones = ({ visible, titulo, opciones, valor, onElegir, onCerrar }) => {
+  if (!visible) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCerrar}>
+      <Pressable
+        onPress={onCerrar}
+        accessibilityLabel="Cerrar"
+        style={{ flex: 1, backgroundColor: 'rgba(32,30,29,0.5)', justifyContent: 'flex-end' }}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            backgroundColor: TOKENS.colors.surfaceAlt,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingTop: 12,
+            paddingBottom: 24,
+            maxHeight: '75%',
+          }}
+        >
+          <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: TOKENS.colors.neutral400, marginBottom: 12 }} />
+          <Text accessibilityRole="header" style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text, paddingHorizontal: 24, paddingBottom: 8 }}>
+            {titulo}
+          </Text>
+          <ScrollView>
+            {opciones.map((o) => {
+              const activa = o.value === valor;
+              return (
+                <Pressable
+                  key={String(o.value)}
+                  onPress={() => onElegir(o.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: activa }}
+                  style={({ pressed }) => ({
+                    minHeight: 56,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingHorizontal: 24,
+                    backgroundColor: pressed ? TOKENS.colors.neutral200 : 'transparent',
+                  })}
+                >
+                  <View style={{ width: 24 }}>{activa ? <IconCheck size={22} color={TOKENS.colors.accentText} /> : null}</View>
+                  <View style={{ flex: 1, paddingVertical: 8 }}>
+                    <Text style={{ ...TOKENS.type.bodyLarge, fontWeight: activa ? '700' : '400', color: TOKENS.colors.text }}>{o.label}</Text>
+                    {!!o.detalle && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{o.detalle}</Text>}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 };
 
@@ -462,61 +779,290 @@ export const KeyValueCard = ({ rows }) => (
 );
 
 // ─────────────────────────────────────────────────────────────
-// Encabezado de pantalla
+// Botón de ícono (Material 3): 48x48 de área táctil, ícono de 24.
 // ─────────────────────────────────────────────────────────────
-export const Header = ({ title, subtitle, onBack = null, right = null }) => (
+export const IconButton = ({ children, onPress, label, style, disabled = false }) => (
+  <Pressable
+    onPress={onPress}
+    disabled={disabled}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    style={({ pressed }) => [
+      {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: pressed ? TOKENS.colors.neutral200 : 'transparent',
+        opacity: disabled ? 0.4 : 1,
+      },
+      style,
+    ]}
+  >
+    {children}
+  </Pressable>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Barra superior (Material 3, pequeña): atrás, título de una línea, acciones a la derecha.
+// ─────────────────────────────────────────────────────────────
+export const Header = ({ title, subtitle, onBack = null, right = null, lines = 1 }) => (
   <View
     style={{
-      backgroundColor: TOKENS.colors.surface,
-      paddingHorizontal: TOKENS.spacing.lg,
-      paddingTop: TOKENS.spacing.base,
-      paddingBottom: TOKENS.spacing.base,
-      borderBottomWidth: 1,
-      borderBottomColor: TOKENS.colors.divider,
+      backgroundColor: TOKENS.colors.bg,
+      minHeight: 64,
+      paddingLeft: onBack ? 4 : TOKENS.spacing.lg,
+      paddingRight: 4,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: TOKENS.spacing.md,
+      gap: 4,
     }}
   >
     {onBack && (
-      <Pressable
-        onPress={onBack}
-        accessibilityRole="button"
-        accessibilityLabel="Volver"
-        hitSlop={TOKENS.hitSlop}
-        style={{ width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, borderColor: TOKENS.colors.neutral300, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Text style={{ fontSize: 22, color: TOKENS.colors.text, marginTop: -2 }}>‹</Text>
-      </Pressable>
+      <IconButton onPress={onBack} label="Volver a la pantalla anterior">
+        <IconArrowLeft size={24} color={TOKENS.colors.text} />
+      </IconButton>
     )}
-    <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: TOKENS.fontSizes.h3, fontWeight: '800', color: TOKENS.colors.text }}>{title}</Text>
-      {!!subtitle && <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>{subtitle}</Text>}
+    <View style={{ flex: 1, minWidth: 0, paddingVertical: 8, paddingLeft: onBack ? 4 : 0 }}>
+      <Text accessibilityRole="header" numberOfLines={lines} style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text }}>
+        {title}
+      </Text>
+      {!!subtitle && (
+        <Text numberOfLines={lines} style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 1 }}>
+          {subtitle}
+        </Text>
+      )}
     </View>
     {right}
   </View>
 );
 
+// Título de pantalla de las pestañas (sin etiquetas superiores): titular y bajada opcional.
+export const ScreenTitle = ({ title, subtitle, right }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+    <View style={{ flex: 1 }}>
+      <Text accessibilityRole="header" style={{ ...TOKENS.type.headlineMedium, color: TOKENS.colors.text }}>
+        {title}
+      </Text>
+      {!!subtitle && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, marginTop: 4 }}>{subtitle}</Text>}
+    </View>
+    {right}
+  </View>
+);
+
+// Encabezado de sección: el título habla por sí solo; acción opcional a la derecha.
+export const SectionTitle = ({ title, actionLabel, onAction, style }) => (
+  <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48 }, style]}>
+    <Text accessibilityRole="header" style={{ ...TOKENS.type.titleLarge, color: TOKENS.colors.text }}>
+      {title}
+    </Text>
+    {!!actionLabel && (
+      <Pressable
+        onPress={onAction}
+        accessibilityRole="button"
+        style={{ minHeight: 48, justifyContent: 'center', paddingLeft: 12 }}
+      >
+        <Text style={{ ...TOKENS.type.labelLarge, color: TOKENS.colors.accentText }}>{actionLabel}</Text>
+      </Pressable>
+    )}
+  </View>
+);
+
+// Aviso en banda (sin conexión, errores recuperables).
+export const Banner = ({ text, tone = 'warning', icon, action, onAction }) => {
+  const tonos = {
+    warning: { bg: TOKENS.colors.warningTint, fg: TOKENS.colors.warningText, icon: TOKENS.colors.warning },
+    danger: { bg: TOKENS.colors.dangerTint, fg: TOKENS.colors.danger, icon: TOKENS.colors.danger },
+  };
+  const t = tonos[tone] || tonos.warning;
+  return (
+    <View accessibilityRole="alert" style={{ backgroundColor: t.bg, borderRadius: TOKENS.radius.md, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      {icon || <IconAlertTriangle size={22} color={t.icon} />}
+      <Text style={{ ...TOKENS.type.bodyMedium, color: t.fg, flex: 1, fontWeight: '600' }}>{text}</Text>
+      {!!action && (
+        <Pressable onPress={onAction} accessibilityRole="button" style={{ minHeight: 48, justifyContent: 'center' }}>
+          <Text style={{ ...TOKENS.type.labelLarge, color: t.fg }}>{action}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+};
+
+// Aviso de "sin conexión" igual en todas las pestañas.
+export const AvisoSinConexion = () => (
+  <Banner icon={<IconWifiOff size={22} color={TOKENS.colors.warning} />} text="Sin conexión. Ves los datos guardados en este teléfono." />
+);
+
+// Botón de acción flotante extendido (Material 3): una sola acción principal por pantalla.
+export const Fab = ({ label, icon, onPress, style }) => (
+  <Pressable
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    style={({ pressed }) => [
+      {
+        position: 'absolute',
+        right: 16,
+        bottom: 16,
+        minHeight: 56,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 20,
+        borderRadius: 16,
+        backgroundColor: pressed ? TOKENS.colors.accent700 : TOKENS.colors.accent,
+        ...TOKENS.shadow.md,
+      },
+      style,
+    ]}
+  >
+    {icon}
+    <Text style={{ ...TOKENS.type.labelLarge, fontSize: 16, color: '#fff' }}>{label}</Text>
+  </Pressable>
+);
+
+// Snackbar: aviso breve y pasajero (se oculta solo). Quien lo usa controla `visible`.
+export const Snackbar = ({ visible, message, actionLabel, onAction, onDismiss }) => {
+  useEffect(() => {
+    if (!visible) return undefined;
+    const t = setTimeout(() => onDismiss?.(), 4500);
+    return () => clearTimeout(t);
+  }, [visible, message, onDismiss]);
+  if (!visible) return null;
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      accessibilityRole="alert"
+      style={{
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        bottom: 96,
+        minHeight: 48,
+        backgroundColor: TOKENS.colors.text,
+        borderRadius: 8,
+        paddingLeft: 16,
+        paddingRight: actionLabel ? 4 : 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        ...TOKENS.shadow.md,
+      }}
+    >
+      <Text style={{ ...TOKENS.type.bodyMedium, color: '#f5ead8', flex: 1, paddingVertical: 12 }}>{message}</Text>
+      {!!actionLabel && (
+        <Pressable onPress={onAction} accessibilityRole="button" style={{ minHeight: 48, paddingHorizontal: 12, justifyContent: 'center' }}>
+          <Text style={{ ...TOKENS.type.labelLarge, color: TOKENS.colors.accent400 }}>{actionLabel}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+};
+
+// Menú de acciones de la barra superior (Material 3): lista corta bajo el botón de tres puntos.
+export const MenuAcciones = ({ visible, onCerrar, items }) => {
+  if (!visible) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onCerrar}>
+      <Pressable onPress={onCerrar} accessibilityLabel="Cerrar menú" style={{ flex: 1 }}>
+        <View
+          accessibilityRole="menu"
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: TOP_INSET + 52,
+            minWidth: 220,
+            backgroundColor: TOKENS.colors.surfaceAlt,
+            borderRadius: 12,
+            paddingVertical: 8,
+            ...TOKENS.shadow.lg,
+          }}
+        >
+          {items.map((it) => (
+            <Pressable
+              key={it.label}
+              onPress={() => {
+                onCerrar();
+                it.onPress?.();
+              }}
+              accessibilityRole="menuitem"
+              style={({ pressed }) => ({
+                minHeight: 48,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 14,
+                paddingHorizontal: 16,
+                backgroundColor: pressed ? TOKENS.colors.neutral200 : 'transparent',
+              })}
+            >
+              {it.icon}
+              <Text style={{ ...TOKENS.type.bodyLarge, color: it.destructive ? TOKENS.colors.danger : TOKENS.colors.text }}>{it.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Pressable>
+    </Modal>
+  );
+};
+
 // ─────────────────────────────────────────────────────────────
 // Barra de pestañas inferior
 // ─────────────────────────────────────────────────────────────
-const TAB_ICON = { home: '⌂', folders: '▤', activity: '◷', settings: '⚙' };
+const renderTabIcon = (key, color) => {
+  switch (key) {
+    case 'home':
+      return <IconHome size={24} color={color} />;
+    case 'lotes':
+      return <IconLotes size={24} color={color} />;
+    case 'folders':
+      return <IconPuntos size={24} color={color} />;
+    case 'activity':
+      return <IconActivity size={24} color={color} />;
+    case 'settings':
+      return <IconSettings size={24} color={color} />;
+    default:
+      return <IconDot size={24} color={color} />;
+  }
+};
+
+// Avatar con las iniciales: abre Ajustes (cuenta y cerrar sesión) desde cualquier pestaña.
+export const AvatarButton = ({ iniciales, onPress }) => (
+  <Pressable
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel="Abrir ajustes y cuenta"
+    style={({ pressed }) => ({
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: pressed ? TOKENS.colors.accent300 : TOKENS.colors.accent200,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: TOKENS.colors.accent300,
+    })}
+  >
+    <Text style={{ ...TOKENS.type.titleMedium, color: TOKENS.colors.accent800 }}>{iniciales}</Text>
+  </Pressable>
+);
 
 export const TabBar = ({ current, onChange, items }) => (
   <View
+    accessibilityRole="tablist"
     style={{
       flexDirection: 'row',
+      backgroundColor: TOKENS.colors.surfaceAlt,
       borderTopWidth: 1,
       borderTopColor: TOKENS.colors.neutral200,
-      backgroundColor: TOKENS.colors.surfaceAlt,
-      paddingTop: 8,
-      paddingBottom: 22,
-      paddingHorizontal: 8,
+      paddingTop: 12,
+      paddingBottom: 16,
+      paddingHorizontal: 4,
     }}
   >
     {items.map((it) => {
       const active = it.key === current;
-      const color = active ? TOKENS.colors.accent700 : TOKENS.colors.neutral500;
+      const color = active ? TOKENS.colors.accent900 : TOKENS.colors.neutral600;
       return (
         <Pressable
           key={it.key}
@@ -524,43 +1070,224 @@ export const TabBar = ({ current, onChange, items }) => (
           accessibilityRole="tab"
           accessibilityState={{ selected: active }}
           accessibilityLabel={it.label}
-          style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 6, minHeight: TOKENS.tapTarget, justifyContent: 'center' }}
+          style={{ flex: 1, alignItems: 'center', gap: 4, minHeight: 56 }}
         >
-          <Text style={{ fontSize: 20, color }}>{TAB_ICON[it.key] || '•'}</Text>
-          <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '700', color }}>{it.label}</Text>
+          {/* Indicador activo (píldora) de Material 3 */}
+          <View
+            style={{
+              width: 64,
+              height: 32,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: active ? TOKENS.colors.accent200 : 'transparent',
+            }}
+          >
+            {renderTabIcon(it.key, color)}
+          </View>
+          {/* 12 sp (como Material 3): con 360 dp o letra grande, 4 rótulos caben sin apretarse. */}
+          <Text numberOfLines={1} style={{ ...TOKENS.type.labelSmall, fontWeight: active ? '800' : '600', color }}>
+            {it.label}
+          </Text>
         </Pressable>
       );
     })}
   </View>
 );
 
-// ResultCard heredado (compat) — usa la severidad real del backend.
-export const ResultCard = ({ nivel, percentage, confidence, ubicacion, medicion }) => {
-  const m = medicion || { nivel_corrosion: nivel, area_corroida_pct: percentage, confianza_promedio: confidence };
-  const s = severidad(m);
-  return (
-    <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, ...TOKENS.shadow.md, marginBottom: TOKENS.spacing.base }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 6 }}>
-        <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
-        <Text style={{ fontSize: TOKENS.fontSizes.xs, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: s.color }}>{s.short}</Text>
-      </View>
-      <Text style={{ fontSize: 42, fontWeight: '800', color: TOKENS.colors.text }}>{num(m.area_corroida_pct, 0).toFixed(0)}%</Text>
-      <Text style={{ fontSize: TOKENS.fontSizes.small, color: TOKENS.colors.neutral600, marginTop: 2 }}>Corrosión detectada</Text>
-      <Divider />
-      <View style={{ gap: 10 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.body }}>Confianza</Text>
-          <Text style={{ fontWeight: '700', fontSize: TOKENS.fontSizes.body }}>{confianzaPct(m.confianza_promedio)}%</Text>
-        </View>
-        <ProgressBar value={confianzaPct(m.confianza_promedio)} color={TOKENS.colors.accent2} />
-        {!!ubicacion && (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-            <Text style={{ color: TOKENS.colors.neutral600, fontSize: TOKENS.fontSizes.body }}>Ubicación</Text>
-            <Text style={{ fontWeight: '700', fontSize: TOKENS.fontSizes.body }}>{ubicacion}</Text>
+// LecturaNivel — la lectura de una medición: nivel (ícono + nombre), % y su aclaración honesta.
+//   El % es aproximado y se mide sobre la placa cuando el backend lo indica (area_base = 'placa').
+// ─────────────────────────────────────────────────────────────
+export const LecturaNivel = ({ medicion, compacta = false }) => {
+  const s = severidad(medicion || {});
+  const sobrePlaca = medicion?.area_base === 'placa' || medicion?.area_corroida_pct_foto != null;
+  if (compacta) {
+    // Bloque compacto (detalle de foto): ícono + nivel + aclaración a la izquierda y el % grande en cifras a la derecha.
+    return (
+      <View
+        accessible
+        accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado`}
+        style={{ gap: 10 }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+            <IconNivel nivel={s.i} size={28} color={ICONO_SOBRE_NIVEL[s.i]} />
           </View>
-        )}
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...TOKENS.type.titleMedium, color: s.texto }}>{s.label}</Text>
+            <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>{sobrePlaca ? 'Aproximado sobre la placa' : 'Aproximado sobre la foto'}</Text>
+          </View>
+          <PctMono value={medicion?.area_corroida_pct} size={32} />
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${s.label}, ${formatoPct(medicion?.area_corroida_pct)} ${sobrePlaca ? 'sobre la placa' : 'de la foto'}, aproximado`}
+      style={{ gap: 12 }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: s.color, alignItems: 'center', justifyContent: 'center' }}>
+          <IconNivel nivel={s.i} size={32} color={ICONO_SOBRE_NIVEL[s.i]} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...TOKENS.type.titleLarge, color: s.texto }}>{s.label}</Text>
+          <PctMono value={medicion?.area_corroida_pct} size={38} />
+        </View>
+      </View>
+      <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600 }}>
+        {sobrePlaca ? 'Aproximado sobre la placa' : 'Aproximado sobre la foto'}. Depende del encuadre y no reemplaza una inspección en sitio.
+      </Text>
+    </View>
+  );
+};
+
+// Tarjeta con la lectura (resultado de un análisis).
+export const ResultCard = ({ medicion, ubicacion, loteNombre, nivel, percentage, confidence }) => {
+  const m = medicion || { nivel_corrosion: nivel, area_corroida_pct: percentage, confianza_promedio: confidence };
+  return (
+    <View style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: TOKENS.radius.lg, padding: TOKENS.spacing.lg, borderWidth: 1, borderColor: TOKENS.colors.border, marginBottom: TOKENS.spacing.base, ...TOKENS.shadow.card }}>
+      <LecturaNivel medicion={m} />
+      {!!(ubicacion || loteNombre || m.lote_nombre) && (
+        <View style={{ marginTop: 14, gap: 8, borderTopWidth: 1, borderTopColor: TOKENS.colors.neutral200, paddingTop: 14 }}>
+          {!!ubicacion && <FilaDato label="Punto" value={ubicacion} />}
+          {!!(loteNombre || m.lote_nombre) && <FilaDato label="Lote" value={loteNombre || m.lote_nombre} />}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Fila etiqueta / valor, el valor se parte en varias líneas en vez de truncarse.
+export const FilaDato = ({ label, value }) => (
+  <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+    <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral600, width: 104 }}>{label}</Text>
+    <Text style={{ ...TOKENS.type.titleSmall, color: TOKENS.colors.text, flex: 1 }}>{value}</Text>
+  </View>
+);
+
+// ─────────────────────────────────────────────────────────────
+// ConfirmModal — Diálogo de Material 3 (reemplazo accesible de Alert.alert).
+//   Título, mensaje y acciones de texto alineadas a la derecha; la acción destructiva usa el color de
+//   peligro y siempre nombra lo que hace ("Eliminar", "Cerrar sesión"), nunca "Aceptar".
+// ─────────────────────────────────────────────────────────────
+const AccionTexto = ({ label, onPress, danger = false, primary = false }) => (
+  <Pressable
+    onPress={onPress}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    style={({ pressed }) => ({
+      minHeight: 48,
+      minWidth: 64,
+      paddingHorizontal: 12,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: pressed ? (danger ? TOKENS.colors.dangerTint : TOKENS.colors.neutral200) : 'transparent',
+    })}
+  >
+    <Text
+      style={{
+        ...TOKENS.type.labelLarge,
+        fontSize: 15,
+        color: danger ? TOKENS.colors.danger : primary ? TOKENS.colors.accentText : TOKENS.colors.neutral700,
+      }}
+    >
+      {label}
+    </Text>
+  </Pressable>
+);
+
+const Dialogo = ({ children, onCancel }) => (
+  <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
+    <View style={{ flex: 1, backgroundColor: 'rgba(32,30,29,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View
+        accessibilityViewIsModal
+        style={{ backgroundColor: TOKENS.colors.surfaceAlt, borderRadius: 28, paddingTop: 24, paddingHorizontal: 24, paddingBottom: 16, width: '100%', maxWidth: 360, ...TOKENS.shadow.lg }}
+      >
+        {children}
       </View>
     </View>
+  </Modal>
+);
+
+export const ConfirmModal = ({
+  visible,
+  title,
+  message,
+  confirmLabel = 'Aceptar',
+  cancelLabel = 'Cancelar',
+  variant = 'primary', // primary | danger
+  extraLabel = '', // tercera acción opcional (p. ej. "Descartar y continuar")
+  onExtra,
+  onConfirm,
+  onCancel,
+}) => {
+  if (!visible) return null;
+  const apilado = Boolean(extraLabel);
+  return (
+    <Dialogo onCancel={onCancel}>
+      {!!title && (
+        <Text accessibilityRole="header" style={{ ...TOKENS.type.headlineSmall, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 12 }}>
+          {title}
+        </Text>
+      )}
+      {!!message && <Text style={{ ...TOKENS.type.bodyLarge, color: TOKENS.colors.neutral700 }}>{message}</Text>}
+      <View
+        style={{
+          flexDirection: apilado ? 'column' : 'row',
+          alignItems: apilado ? 'flex-end' : 'center',
+          justifyContent: 'flex-end',
+          gap: 4,
+          marginTop: 20,
+        }}
+      >
+        {!!cancelLabel && <AccionTexto label={cancelLabel} onPress={onCancel} />}
+        {!!extraLabel && <AccionTexto label={extraLabel} onPress={onExtra} danger />}
+        <AccionTexto label={confirmLabel} onPress={onConfirm} danger={variant === 'danger'} primary={variant !== 'danger'} />
+      </View>
+    </Dialogo>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// PromptModal — Diálogo con un campo de texto (reemplazo de Alert.prompt)
+// ─────────────────────────────────────────────────────────────
+export const PromptModal = ({
+  visible,
+  title,
+  message,
+  initialValue = '',
+  placeholder = '',
+  confirmLabel = 'Guardar',
+  cancelLabel = 'Cancelar',
+  onConfirm,
+  onCancel,
+}) => {
+  const [value, setValue] = useState(initialValue);
+
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue, visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Dialogo onCancel={onCancel}>
+      {!!title && (
+        <Text accessibilityRole="header" style={{ ...TOKENS.type.headlineSmall, fontWeight: '700', color: TOKENS.colors.text, marginBottom: 8 }}>
+          {title}
+        </Text>
+      )}
+      {!!message && <Text style={{ ...TOKENS.type.bodyMedium, color: TOKENS.colors.neutral700, marginBottom: 16 }}>{message}</Text>}
+      <Field label="" value={value} onChangeText={setValue} placeholder={placeholder} autoFocus accessibilityLabel={title} />
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
+        <AccionTexto label={cancelLabel} onPress={onCancel} />
+        <AccionTexto label={confirmLabel} onPress={() => onConfirm(value)} primary />
+      </View>
+    </Dialogo>
   );
 };
 
@@ -591,4 +1318,19 @@ export default {
   Header,
   TabBar,
   ResultCard,
+  ScreenTitle,
+  LecturaNivel,
+  FilaDato,
+  SectionTitle,
+  Banner,
+  Fab,
+  Snackbar,
+  MenuAcciones,
+  IconButton,
+  Chip,
+  HojaOpciones,
+  Foto,
+  NivelBadge,
+  NivelChip,
+  SwatchNivel,
 };

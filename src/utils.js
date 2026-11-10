@@ -1,12 +1,14 @@
 // src/utils.js — Helpers compartidos. No duplicar en App.js.
 
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { necesitaConvertirAJpeg } from './subida';
 import * as Location from 'expo-location';
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-import { APP_CONFIG, LISTA_BLOQUES, CIUDAD } from './config';
+import { APP_CONFIG, LISTA_BLOQUES } from './config';
 import { num, severidad } from './DesignTokens';
 
 // ───────────────────────────── Geometría ─────────────────────────────
@@ -33,6 +35,7 @@ export async function getIdToken() {
 
 // ───────────────────────────── Ubicación ─────────────────────────────
 export async function getCurrentLocation() {
+  if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').getCurrentLocationDemo();
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {
     const err = new Error('Sin permiso de ubicación. Actívalo en Ajustes del teléfono.');
@@ -48,6 +51,7 @@ export async function getCurrentLocation() {
 }
 
 export async function reverseGeocode(lat, lng) {
+  if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').reverseGeocodeDemo();
   try {
     const [a] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
     if (!a) return { ciudad: null, barrio: null, direccion: null };
@@ -62,8 +66,10 @@ export async function reverseGeocode(lat, lng) {
 }
 
 // ───────────────────────────── Cámara / galería ─────────────────────────────
-// Devuelve { uri, base64, width, height } o null si se canceló.
-export async function pickPhoto({ fromCamera = true } = {}) {
+// Devuelve array de fotos [{ uri, base64, width, height }] o null si se canceló.
+// `recortar`: abre el editor de recorte en la galería (solo con una foto; con varias el selector no recorta).
+export async function pickPhotos({ fromCamera = false, allowsMultiple = true, recortar = false } = {}) {
+  if (process.env.EXPO_PUBLIC_DEMO === '1') return require('./demo/dispositivo').pickPhotosDemo({ fromCamera, allowsMultiple });
   const perm = fromCamera
     ? await ImagePicker.requestCameraPermissionsAsync()
     : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -79,27 +85,48 @@ export async function pickPhoto({ fromCamera = true } = {}) {
   const opts = {
     mediaTypes: ['images'],
     quality: 0.6,
-    base64: true,
-    allowsEditing: true,
-    exif: false,
+    base64: false, // la subida usa la URI (upload-url + S3); base64 solo gastaba memoria
+    allowsMultipleSelection: !fromCamera && allowsMultiple,
   };
   const res = fromCamera
-    ? await ImagePicker.launchCameraAsync(opts)
-    : await ImagePicker.launchImageLibraryAsync(opts);
+    ? await ImagePicker.launchCameraAsync({ ...opts, allowsEditing: true })
+    : await ImagePicker.launchImageLibraryAsync({ ...opts, allowsEditing: recortar && !allowsMultiple });
   if (res.canceled || !res.assets?.length) return null;
-  const a = res.assets[0];
-  return { uri: a.uri, base64: a.base64 || null, width: a.width, height: a.height, mimeType: a.mimeType };
+  return Promise.all(
+    res.assets.map((a) =>
+      asegurarJpeg({
+        uri: a.uri,
+        base64: a.base64 || null,
+        width: a.width,
+        height: a.height,
+        mimeType: a.mimeType,
+        fileName: a.fileName,
+      })
+    )
+  );
 }
 
-// Valida que la foto sirva para el modelo (mín. 800x600 según el mockup).
-export function validarFoto(foto) {
-  if (!foto?.uri) return 'No se recibió ninguna foto.';
-  if (!foto.base64) return 'La foto no se pudo leer. Vuelve a capturarla.';
-  if (foto.width && foto.height && (foto.width < 640 || foto.height < 480)) {
-    return 'La foto es muy pequeña. Usa al menos 800 × 600 px.';
+// La subida declara image/jpeg: una foto HEIF/WebP (algunos Android) se convierte a JPEG en silencio.
+// Si la conversión falla se conserva la original (el backend decide por los bytes) y no se molesta al usuario.
+async function asegurarJpeg(foto) {
+  if (!necesitaConvertirAJpeg(foto)) return foto;
+  try {
+    const { manipulateAsync, SaveFormat } = require('expo-image-manipulator');
+    const r = await manipulateAsync(foto.uri, [], { compress: 0.9, format: SaveFormat.JPEG });
+    return { ...foto, uri: r.uri, width: r.width || foto.width, height: r.height || foto.height, mimeType: 'image/jpeg', base64: null };
+  } catch {
+    return foto;
   }
-  return '';
 }
+
+// Devuelve { uri, base64, width, height } o null si se canceló (compatibilidad).
+export async function pickPhoto({ fromCamera = true } = {}) {
+  const fotos = await pickPhotos({ fromCamera, allowsMultiple: false });
+  return fotos?.[0] || null;
+}
+
+// Validación del tamaño mínimo de la foto (lógica pura en ./subida; mensajes sin píxeles).
+export { validarFoto } from './subida';
 
 // ───────────────────────────── Fechas ─────────────────────────────
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -143,7 +170,7 @@ export function calcularEstadisticas(mediciones = []) {
     const pct = num(m.area_corroida_pct, 0);
     suma += pct;
     const s = severidad(m);
-    if (s.i >= 3 || pct >= 40) severas += 1;
+    if (s.i >= 3 || pct >= 25) severas += 1;
   }
   const promedioPct = Math.round(suma / total);
   return {
@@ -173,6 +200,34 @@ export async function loadLocal(key, fallback = null) {
     console.log('loadLocal', key, e?.message);
     return fallback;
   }
+}
+
+// Borra TODO lo que la app guarda del usuario: las claves de AsyncStorage (las
+// declaradas en APP_CONFIG.storageKeys más cualquier otra con prefijo `pixelrust_`)
+// y las fotos locales de guardarFotoLocal. Las claves de Amplify las limpia signOut().
+export async function clearLocalData() {
+  let ok = true;
+  try {
+    const keys = new Set(Object.values(APP_CONFIG.storageKeys));
+    const todas = await AsyncStorage.getAllKeys();
+    todas.filter((k) => k.startsWith('pixelrust_')).forEach((k) => keys.add(k));
+    await AsyncStorage.multiRemove([...keys]);
+  } catch (e) {
+    console.log('clearLocalData', e?.message);
+    ok = false;
+  }
+  try {
+    // Sin sistema de archivos en web (documentDirectory es null/undefined).
+    if (Platform.OS !== 'web' && FileSystem.documentDirectory) {
+      await FileSystem.deleteAsync(FileSystem.documentDirectory + APP_CONFIG.carpetaFotos + '/', {
+        idempotent: true,
+      });
+    }
+  } catch (e) {
+    console.log('clearLocalData fotos', e?.message);
+    ok = false;
+  }
+  return ok;
 }
 
 // ───────────────────────────── Fotos locales ─────────────────────────────
@@ -234,16 +289,17 @@ export function bloqueMasCercano(lat, lng, maxMetros = 120, listaBloques = LISTA
   return best && bestD <= maxMetros ? best.clave : null;
 }
 
-// notas del backend: guardamos el bloque como prefijo legible "Bloque K · <texto>".
+// notas del backend: guardamos el punto como prefijo legible "Punto K · <texto>".
+// (Las mediciones antiguas usan el prefijo "Bloque K": parseBloqueDeNotas acepta ambos.)
 export function construirNotas(bloque, texto = '') {
   const t = (texto || '').trim();
-  return t ? `Bloque ${bloque} · ${t}` : `Bloque ${bloque}`;
+  return t ? `Punto ${bloque} · ${t}` : `Punto ${bloque}`;
 }
 
 export function parseBloqueDeNotas(notas = '') {
   // Incluye guiones: los id_bloque reales (uuid) los usan; las claves de
   // BLOQUES_CAMPUS (letras) también matchean igual que antes.
-  const m = /bloque\s+([a-z0-9-]+)/i.exec(notas || '');
+  const m = /(?:punto|bloque)\s+([a-z0-9-]+)/i.exec(notas || '');
   return m ? m[1].toUpperCase() : null;
 }
 
@@ -297,7 +353,7 @@ export function agruparPorBloque(mediciones = [], mapaLocal = {}, listaBloques =
   if (sinBloque.length) {
     salida.push({
       clave: 'SIN_BLOQUE',
-      bloque: { clave: 'SIN_BLOQUE', nombre: 'Sin bloque', detalle: 'Fuera del campus' },
+      bloque: { clave: 'SIN_BLOQUE', nombre: 'Sin punto', detalle: 'Sin punto asignado' },
       items: orden(sinBloque),
       peorPct: Math.max(...sinBloque.map((m) => num(m.area_corroida_pct, 0))),
     });
@@ -347,4 +403,3 @@ export function agruparMedicionesEnCiudades(mediciones) {
     }));
 }
 
-export { CIUDAD };
