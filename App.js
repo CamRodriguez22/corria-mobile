@@ -26,6 +26,7 @@ import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
 
 import { TOKENS, num, severidad } from './src/DesignTokens';
 import { crearLimitador } from './src/limitador';
+import { crearPublicadorCarga } from './src/carga';
 import { mensajeFotosOmitidas, MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote, opcionesSelector, MENSAJE_FOTO_PEQUENA } from './src/subida';
 import {
   Screen,
@@ -514,48 +515,33 @@ function Root() {
       // Cada recurso se publica apenas llega (la pantalla ya no espera al más lento). Un fallo de red NO
       // es una lista vacía: si /mediciones/recientes falla se conserva la caché y se avisa "Sin conexión".
       // Un 401 en cualquiera avisa una sola vez y detiene las publicaciones que falten.
-      let vencida = false;
-      const vigente = () => sesion === sesionRef.current && !vencida;
-      const manejarFallo = (e) => {
-        if (sesion !== sesionRef.current || vencida || !esSesionVencida(e)) return;
-        vencida = true;
-        avisarSesionVencida();
-        setOffline(true);
-      };
-      const tarea = async (promesa, publicar, alFallar) => {
-        let valor;
-        try {
-          valor = await promesa;
-        } catch (e) {
-          manejarFallo(e);
-          if (vigente()) alFallar?.(e);
-          return;
-        }
-        if (!vigente()) return;
-        try {
-          await publicar(valor);
-        } catch (e) {
-          console.log('cargarTodo publicar', e?.message);
-        }
-      };
+      const carga = crearPublicadorCarga({
+        sesionVigente: () => sesion === sesionRef.current,
+        esSesionVencida,
+        alVencer: () => { avisarSesionVencida(); setOffline(true); },
+        alErrorPublicacion: (e) => { console.log('cargarTodo publicar', e?.message); setOffline(true); },
+      });
+      const { tarea } = carga;
       // El dueño de la caché (cognito_sub) sale del perfil; si el perfil falla, del guardado.
       const pPerfil = getMiPerfil();
       const subCache = () => pPerfil.then((p) => p?.cognito_sub, () => undefined).then((sub) => sub ?? perfilGuardado?.cognito_sub);
 
       await Promise.all([
-        tarea(pPerfil, (perfilNuevo) => {
+        tarea(pPerfil, async (perfilNuevo) => {
           if (!perfilNuevo) return;
           setPerfil(perfilNuevo);
-          saveLocal(APP_CONFIG.storageKeys.perfilCache, envolverCache(perfilNuevo.cognito_sub, perfilNuevo));
+          await saveLocal(APP_CONFIG.storageKeys.perfilCache, envolverCache(perfilNuevo.cognito_sub, perfilNuevo));
         }),
-        tarea(getIndicadores(), async (inds) => {
+        tarea(getIndicadores(), async (inds, vigente) => {
           if (!inds) return;
           setIndicadoresServidor(inds);
-          saveLocal(APP_CONFIG.storageKeys.indicadoresCache, envolverCache(await subCache(), inds));
+          const sub = await subCache();
+          if (!vigente()) return;
+          await saveLocal(APP_CONFIG.storageKeys.indicadoresCache, envolverCache(sub, inds));
         }),
         tarea(
           getBloques(),
-          async (lista) => {
+          async (lista, vigente) => {
             if (!Array.isArray(lista)) {
               setErrorBloques(true);
               return;
@@ -563,13 +549,15 @@ function Root() {
             const adaptados = lista.map(adaptarBloque);
             setBloques(adaptados);
             setErrorBloques(false);
-            saveLocal(APP_CONFIG.storageKeys.bloquesCache, envolverCache(await subCache(), adaptados));
+            const sub = await subCache();
+            if (!vigente()) return;
+            await saveLocal(APP_CONFIG.storageKeys.bloquesCache, envolverCache(sub, adaptados));
           },
           () => setErrorBloques(true)
         ),
         tarea(
           getMedicionesRecientes(undefined, PAGINA_MEDICIONES),
-          (respMeds) => {
+          async (respMeds) => {
             const lista = listaDeRespuesta(respMeds);
             setHayMasMediciones(calcularHayMas(respMeds, PAGINA_MEDICIONES));
 
@@ -582,8 +570,8 @@ function Root() {
               const fresca = prev && limpio.find((m) => m.id_medicion === prev.id_medicion);
               return fresca ? { ...prev, url_thumbnail: fresca.url_thumbnail, url_imagen: fresca.url_imagen, _urlTs: fresca._urlTs } : prev;
             });
-            setOffline(false);
-            saveLocal(
+            setOffline(carga.falloPublicacion);
+            await saveLocal(
               APP_CONFIG.storageKeys.historialCache,
               limpio.map(({ detecciones, ...rest }) => rest)
             );
@@ -595,11 +583,14 @@ function Root() {
         ),
       ]);
     } catch (e) {
+      if (sesion !== sesionRef.current) return;
       console.log('cargarTodo', e?.message);
       setOffline(true);
     } finally {
-      setLoadingData(false);
-      setRefreshing(false);
+      if (sesion === sesionRef.current) {
+        setLoadingData(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
