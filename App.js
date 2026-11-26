@@ -25,7 +25,9 @@ import { IBMPlexMono_600SemiBold } from '@expo-google-fonts/ibm-plex-mono/600Sem
 import { IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono/700Bold';
 
 import { TOKENS, num, severidad } from './src/DesignTokens';
-import { MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote, opcionesSelector, MENSAJE_FOTO_PEQUENA } from './src/subida';
+import { crearLimitador } from './src/limitador';
+import { crearPublicadorCarga } from './src/carga';
+import { mensajeFotosOmitidas, MENSAJE_FOTOS_PEQUENAS, MODO_INDIVIDUAL, MODO_LOTE, paramsLote, opcionesSelector, MENSAJE_FOTO_PEQUENA } from './src/subida';
 import {
   Screen,
   Logo,
@@ -139,6 +141,9 @@ const TABS = [
   { key: 'folders', label: 'Puntos' },
   { key: 'activity', label: 'Actividad' },
 ];
+
+// Resúmenes diarios por punto: como máximo 3 peticiones simultáneas (cada una es una llamada a Lambda).
+const limitadorResumenes = crearLimitador(3);
 
 export default function App() {
   return (
@@ -507,71 +512,85 @@ function Root() {
     if (Array.isArray(cache) && cache.length) setMediciones(limpiarVencidas(cache));
 
     try {
-      // allSettled: un fallo de red NO es una lista vacía. Si /mediciones/recientes
-      // falla se conserva la lista en caché (no se sobrescribe) y se avisa "Sin conexión".
-      const [rPerfil, rMeds, rBloques, rInds] = await Promise.allSettled([
-        getMiPerfil(),
-        getMedicionesRecientes(undefined, PAGINA_MEDICIONES),
-        getBloques(),
-        getIndicadores(),
-      ]);
-      if (sesion !== sesionRef.current) return;
-      const fallos = [rPerfil, rMeds, rBloques, rInds].filter((r) => r.status === 'rejected').map((r) => r.reason);
-      if (fallos.some(esSesionVencida)) {
-        avisarSesionVencida();
-        setOffline(true);
-        return;
-      }
-      if (rPerfil.status === 'fulfilled' && rPerfil.value) {
-        setPerfil(rPerfil.value);
-        saveLocal(APP_CONFIG.storageKeys.perfilCache, envolverCache(rPerfil.value.cognito_sub, rPerfil.value));
-      }
-      if (rInds.status === 'fulfilled' && rInds.value) {
-        setIndicadoresServidor(rInds.value);
-        saveLocal(
-          APP_CONFIG.storageKeys.indicadoresCache,
-          envolverCache(rPerfil.status === 'fulfilled' ? rPerfil.value?.cognito_sub : perfilGuardado?.cognito_sub, rInds.value)
-        );
-      }
-      if (rBloques.status === 'fulfilled' && Array.isArray(rBloques.value)) {
-        const adaptados = rBloques.value.map(adaptarBloque);
-        setBloques(adaptados);
-        setErrorBloques(false);
-        const subPerfil = rPerfil.status === 'fulfilled' ? rPerfil.value?.cognito_sub : perfilGuardado?.cognito_sub;
-        saveLocal(APP_CONFIG.storageKeys.bloquesCache, envolverCache(subPerfil, adaptados));
-      } else {
-        setErrorBloques(true);
-      }
-
-      if (rMeds.status === 'rejected') {
-        console.log('cargarTodo mediciones', rMeds.reason?.message);
-        setOffline(true);
-        return;
-      }
-      const respMeds = rMeds.value;
-      const lista = listaDeRespuesta(respMeds);
-      setHayMasMediciones(calcularHayMas(respMeds, PAGINA_MEDICIONES));
-
-      const limpio = marcarCarga(lista.map(({ mascaras, ...rest }) => rest)).sort(
-        (a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0)
-      );
-      setMediciones(limpio);
-      // El detalle abierto recibe las URL nuevas (las que tenía pueden estar por vencer).
-      setDetalle((prev) => {
-        const fresca = prev && limpio.find((m) => m.id_medicion === prev.id_medicion);
-        return fresca ? { ...prev, url_thumbnail: fresca.url_thumbnail, url_imagen: fresca.url_imagen, _urlTs: fresca._urlTs } : prev;
+      // Cada recurso se publica apenas llega (la pantalla ya no espera al más lento). Un fallo de red NO
+      // es una lista vacía: si /mediciones/recientes falla se conserva la caché y se avisa "Sin conexión".
+      // Un 401 en cualquiera avisa una sola vez y detiene las publicaciones que falten.
+      const carga = crearPublicadorCarga({
+        sesionVigente: () => sesion === sesionRef.current,
+        esSesionVencida,
+        alVencer: () => { avisarSesionVencida(); setOffline(true); },
+        alErrorPublicacion: (e) => { console.log('cargarTodo publicar', e?.message); setOffline(true); },
       });
-      setOffline(false);
-      saveLocal(
-        APP_CONFIG.storageKeys.historialCache,
-        limpio.map(({ detecciones, ...rest }) => rest)
-      );
+      const { tarea } = carga;
+      // El dueño de la caché (cognito_sub) sale del perfil; si el perfil falla, del guardado.
+      const pPerfil = getMiPerfil();
+      const subCache = () => pPerfil.then((p) => p?.cognito_sub, () => undefined).then((sub) => sub ?? perfilGuardado?.cognito_sub);
+
+      await Promise.all([
+        tarea(pPerfil, async (perfilNuevo) => {
+          if (!perfilNuevo) return;
+          setPerfil(perfilNuevo);
+          await saveLocal(APP_CONFIG.storageKeys.perfilCache, envolverCache(perfilNuevo.cognito_sub, perfilNuevo));
+        }),
+        tarea(getIndicadores(), async (inds, vigente) => {
+          if (!inds) return;
+          setIndicadoresServidor(inds);
+          const sub = await subCache();
+          if (!vigente()) return;
+          await saveLocal(APP_CONFIG.storageKeys.indicadoresCache, envolverCache(sub, inds));
+        }),
+        tarea(
+          getBloques(),
+          async (lista, vigente) => {
+            if (!Array.isArray(lista)) {
+              setErrorBloques(true);
+              return;
+            }
+            const adaptados = lista.map(adaptarBloque);
+            setBloques(adaptados);
+            setErrorBloques(false);
+            const sub = await subCache();
+            if (!vigente()) return;
+            await saveLocal(APP_CONFIG.storageKeys.bloquesCache, envolverCache(sub, adaptados));
+          },
+          () => setErrorBloques(true)
+        ),
+        tarea(
+          getMedicionesRecientes(undefined, PAGINA_MEDICIONES),
+          async (respMeds) => {
+            const lista = listaDeRespuesta(respMeds);
+            setHayMasMediciones(calcularHayMas(respMeds, PAGINA_MEDICIONES));
+
+            const limpio = marcarCarga(lista.map(({ mascaras, ...rest }) => rest)).sort(
+              (a, z) => new Date(z.timestamp || 0) - new Date(a.timestamp || 0)
+            );
+            setMediciones(limpio);
+            // El detalle abierto recibe las URL nuevas (las que tenía pueden estar por vencer).
+            setDetalle((prev) => {
+              const fresca = prev && limpio.find((m) => m.id_medicion === prev.id_medicion);
+              return fresca ? { ...prev, url_thumbnail: fresca.url_thumbnail, url_imagen: fresca.url_imagen, _urlTs: fresca._urlTs } : prev;
+            });
+            setOffline(carga.falloPublicacion);
+            await saveLocal(
+              APP_CONFIG.storageKeys.historialCache,
+              limpio.map(({ detecciones, ...rest }) => rest)
+            );
+          },
+          (e) => {
+            console.log('cargarTodo mediciones', e?.message);
+            setOffline(true);
+          }
+        ),
+      ]);
     } catch (e) {
+      if (sesion !== sesionRef.current) return;
       console.log('cargarTodo', e?.message);
       setOffline(true);
     } finally {
-      setLoadingData(false);
-      setRefreshing(false);
+      if (sesion === sesionRef.current) {
+        setLoadingData(false);
+        setRefreshing(false);
+      }
     }
   }, []);
 
@@ -672,7 +691,9 @@ function Root() {
     const token = nuevoToken(resumenTokens.current, clave);
     setResumenes((r) => ({ ...r, [clave]: { ...(previo || { dias: [] }), estado: 'cargando', error: '' } }));
     try {
-      const resp = await getResumenDiario(anio, idPunto);
+      // Por punto hay muchas peticiones a la vez (puntos × 2 años): se limitan a pocas simultáneas.
+      const vigente = () => sesion === sesionRef.current && tokenVigente(resumenTokens.current, clave, token);
+      const resp = await (idPunto ? limitadorResumenes.ejecutar(() => getResumenDiario(anio, idPunto), { vigente }) : getResumenDiario(anio, idPunto));
       if (sesion !== sesionRef.current || !tokenVigente(resumenTokens.current, clave, token)) return;
       setResumenes((r) => ({ ...r, [clave]: { estado: 'ok', dias: resp?.dias || [], truncado: Boolean(resp?.truncado), error: '' } }));
     } catch (e) {
@@ -747,6 +768,7 @@ function Root() {
   const onRefresh = () => {
     setRefreshing(true);
     invalidarTokens(resumenTokens.current);
+    limitadorResumenes.descartarObsoletas();
     setResumenes({});
     setExtras([]);
     rangosCargados.current = new Map();
@@ -833,6 +855,7 @@ function Root() {
   // filtrarse al siguiente usuario que inicie sesión en este dispositivo.
   const reiniciarEstadoSesion = () => {
     sesionRef.current += 1;
+    limitadorResumenes.descartarObsoletas();
     setLogged(false);
     setPerfil(null);
     setIndicadoresServidor(null);
@@ -842,6 +865,7 @@ function Root() {
     setPorPunto({});
     setExtras([]);
     invalidarTokens(resumenTokens.current);
+    limitadorResumenes.descartarObsoletas();
     setHistorialLotes({ lista: [], estado: 'idle' });
     rangosCargados.current = new Map();
     setResumenes({});
@@ -890,6 +914,7 @@ function Root() {
   const cerrarSesionLocal = async () => {
     // Invalida la sesión ANTES de esperar: las respuestas tardías ya se descartan.
     sesionRef.current += 1;
+    limitadorResumenes.descartarObsoletas();
     try {
       await signOut();
     } catch {}
@@ -1081,7 +1106,7 @@ function Root() {
         fijarCola([{ ...f, status: 'esperando' }]);
         setScreen('preview');
       } else {
-        const fotosSeleccionadas = await pickPhotos(sel);
+        const fotosSeleccionadas = await pickPhotos({ ...sel, onOmitidas: (n) => avisar('Fotos omitidas', mensajeFotosOmitidas(n)) });
         if (!fotosSeleccionadas || !fotosSeleccionadas.length) return;
         const validas = [];
         for (const item of fotosSeleccionadas) {

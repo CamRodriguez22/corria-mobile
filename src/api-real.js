@@ -31,7 +31,8 @@
 //   clima, punto_info{ id_punto, sede, ciudad, coordenadas{lat,lng} }, latitud_real, longitud_real
 
 import { Platform } from 'react-native';
-import { parteArchivoForm, renombrarPorTandas } from './logic';
+import { File } from 'expo-file-system';
+import { parteArchivoForm, renombrarPorTandas, mensajeErrorSubidaS3 } from './logic';
 import { AWS_CONFIG, APP_CONFIG } from './config';
 import { getIdToken } from './utils';
 
@@ -208,23 +209,35 @@ export async function pedirUploadUrl(contentType = 'image/jpeg', token) {
   });
 }
 
+// La subida a S3 puede tardar más que una petición normal (foto grande, red móvil lenta): 120 s.
+const TIMEOUT_S3_MS = 120000;
+
 export async function subirFotoAS3({ url, fields }, uri) {
   const form = new FormData();
   Object.entries(fields).forEach(([k, v]) => form.append(k, v));
-  // S3 exige que `file` sea el ÚLTIMO campo. En web debe ser un Blob con nombre.
+  // S3 exige que `file` sea el ÚLTIMO campo. En web debe ser un Blob con nombre; en nativo, un
+  // objeto con name/type/bytes() (el fetch de Expo SDK 57 no acepta {uri,name,type}).
   const parte = await parteArchivoForm({
     uri,
     type: fields['Content-Type'] || 'image/jpeg',
     esWeb: Platform.OS === 'web',
     fetchFn: fetch,
+    crearArchivo: (u) => new File(u),
   });
   if (parte.nombre) form.append('file', parte.valor, parte.nombre);
   else form.append('file', parte.valor);
 
-  const res = await fetch(url, {
-    method: 'POST',
-    body: form,
-  });
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_S3_MS);
+  let res;
+  try {
+    res = await fetch(url, { method: 'POST', body: form, signal: ctrl.signal });
+  } catch (e) {
+    console.log('subirFotoAS3', e?.name, e?.message);
+    throw new Error(mensajeErrorSubidaS3(e), { cause: e });
+  } finally {
+    clearTimeout(t);
+  }
   if (!res.ok) {
     throw new Error(`Error al subir la imagen al almacenamiento (${res.status}).`);
   }

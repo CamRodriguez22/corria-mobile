@@ -86,3 +86,28 @@ test('puntoDeTendencia: el elegido, si no el de atención, si no el primero; nul
   assert.equal(puntoDeTendencia(null, undefined, claves), 'C');
   assert.equal(puntoDeTendencia('B', 'C', []), null);
 });
+
+
+import { solicitudesResumenPuntos } from '../src/puntos.js';
+
+test('point summaries request the current year for all points before older years', () => {
+  const years = Object.freeze(['2025', '2026']);
+  const points = Object.freeze(['p1', 'p2']);
+  assert.deepEqual(solicitudesResumenPuntos(years, points, true), [
+    { anio: '2026', opciones: { idPunto: 'p1', forzar: true } },
+    { anio: '2026', opciones: { idPunto: 'p2', forzar: true } },
+    { anio: '2025', opciones: { idPunto: 'p1', forzar: true } },
+    { anio: '2025', opciones: { idPunto: 'p2', forzar: true } },
+  ]);
+  assert.deepEqual(years, ['2025', '2026']);
+  assert.deepEqual(points, ['p1', 'p2']);
+});
+
+test('point summary scheduling handles empty inputs and preserves refresh intent', () => {
+  assert.deepEqual(solicitudesResumenPuntos(), []);
+  assert.deepEqual(solicitudesResumenPuntos(['2026'], []), []);
+  assert.deepEqual(solicitudesResumenPuntos([], ['p1']), []);
+  assert.deepEqual(solicitudesResumenPuntos(['2026'], ['p1']), [
+    { anio: '2026', opciones: { idPunto: 'p1', forzar: false } },
+  ]);
+});

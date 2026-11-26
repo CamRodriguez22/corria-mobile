@@ -7,7 +7,6 @@ import {
   Pressable,
   Animated,
   Easing,
-  Image,
   ActivityIndicator,
   ScrollView,
   Platform,
@@ -16,10 +15,11 @@ import {
   StyleSheet,
   AccessibilityInfo,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Text, TextInput as RNTextInput } from './Typography';
 import { TOKENS, NIVELES, severidad, num } from './DesignTokens';
 import { nivelDeMedicion } from './niveles';
-import { miniaturaDe } from './miniaturas';
+import { miniaturaDe, claveCacheMiniatura } from './miniaturas';
 import { formatoPct } from './fechas';
 import { ICONO_SOBRE_NIVEL } from './paleta';
 import {
@@ -364,7 +364,13 @@ export const StatCard = ({ value, label, color = TOKENS.colors.text }) => (
 // ─────────────────────────────────────────────────────────────
 const COLOR_MARCADOR = '#e6dac4';
 
-export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
+// expo-image cachea en disco por `cacheKey` (estable por medición) y no por la URL prefirmada, que cambia en cada carga.
+// El resizeMode de RN se traduce a su contentFit. `recyclingKey` evita que una celda reciclada muestre un instante la foto anterior.
+const ajusteDe = (resizeMode) => (resizeMode === 'stretch' ? 'fill' : resizeMode || 'cover');
+const fuenteImagen = (uri, cacheKey) => (cacheKey ? { uri, cacheKey } : { uri });
+const ImagenAnimada = Animated.createAnimatedComponent(Image);
+
+export const Foto = ({ uri, cacheKey = null, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
   const [estado, setEstado] = useState(uri ? 'cargando' : 'vacia');
   const reducido = useReducedMotion();
   const pulso = useRef(new Animated.Value(0)).current;
@@ -393,9 +399,11 @@ export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24, onCargad
       )}
       {!!uri && estado !== 'error' && (
         <Image
-          source={{ uri }}
+          source={fuenteImagen(uri, cacheKey)}
           style={StyleSheet.absoluteFill}
-          resizeMode={resizeMode}
+          contentFit={ajusteDe(resizeMode)}
+          cachePolicy="memory-disk"
+          recyclingKey={cacheKey || uri}
           onLoad={() => {
             setEstado('lista');
             onCargada?.();
@@ -418,7 +426,7 @@ export const Foto = ({ uri, style, resizeMode = 'cover', iconSize = 24, onCargad
 
 // Foto grande con la miniatura (ya en caché) de marcador: se ve al instante y la imagen completa aparece con un
 // fundido cuando termina de cargar. Si la completa falla, queda la miniatura. Sin miniatura distinta, es `Foto`.
-export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
+export const FotoProgresiva = ({ uri, uriMini, cacheKey = null, cacheKeyMini = null, style, resizeMode = 'cover', iconSize = 24, onCargada, onFallo }) => {
   const reducido = useReducedMotion();
   const fundido = useRef(new Animated.Value(0)).current;
   const [fallo, setFallo] = useState(false);
@@ -427,15 +435,17 @@ export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', icon
     fundido.setValue(0);
     setFallo(false);
   }, [uri, fundido]);
-  if (!conMini) return <Foto uri={uri} style={style} resizeMode={resizeMode} iconSize={iconSize} onCargada={onCargada} onFallo={onFallo} />;
+  if (!conMini) return <Foto uri={uri} cacheKey={cacheKey} style={style} resizeMode={resizeMode} iconSize={iconSize} onCargada={onCargada} onFallo={onFallo} />;
   return (
     <View style={[{ overflow: 'hidden' }, style]}>
-      <Foto uri={uriMini} style={StyleSheet.absoluteFill} resizeMode={resizeMode} iconSize={iconSize} />
+      <Foto uri={uriMini} cacheKey={cacheKeyMini} style={StyleSheet.absoluteFill} resizeMode={resizeMode} iconSize={iconSize} />
       {!!uri && !fallo && (
-        <Animated.Image
-          source={{ uri }}
+        <ImagenAnimada
+          source={fuenteImagen(uri, cacheKey)}
           style={[StyleSheet.absoluteFill, { opacity: fundido }]}
-          resizeMode={resizeMode}
+          contentFit={ajusteDe(resizeMode)}
+          cachePolicy="memory-disk"
+          recyclingKey={cacheKey || uri}
           onLoad={() => {
             onCargada?.();
             if (reducido) fundido.setValue(1);
@@ -452,8 +462,8 @@ export const FotoProgresiva = ({ uri, uriMini, style, resizeMode = 'cover', icon
   );
 };
 
-export const Thumb = ({ uri, size = 52, radius = 14, style }) => (
-  <Foto uri={uri} style={[{ width: size, height: size, borderRadius: radius }, style]} iconSize={Math.round(size * 0.4)} />
+export const Thumb = ({ uri, cacheKey = null, size = 52, radius = 14, style }) => (
+  <Foto uri={uri} cacheKey={cacheKey} style={[{ width: size, height: size, borderRadius: radius }, style]} iconSize={Math.round(size * 0.4)} />
 );
 
 // ─────────────────────────────────────────────────────────────
@@ -480,7 +490,7 @@ export const MeasurementRow = ({ medicion, title, subtitle, onPress }) => {
         },
       ]}
     >
-      <Thumb uri={miniaturaDe(medicion)} />
+      <Thumb uri={miniaturaDe(medicion)} cacheKey={claveCacheMiniatura(medicion)} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: TOKENS.fontSizes.h5, fontWeight: '700', color: TOKENS.colors.text }}>
           {title}

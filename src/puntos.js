@@ -108,3 +108,10 @@ export function elegirEstadoPunto({ resumenes = [], local = null, hayMas = false
   }
   return { estado: local, parcial: Boolean(local) && Boolean(hayMas), fuente: 'local' };
 }
+
+// Years arrive oldest first; enqueue every point's current year before historical years.
+export function solicitudesResumenPuntos(anios = [], puntos = [], forzar = false) {
+  return [...anios].reverse().flatMap((anio) =>
+    puntos.map((idPunto) => ({ anio, opciones: { idPunto, forzar } }))
+  );
+}

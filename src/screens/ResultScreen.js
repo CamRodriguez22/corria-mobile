@@ -7,7 +7,7 @@ import { TOKENS } from '../DesignTokens';
 import { IconCheck, IconPlus, IconMinus, IconHome } from '../Icons';
 import { textoResumenCola } from '../logic';
 import { construirMosaico, dividirEnFilas } from '../galeria';
-import { imagenDe } from '../miniaturas';
+import { imagenDe, claveCacheImagen } from '../miniaturas';
 
 const PAD = TOKENS.spacing.lg;
 
@@ -101,7 +101,7 @@ export default function ResultScreen({
               </View>
             )}
 
-            <Foto uri={uri} style={{ width: width - PAD * 2, height: (width - PAD * 2) * 0.58, borderRadius: TOKENS.radius.lg }} iconSize={40} />
+            <Foto uri={uri} cacheKey={claveCacheImagen(medicion)} style={{ width: width - PAD * 2, height: (width - PAD * 2) * 0.58, borderRadius: TOKENS.radius.lg }} iconSize={40} />
 
             <ResultCard medicion={medicion} ubicacion={`Punto ${bloqueSel}`} loteNombre={medicion.lote_nombre || loteNombre} />
 

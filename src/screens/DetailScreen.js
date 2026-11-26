@@ -8,7 +8,7 @@ import FotoConMascara from '../FotoConMascara';
 import { hayMascara, aspectoParaMascara, uriParaMedirAspecto } from '../mascara';
 import { TOKENS } from '../DesignTokens';
 import { IconShare, IconMoreVertical, IconEdit, IconTrash, IconDownload } from '../Icons';
-import { imagenDe, miniaturaDe } from '../miniaturas';
+import { imagenDe, miniaturaDe, claveCacheImagen, claveCacheMiniatura } from '../miniaturas';
 import { fechaHoraLarga, fechaHoraCorta } from '../fechas';
 import { plural } from '../fechas';
 
@@ -130,7 +130,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
       <Header title={titulo} subtitle={subtitulo} onBack={onBack} right={acciones} />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={{ paddingHorizontal: 12, gap: 10 }}>
-          <FotoConMascara uri={uri} uriMini={uriMini} medicion={medicion} ancho={anchoFoto} alto={altoFoto} aspecto={aspecto} mostrarMascara={conMascara && vista === 'corrosion'} />
+          <FotoConMascara uri={uri} uriMini={uriMini} cacheKey={claveCacheImagen(medicion)} cacheKeyMini={claveCacheMiniatura(medicion)} medicion={medicion} ancho={anchoFoto} alto={altoFoto} aspecto={aspecto} mostrarMascara={conMascara && vista === 'corrosion'} />
           {conMascara && (
             <View accessibilityLabel="Vista de la foto">
               <Segmented
@@ -205,6 +205,7 @@ export default function DetailScreen({ medicion, puntoNombre, empresa, obs, pued
           <FotoConMascara
             key={`${uri}|${intentoCaptura}`}
             uri={uri}
+            cacheKey={claveCacheImagen(medicion)}
             medicion={medicion}
             ancho={anchoFoto}
             alto={Math.round(anchoFoto / aspectoReal)}
